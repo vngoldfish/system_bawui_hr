@@ -1,0 +1,388 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Department model
+model Department {
+  id          String   @id @default(cuid())
+  name        String
+  nameKana    String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employees Employee[]
+
+  @@map("departments")
+}
+
+// Position model
+model Position {
+  id          String   @id @default(cuid())
+  name        String
+  nameKana    String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employees Employee[]
+
+  @@map("positions")
+}
+
+// ContractType model
+model ContractType {
+  id                 String   @id @default(cuid())
+  name               String
+  nameKana           String
+  description        String?
+  defaultEndDateType String   @default("none")
+  defaultSalaryType  String   @default("月給")
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  employees         Employee[]
+  employeeContracts EmployeeContract[]
+
+  @@map("contract_types")
+}
+
+// Employee-specific contract schedule model
+model EmployeeContract {
+  id                          String       @id @default(cuid())
+  employeeId                  String
+  employee                    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  contractTypeId              String
+  contractType                ContractType @relation(fields: [contractTypeId], references: [id])
+  name                        String
+  startDate                   DateTime
+  endDate                     DateTime?
+  workDays                    Json         @default("[1,2,3,4,5]")
+  standardHoursPerDay         Float        @default(8)
+  defaultCheckIn              String       @default("08:00")
+  defaultCheckOut             String       @default("17:00")
+  defaultBreakStart           String       @default("12:00")
+  defaultBreakEnd             String       @default("13:00")
+  holidayWorkCountsAsOvertime Boolean      @default(true)
+  isActive                    Boolean      @default(true)
+  notes                       String       @default("")
+  createdAt                   DateTime     @default(now())
+  updatedAt                   DateTime     @updatedAt
+
+  @@index([employeeId, startDate, endDate])
+  @@index([contractTypeId])
+  @@map("employee_contracts")
+}
+
+// Company holiday / red day calendar
+model Holiday {
+  id            String   @id @default(cuid())
+  date          DateTime @unique
+  name          String
+  type          String   @default("NATIONAL")
+  isPaidHoliday Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  notes         String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([date])
+  @@index([isActive])
+  @@map("holidays")
+}
+
+// Employee model
+model Employee {
+  id            String         @id @default(cuid())
+  employeeCode  String         @unique
+  firstName     String
+  lastName      String
+  firstNameKana String
+  lastNameKana  String
+  email         String         @unique
+  phone         String
+  birthDate     DateTime?
+  avatar        String?        @default("")
+  departmentId  String
+  department    Department     @relation(fields: [departmentId], references: [id])
+  positionId    String
+  position      Position       @relation(fields: [positionId], references: [id])
+  hireDate      DateTime
+  salary        Float
+  status        EmployeeStatus @default(ACTIVE)
+  role          String         @default("EMPLOYEE")
+  password      String         @default("")
+
+  // Nationality & residence
+  nationality            String    @default("日本")
+  residenceStatus        String?
+  residenceCardNumber    String?
+  residenceCardIssueDate DateTime?
+  residenceExpiry        DateTime?
+  workRestriction        String?
+
+  // Contract
+  contractTypeId      String
+  contractType        ContractType @relation(fields: [contractTypeId], references: [id])
+  contractStartDate   DateTime?
+  contractEndDate     DateTime?
+  contractEndDateType String       @default("none")
+
+  // Salary details
+  salaryType String @default("月給")
+  hourlyRate Float  @default(0)
+  dailyRate  Float  @default(0)
+  benefits   Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  attendanceRecords    AttendanceRecord[]
+  payrollRecords       PayrollRecord[]
+  overtimeRequests     OvertimeRequest[]
+  leaveRequests        LeaveRequest[]
+  approvedOvertime     OvertimeRequest[]      @relation("OvertimeApproval")
+  approvedLeave        LeaveRequest[]         @relation("LeaveApproval")
+  employeeContracts    EmployeeContract[]
+  dependents           Dependent[]
+  education            Education[]
+  certifications       Certification[]
+  residenceCardHistory ResidenceCardHistory[]
+  sentAnnouncements    Announcement[]         @relation("SentAnnouncements")
+
+  @@index([departmentId])
+  @@index([positionId])
+  @@index([contractTypeId])
+  @@index([status])
+  @@index([lastName, firstName])
+  @@index([lastNameKana, firstNameKana])
+  @@map("employees")
+}
+
+// Dependent model
+model Dependent {
+  id           String    @id @default(cuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  name         String
+  relationship String
+  birthDate    DateTime?
+  gender       String?
+  cohabitation String    @default("同居")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("dependents")
+}
+
+// Education model
+model Education {
+  id             String   @id @default(cuid())
+  employeeId     String
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  school         String
+  degree         String?
+  major          String?
+  graduationYear String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("education_records")
+}
+
+// Certification model
+model Certification {
+  id           String    @id @default(cuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  name         String
+  issuer       String?
+  acquiredDate DateTime?
+  expiryDate   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("certifications")
+}
+
+// Residence Card History model
+model ResidenceCardHistory {
+  id                     String    @id @default(cuid())
+  employeeId             String
+  employee               Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  residenceStatus        String
+  residenceCardNumber    String?
+  residenceCardIssueDate DateTime?
+  residenceExpiry        DateTime?
+  workRestriction        String?
+  updatedAt              DateTime  @default(now())
+
+  @@map("residence_card_history")
+}
+
+// Attendance Record model
+model AttendanceRecord {
+  id            String           @id @default(cuid())
+  employeeId    String
+  employee      Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date          DateTime
+  checkIn       DateTime?
+  checkOut      DateTime?
+  breakStart    DateTime?
+  breakEnd      DateTime?
+  overtimeHours Float            @default(0)
+  notes         String           @default("")
+  status        AttendanceStatus @default(PRESENT)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([employeeId, date])
+  @@map("attendance_records")
+}
+
+// Payroll Record model
+model PayrollRecord {
+  id          String        @id @default(cuid())
+  employeeId  String
+  employee    Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  month       String // YYYY-MM format
+  baseSalary  Float
+  overtimePay Float         @default(0)
+  bonus       Float         @default(0)
+  deductions  Float         @default(0)
+  tax         Float         @default(0)
+  insurance   Float         @default(0)
+  netSalary   Float
+  paymentDate DateTime
+  status      PayrollStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([employeeId, month])
+  @@map("payroll_records")
+}
+
+// Overtime Request model
+model OvertimeRequest {
+  id         String        @id @default(cuid())
+  employeeId String
+  employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime
+  startTime  String
+  endTime    String
+  reason     String
+  status     RequestStatus @default(PENDING)
+  approvedBy String?
+  approver   Employee?     @relation("OvertimeApproval", fields: [approvedBy], references: [id])
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@map("overtime_requests")
+}
+
+// Leave Request model
+model LeaveRequest {
+  id         String        @id @default(cuid())
+  employeeId String
+  employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  startDate  DateTime
+  endDate    DateTime
+  type       LeaveType
+  reason     String
+  status     RequestStatus @default(PENDING)
+  approvedBy String?
+  approver   Employee?     @relation("LeaveApproval", fields: [approvedBy], references: [id])
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@map("leave_requests")
+}
+
+// Enums
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EARLY_LEAVE
+  HOLIDAY
+}
+
+enum PayrollStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  PERSONAL
+  OTHER
+}
+
+model RolePermission {
+  id         String   @id @default(cuid())
+  role       String
+  permission String
+  createdAt  DateTime @default(now())
+
+  @@unique([role, permission])
+  @@map("role_permissions")
+}
+
+model Permission {
+  key         String   @id
+  name        String
+  category    String
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@map("permissions")
+}
+
+model Announcement {
+  id             String   @id @default(cuid())
+  title          String
+  content        String
+  type           String   @default("info") // info, urgent, general, warning
+  targetType     String   @default("ALL")  // ALL, DEPARTMENT, POSITION, EMPLOYEE
+  targetId       String?                   // ID of target department, position or employee
+  showSenderName Boolean  @default(true)
+  senderId       String
+  sender         Employee @relation("SentAnnouncements", fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([targetType, targetId])
+  @@map("announcements")
+}
+
+model ReminderTemplate {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reminder_templates")
+}
