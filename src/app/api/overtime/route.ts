@@ -16,9 +16,11 @@ export async function GET(request: NextRequest) {
     const employeeId = searchParams.get('employeeId');
     const status = searchParams.get('status');
 
-    let where: any = {};
+    const where: any = {};
 
-    if (user.role === 'EMPLOYEE') {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployeeMode = user.role === 'EMPLOYEE' || viewMode === 'employee';
+    if (isEmployeeMode) {
       where.employeeId = user.id;
     } else if (employeeId) {
       where.employeeId = employeeId;
@@ -52,7 +54,9 @@ export async function POST(request: NextRequest) {
     }
     const data = await request.json();
 
-    const targetEmployeeId = user.role === 'EMPLOYEE' ? user.id : data.employeeId;
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployeeMode = user.role === 'EMPLOYEE' || viewMode === 'employee';
+    const targetEmployeeId = isEmployeeMode ? user.id : data.employeeId;
 
     if (!targetEmployeeId) {
       return errorResponse('従業員IDが指定されていません。', 400);

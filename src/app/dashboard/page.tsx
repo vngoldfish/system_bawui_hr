@@ -30,7 +30,8 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  const isEmployee = dbUser.role === 'EMPLOYEE';
+  const viewMode = cookieStore.get('view_mode')?.value || 'admin';
+  const isEmployee = dbUser.role === 'EMPLOYEE' || viewMode === 'employee';
 
   if (isEmployee) {
     // Fetch only the logged-in employee's record

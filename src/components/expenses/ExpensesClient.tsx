@@ -1,4 +1,5 @@
 'use client';
+import { useI18n } from '@/lib/i18n';
 
 import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
@@ -21,18 +22,20 @@ interface ExpenseClaim {
   memo: string;
 }
 
-const categories = [
-  { value: 'transport', label: '交通費', icon: '🚃' },
-  { value: 'accommodation', label: '宿泊費', icon: '🏨' },
-  { value: 'meal', label: '会議費・飲食費', icon: '🍽️' },
-  { value: 'communication', label: '通信費', icon: '📱' },
-  { value: 'supplies', label: '事務用品', icon: '📎' },
-  { value: 'entertainment', label: '接待費', icon: '🤝' },
-  { value: 'training', label: '研修費', icon: '📚' },
-  { value: 'other', label: 'その他', icon: '📦' },
-];
+
 
 export default function ExpensesClient({ employees }: { employees: Employee[] }) {
+  const { t } = useI18n();
+  const categories = [
+    { value: 'transport', label: t('expenses.categories.transport'), icon: '🚃' },
+    { value: 'accommodation', label: t('expenses.categories.accommodation'), icon: '🏨' },
+    { value: 'meal', label: t('expenses.categories.meal'), icon: '🍽️' },
+    { value: 'communication', label: t('expenses.categories.communication'), icon: '📱' },
+    { value: 'supplies', label: t('expenses.categories.supplies'), icon: '📎' },
+    { value: 'entertainment', label: t('expenses.categories.entertainment'), icon: '🤝' },
+    { value: 'training', label: t('expenses.categories.training'), icon: '📚' },
+    { value: 'other', label: t('expenses.categories.other'), icon: '📦' },
+  ];
   const [claims, setClaims] = useState<ExpenseClaim[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [formEmp, setFormEmp] = useState('');
@@ -68,7 +71,7 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
   };
 
   const handleApprove = (id: string) => {
-    setClaims(prev => prev.map(c => c.id === id ? { ...c, status: 'approved', approvedBy: '管理者' } : c));
+    setClaims(prev => prev.map(c => c.id === id ? { ...c, status: 'approved', approvedBy: t('expenses.adminApprover') } : c));
   };
 
   const handleReject = (id: string) => {
@@ -101,9 +104,9 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
     return 'bg-yellow-100 text-yellow-700';
   };
   const statusLabel = (s: string) => {
-    if (s === 'approved') return '承認済み';
-    if (s === 'rejected') return '却下';
-    return '承認待ち';
+    if (s === 'approved') return t('common.approved');
+    if (s === 'rejected') return t('common.rejected');
+    return t('common.pending');
   };
 
   return (
@@ -111,11 +114,11 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: '申請件数', value: `${stats.count}件`, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: '合計金額', value: `¥${stats.total.toLocaleString()}`, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: '承認待ち', value: `${stats.pending}件`, color: 'text-yellow-600', bg: 'bg-yellow-50' },
-          { label: '承認済み', value: `${stats.approved}件`, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: '却下', value: `${stats.rejected}件`, color: 'text-red-600', bg: 'bg-red-50' },
+          { label: t('expenses.statsCount'), value: `${stats.count}${t('common.caseUnit')}`, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: t('expenses.statsTotal'), value: `¥${stats.total.toLocaleString()}`, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: t('common.pending'), value: `${stats.pending}${t('common.caseUnit')}`, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+          { label: t('common.approved'), value: `${stats.approved}${t('common.caseUnit')}`, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: t('common.rejected'), value: `${stats.rejected}${t('common.caseUnit')}`, color: 'text-red-600', bg: 'bg-red-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-200`}>
             <p className="text-xs text-slate-500 mb-1">{s.label}</p>
@@ -127,13 +130,13 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
       {/* Month & Actions */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex gap-3 items-center">
-          <label className="text-sm font-medium text-slate-600">対象月:</label>
+          <label className="text-sm font-medium text-slate-600">{t('shift.month')}:</label>
           <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
         </div>
         <button onClick={() => setShowForm(true)}
           className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-          経費申請
+          {t('expenses.claim')}
         </button>
       </div>
 
@@ -143,27 +146,27 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={e => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-800">経費申請</h3>
+                <h3 className="text-lg font-bold text-slate-800">{t('expenses.claim')}</h3>
                 <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
               </div>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-slate-600">申請者</label>
+                    <label className="text-sm font-medium text-slate-600">{t('expenses.applicant')}</label>
                     <select value={formEmp} onChange={e => setFormEmp(e.target.value)}
                       className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm">
-                      <option value="">選択</option>
+                      <option value="">{t('common.select')}</option>
                       {employees.map(e => <option key={e.id} value={e.id}>{e.lastName} {e.firstName}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-600">日付</label>
+                    <label className="text-sm font-medium text-slate-600">{t('common.date')}</label>
                     <input type="date" value={formDate} onChange={e => setFormDate(e.target.value)}
                       className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-600">カテゴリ</label>
+                  <label className="text-sm font-medium text-slate-600">{t('expenses.category')}</label>
                   <div className="grid grid-cols-4 gap-2 mt-2">
                     {categories.map(c => (
                       <button key={c.value} onClick={() => setFormCategory(c.value)}
@@ -175,31 +178,31 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-600">金額</label>
+                  <label className="text-sm font-medium text-slate-600">{t('expenses.amount')}</label>
                   <input type="number" value={formAmount} onChange={e => setFormAmount(e.target.value)}
                     className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="10000" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-600">内容</label>
+                  <label className="text-sm font-medium text-slate-600">{t('expenses.desc')}</label>
                   <input type="text" value={formDesc} onChange={e => setFormDesc(e.target.value)}
-                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="東京→大阪 出張交通費" />
+                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder={t('expenses.descPlaceholder')} />
                 </div>
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={formReceipt} onChange={e => setFormReceipt(e.target.checked)} className="rounded border-slate-300" />
-                    <span className="text-sm text-slate-600">領収書あり</span>
+                    <span className="text-sm text-slate-600">{t('expenses.receiptIncluded')}</span>
                   </label>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-600">メモ</label>
+                  <label className="text-sm font-medium text-slate-600">{t('expenses.memo')}</label>
                   <textarea value={formMemo} onChange={e => setFormMemo(e.target.value)} rows={2}
                     className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm resize-none" />
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
-                <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 text-sm">キャンセル</button>
+                <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 text-sm">{t('common.cancel')}</button>
                 <button onClick={handleSubmit} disabled={!formEmp || !formCategory || !formAmount}
-                  className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50">申請</button>
+                  className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50">{t('expenses.claim')}</button>
               </div>
             </div>
           </div>
@@ -207,21 +210,21 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
       )}
 
       {/* Claims Table */}
-      <Card title="経費申請一覧">
+      <Card title={t('expenses.title')}>
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <input type="text" placeholder="名前・内容で検索..." value={search} onChange={e => setSearch(e.target.value)}
+            <input type="text" placeholder={t('expenses.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm" />
           </div>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
-            <option value="">全ての状態</option>
-            <option value="pending">承認待ち</option>
-            <option value="approved">承認済み</option>
-            <option value="rejected">却下</option>
+            <option value="">{t('common.allStatus')}</option>
+            <option value="pending">{t('common.pending')}</option>
+            <option value="approved">{t('common.approved')}</option>
+            <option value="rejected">{t('common.rejected')}</option>
           </select>
         </div>
 
@@ -239,19 +242,19 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
             </colgroup>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">申請者</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">日付</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">カテゴリ</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">内容</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">金額</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">領収書</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">状態</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">操作</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('expenses.applicant')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('common.date')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('expenses.category')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('expenses.desc')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('expenses.amount')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('expenses.receipt')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('common.status')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-400">経費申請がありません</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-400">{t('common.noData')}</td></tr>
               ) : filtered.map(c => {
                 const emp = employees.find(e => e.id === c.employeeId);
                 const cat = categories.find(ct => ct.value === c.category);
@@ -271,8 +274,8 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
                     <td className="px-4 py-3 text-center">
                       {c.status === 'pending' && (
                         <div className="flex gap-1 justify-center">
-                          <button onClick={() => handleApprove(c.id)} className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100">承認</button>
-                          <button onClick={() => handleReject(c.id)} className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100">却下</button>
+                          <button onClick={() => handleApprove(c.id)} className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100">{t('leave.approveBtn')}</button>
+                          <button onClick={() => handleReject(c.id)} className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100">{t('leave.rejectBtn')}</button>
                         </div>
                       )}
                     </td>
@@ -285,7 +288,7 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
       </Card>
 
       {/* Category Summary */}
-      <Card title="カテゴリ別集計">
+      <Card title={t('expenses.categorySummary')}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {categories.map(cat => {
             const total = claims.filter(c => c.category === cat.value && c.date.startsWith(selectedMonth)).reduce((s, c) => s + c.amount, 0);

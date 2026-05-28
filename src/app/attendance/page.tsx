@@ -32,7 +32,8 @@ export default async function AttendancePage() {
     redirect('/login');
   }
 
-  const isEmployee = dbUser.role === 'EMPLOYEE';
+  const viewMode = cookieStore.get('view_mode')?.value || 'admin';
+  const isEmployee = dbUser.role === 'EMPLOYEE' || viewMode === 'employee';
 
   let employees: any[] = [];
   let records: any[] = [];
@@ -62,7 +63,7 @@ export default async function AttendancePage() {
 
   return (
     <DashboardLayout title="勤怠管理" subtitle={isEmployee ? `${user.lastName} ${user.firstName} さんの出退勤管理` : "従業員の出退勤・残業管理"}>
-      <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]">読み込み中...</div>}>
+      <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]">Loading...</div>}>
         <AttendanceClient 
           initialRecords={records} 
           employees={employees} 

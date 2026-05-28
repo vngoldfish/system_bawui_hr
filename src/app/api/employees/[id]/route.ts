@@ -31,7 +31,9 @@ export async function GET(
     const { id } = await params;
     
     // Regular employees can only view their own details
-    if (user.role === 'EMPLOYEE' && user.id !== id) {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployeeMode = user.role === 'EMPLOYEE' || viewMode === 'employee';
+    if (isEmployeeMode && user.id !== id) {
       return errorResponse('Forbidden', 403);
     }
     const employee = await prisma.employee.findUnique({
@@ -59,7 +61,8 @@ export async function PUT(
     if (!user) {
       return errorResponse('Unauthorized', 401);
     }
-    if (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER') {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    if (viewMode === 'employee' || (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER')) {
       return errorResponse('Forbidden', 403);
     }
 
@@ -197,7 +200,8 @@ export async function DELETE(
     if (!user) {
       return errorResponse('Unauthorized', 401);
     }
-    if (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER') {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    if (viewMode === 'employee' || (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER')) {
       return errorResponse('Forbidden', 403);
     }
 

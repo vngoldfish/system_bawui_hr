@@ -1,4 +1,5 @@
 'use client';
+import { useI18n } from '@/lib/i18n';
 
 import { useMemo, useState, useEffect } from 'react';
 import Card from '@/components/common/Card';
@@ -76,7 +77,7 @@ interface LeaveRequest {
 }
 
 // Check expiry status (Urgency Level)
-function getExpiryStatus(dateStr: string | null) {
+function getExpiryStatus(dateStr: string | null, t?: any) {
   if (!dateStr) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -84,16 +85,29 @@ function getExpiryStatus(dateStr: string | null) {
   d.setHours(0, 0, 0, 0);
   const daysLeft = Math.ceil((d.getTime() - today.getTime()) / 86400000);
 
+  const getLabel = (level: string) => {
+    if (!t) {
+      if (level === 'expired') return `Expired (${Math.abs(daysLeft)} days ago)`;
+      if (level === 'urgent') return `Urgent (${daysLeft} days left)`;
+      if (level === 'warning') return `Warning (${daysLeft} days left)`;
+      return `Safe (${daysLeft} days left)`;
+    }
+    if (level === 'expired') return t('dashboard.expiryStatusExpired').replace('{days}', String(Math.abs(daysLeft)));
+    if (level === 'urgent') return t('dashboard.expiryStatusUrgent').replace('{days}', String(daysLeft));
+    if (level === 'warning') return t('dashboard.expiryStatusWarning').replace('{days}', String(daysLeft));
+    return t('dashboard.expiryStatusSafe').replace('{days}', String(daysLeft));
+  };
+
   if (daysLeft < 0) {
-    return { level: 'expired', daysLeft, label: `期限切れ (${Math.abs(daysLeft)}日経過)`, colorClass: 'text-red-700 bg-red-50 border-red-200', pct: 0 };
+    return { level: 'expired', daysLeft, label: getLabel('expired'), colorClass: 'text-red-700 bg-red-50 border-red-200', pct: 0 };
   }
   if (daysLeft <= 30) {
-    return { level: 'urgent', daysLeft, label: `あと ${daysLeft} 日 (切迫)`, colorClass: 'text-orange-700 bg-orange-50 border-orange-200', pct: Math.max(0, (daysLeft / 30) * 100) };
+    return { level: 'urgent', daysLeft, label: getLabel('urgent'), colorClass: 'text-orange-700 bg-orange-50 border-orange-200', pct: Math.max(0, (daysLeft / 30) * 100) };
   }
   if (daysLeft <= 90) {
-    return { level: 'warning', daysLeft, label: `あと ${daysLeft} 日 (注意)`, colorClass: 'text-amber-700 bg-amber-50 border-amber-200', pct: Math.max(0, (daysLeft / 90) * 100) };
+    return { level: 'warning', daysLeft, label: getLabel('warning'), colorClass: 'text-amber-700 bg-amber-50 border-amber-200', pct: Math.max(0, (daysLeft / 90) * 100) };
   }
-  return { level: 'safe', daysLeft, label: `有効 (残り ${daysLeft} 日)`, colorClass: 'text-green-700 bg-green-50 border-green-200', pct: 100 };
+  return { level: 'safe', daysLeft, label: getLabel('safe'), colorClass: 'text-green-700 bg-green-50 border-green-200', pct: 100 };
 }
 
 export default function DashboardClient({
@@ -114,8 +128,10 @@ export default function DashboardClient({
     role: string;
   };
 }) {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'attendance' | 'overtime' | 'compliance'>('attendance');
   const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'present' | 'late' | 'absent' | 'leave' | 'unregistered'>('all');
+
   const [showForbiddenAlert, setShowForbiddenAlert] = useState(false);
   const [user, setUser] = useState<LoggedUser | null>(null);
 
@@ -237,7 +253,7 @@ export default function DashboardClient({
       });
       const body = await res.json();
       if (!res.ok) {
-        throw new Error(body.error || '打刻に失敗しました。');
+        throw new Error(body.error || t('dashboard.punchError'));
       }
 
       if (body.success && body.data) {
@@ -261,11 +277,10 @@ export default function DashboardClient({
           checkOut: formatTime(data.checkOut),
         });
 
-        const labels = { checkIn: '出勤', breakStart: '休憩開始', breakEnd: '休憩終了', checkOut: '退勤' };
-        setPunchSuccess(`${labels[action]}の打刻が完了しました！`);
+        setPunchSuccess(t('dashboard.punchSuccess'));
       }
     } catch (err: any) {
-      setPunchError(err.message || '打刻中にエラーが発生しました。');
+      setPunchError(err.message || t('dashboard.punchErrorOccurred'));
     } finally {
       setPunchLoading(false);
     }
@@ -308,7 +323,7 @@ export default function DashboardClient({
       if (emp.status === 'ON_LEAVE' || leaveEmpIds.has(emp.id)) {
         rollStatus = 'LEAVE';
         const leaveReq = activeLeaves.find(l => l.employeeId === emp.id);
-        note = leaveReq ? `休暇中 (${leaveReq.reason})` : '休職中';
+        note = leaveReq ? t('dashboard.onLeaveWithReason').replace('{reason}', leaveReq.reason) : t('dashboard.onLeaveStatus');
       } else if (attRecord) {
         if (attRecord.status === 'PRESENT') rollStatus = 'PRESENT';
         else if (attRecord.status === 'LATE') rollStatus = 'LATE';
@@ -318,7 +333,7 @@ export default function DashboardClient({
         note = attRecord.note || '';
       } else if (emp.status === 'INACTIVE') {
         rollStatus = 'UNREGISTERED';
-        note = '退職済';
+        note = t('dashboard.resignedStatus');
       }
 
       return {
@@ -393,16 +408,16 @@ export default function DashboardClient({
     const monthlyOTLimitAlerts = employeeOvertime.filter(e => e.monthlyOT >= 20); // 20h alert, 45h limit warning in Japan
 
     // Compliance & Visa Expire Alerts
-    const foreignEmployees = employees.filter(e => e.status !== 'INACTIVE' && e.nationality && e.nationality !== '日本');
+    const foreignEmployees = employees.filter(e => e.status !== 'INACTIVE' && e.nationality && e.nationality !== '\u65e5\u672c');
     const visaAlerts = foreignEmployees
-      .map(e => ({ ...e, expiry: getExpiryStatus(e.residenceExpiry) }))
+      .map(e => ({ ...e, expiry: getExpiryStatus(e.residenceExpiry, t) }))
       .filter(e => e.expiry && e.expiry.level !== 'safe')
       .sort((a, b) => a.expiry!.daysLeft - b.expiry!.daysLeft);
 
     // Contract Expire Alerts
     const activeContractEmployees = employees.filter(e => e.status !== 'INACTIVE' && e.contractEndDate);
     const contractAlerts = activeContractEmployees
-      .map(e => ({ ...e, expiry: getExpiryStatus(e.contractEndDate) }))
+      .map(e => ({ ...e, expiry: getExpiryStatus(e.contractEndDate, t) }))
       .filter(e => e.expiry && e.expiry.level !== 'safe')
       .sort((a, b) => a.expiry!.daysLeft - b.expiry!.daysLeft);
 
@@ -432,14 +447,33 @@ export default function DashboardClient({
     };
   }, [employees, attendance, leaves, todayStr]);
 
+  // Pagination for roll‑call list (after stats)
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const filteredRollCall = useMemo(() => {
+    return stats.rollCallList.filter(emp => {
+      if (attendanceFilter === 'all') return true;
+      if (attendanceFilter === 'present') return emp.rollStatus === 'PRESENT';
+      if (attendanceFilter === 'late') return emp.rollStatus === 'LATE';
+      if (attendanceFilter === 'absent') return emp.rollStatus === 'ABSENT';
+      if (attendanceFilter === 'leave') return emp.rollStatus === 'LEAVE';
+      if (attendanceFilter === 'unregistered') return emp.rollStatus === 'UNREGISTERED';
+      return true;
+    });
+  }, [stats.rollCallList, attendanceFilter]);
+  const totalPages = Math.ceil(filteredRollCall.length / PAGE_SIZE) || 1;
+  const paginatedRollCall = useMemo(() => filteredRollCall.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filteredRollCall, page]);
+  // Reset page when filter changes or data changes
+  useEffect(() => setPage(1), [attendanceFilter, stats.rollCallList]);
+
   // Donut chart stroke definitions
   const donutChartData = useMemo(() => {
     const data = [
-      { label: '出勤', value: stats.presentCount, color: 'url(#grad-emerald)' }, // emerald
-      { label: '遅刻', value: stats.lateCount, color: 'url(#grad-orange)' },    // orange
-      { label: '欠勤', value: stats.absentCount, color: 'url(#grad-red)' },      // red
-      { label: '休暇', value: stats.onLeaveCount, color: 'url(#grad-blue)' },    // blue
-      { label: '未打刻', value: stats.unregisteredCount, color: 'url(#grad-slate)' }, // slate
+      { label: t('status.present'), value: stats.presentCount, color: 'url(#grad-emerald)' }, // emerald
+      { label: t('status.late'), value: stats.lateCount, color: 'url(#grad-orange)' },    // orange
+      { label: t('status.absent'), value: stats.absentCount, color: 'url(#grad-red)' },      // red
+      { label: t('status.leave'), value: stats.onLeaveCount, color: 'url(#grad-blue)' },    // blue
+      { label: t('attendance.unregistered'), value: stats.unregisteredCount, color: 'url(#grad-slate)' }, // slate
     ].filter(item => item.value > 0);
 
     const sum = data.reduce((acc, item) => acc + item.value, 0);
@@ -476,8 +510,8 @@ export default function DashboardClient({
     }).format(new Date());
 
     const currentEmp = employees[0];
-    const visaExpiry = currentEmp?.residenceExpiry ? getExpiryStatus(currentEmp.residenceExpiry) : null;
-    const contractExpiry = currentEmp?.contractEndDate ? getExpiryStatus(currentEmp.contractEndDate) : null;
+    const visaExpiry = currentEmp?.residenceExpiry ? getExpiryStatus(currentEmp.residenceExpiry, t) : null;
+    const contractExpiry = currentEmp?.contractEndDate ? getExpiryStatus(currentEmp.contractEndDate, t) : null;
     const hasCriticalAlerts = (visaExpiry && visaExpiry.level !== 'safe') || (contractExpiry && contractExpiry.level !== 'safe');
 
     return (
@@ -489,13 +523,13 @@ export default function DashboardClient({
           </div>
           <div className="relative z-10">
             <h2 className="text-xl sm:text-2xl font-black">
-              こんにちは、{currentUser?.lastName || user?.lastName || ''} {currentUser?.firstName || user?.firstName || ''} さん！
+              {t('dashboard.welcome').replace('{name}', `${currentUser?.lastName || user?.lastName || ''} ${currentUser?.firstName || user?.firstName || ''}`.trim())}
             </h2>
             <p className="text-xs text-blue-100 mt-1 font-semibold">
-              今日も一日、安全運転・安全作業で頑張りましょう。
+              {t('dashboard.safetyMessage')}
             </p>
             <p className="text-[10px] text-blue-200 mt-4 font-bold tracking-wider uppercase">
-              役割: 一般従業員 (EMPLOYEE)
+              {t('dashboard.roleEmployee')}
             </p>
           </div>
         </div>
@@ -512,7 +546,7 @@ export default function DashboardClient({
                 <span className="text-3xl p-2 bg-white rounded-2xl shadow-sm border border-slate-100 shrink-0">🛂</span>
                 <div className="space-y-1">
                   <h4 className="font-extrabold text-sm flex items-center gap-1.5">
-                    {visaExpiry.level === 'expired' ? '⚠️ 在留カード期限切れ' : '🛂 在留カード期限警告'}
+                    {visaExpiry.level === 'expired' ? t('dashboard.visaExpiryUrgent') : t('dashboard.visaExpiryWarning')}
                     <span className={`px-2 py-0.5 text-[9px] font-black rounded-lg border uppercase ${
                       visaExpiry.level === 'expired' ? 'bg-red-100 border-red-250 text-red-700' :
                       visaExpiry.level === 'urgent' ? 'bg-orange-100 border-orange-250 text-orange-700' :
@@ -521,9 +555,12 @@ export default function DashboardClient({
                       {visaExpiry.label}
                     </span>
                   </h4>
-                  <p className="text-xs text-slate-600 font-semibold leading-relaxed">
-                    在留資格「{currentEmp.residenceStatus || '未指定'}」の期限が <strong>{currentEmp.residenceExpiry}</strong> に{visaExpiry.level === 'expired' ? '切れています' : '満了します'}。更新手続きやサポートが必要な場合は、お早めに人事担当者へご相談ください。
-                  </p>
+                  <p className="text-xs text-slate-600 font-semibold leading-relaxed" dangerouslySetInnerHTML={{
+                    __html: t('dashboard.visaExpiryDetail')
+                      .replace('{status}', currentEmp.residenceStatus || t('common.unspecified'))
+                      .replace('{date}', currentEmp.residenceExpiry)
+                      .replace('{state}', visaExpiry.level === 'expired' ? t('dashboard.visaStateExpired') : t('dashboard.visaStateExpiring'))
+                  }} />
                 </div>
               </div>
             )}
@@ -537,7 +574,7 @@ export default function DashboardClient({
                 <span className="text-3xl p-2 bg-white rounded-2xl shadow-sm border border-slate-100 shrink-0">📋</span>
                 <div className="space-y-1">
                   <h4 className="font-extrabold text-sm flex items-center gap-1.5">
-                    {contractExpiry.level === 'expired' ? '⚠️ 雇用契約期限切れ' : '📋 雇用契約満了のお知らせ'}
+                    {contractExpiry.level === 'expired' ? t('dashboard.contractExpiryUrgent') : t('dashboard.contractExpiryWarning')}
                     <span className={`px-2 py-0.5 text-[9px] font-black rounded-lg border uppercase ${
                       contractExpiry.level === 'expired' ? 'bg-red-100 border-red-250 text-red-700' :
                       contractExpiry.level === 'urgent' ? 'bg-orange-100 border-orange-250 text-orange-700' :
@@ -546,9 +583,12 @@ export default function DashboardClient({
                       {contractExpiry.label}
                     </span>
                   </h4>
-                  <p className="text-xs text-slate-660 font-semibold leading-relaxed">
-                    雇用契約（契約種別: {currentEmp.contractType || '有期'}）が <strong>{currentEmp.contractEndDate}</strong> に{contractExpiry.level === 'expired' ? '切れています' : '満了します'}。更新面談などのスケジュールについては、人事担当者へご確認ください。
-                  </p>
+                  <p className="text-xs text-slate-660 font-semibold leading-relaxed" dangerouslySetInnerHTML={{
+                    __html: t('dashboard.contractExpiryDetail')
+                      .replace('{type}', currentEmp.contractType || t('common.unspecified'))
+                      .replace('{date}', currentEmp.contractEndDate)
+                      .replace('{state}', contractExpiry.level === 'expired' ? t('dashboard.contractStateExpired') : t('dashboard.contractStateExpiring'))
+                  }} />
                 </div>
               </div>
             )}
@@ -558,7 +598,7 @@ export default function DashboardClient({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Punch Card Column */}
           <div className="lg:col-span-7">
-            <Card title="⏰ 今日の打刻 (Time Card)" className="h-full bg-white border border-slate-200 shadow-sm rounded-3xl p-6">
+            <Card title={`⏰ ${t('dashboard.todayStatus')} (Time Card)`} className="h-full bg-white border border-slate-200 shadow-sm rounded-3xl p-6">
               <div className="flex flex-col items-center justify-center py-6">
                 <p className="text-sm font-bold text-slate-400">{todayJst}</p>
                 <div className="text-5xl font-black text-slate-800 tracking-tight font-mono mt-3 mb-8 bg-slate-50 px-6 py-3 rounded-2xl border border-slate-200/60 shadow-inner">
@@ -580,19 +620,19 @@ export default function DashboardClient({
                 {/* Status Log */}
                 <div className="grid grid-cols-4 gap-4 w-full max-w-md text-center text-xs font-bold mb-8">
                   <div className="p-3 bg-slate-50 border border-slate-150 rounded-2xl">
-                    <p className="text-slate-400 mb-1">出勤</p>
+                    <p className="text-slate-400 mb-1">{t('dashboard.punchIn')}</p>
                     <p className="font-mono text-sm text-slate-700">{punchState.checkIn || '--:--'}</p>
                   </div>
                   <div className="p-3 bg-slate-50 border border-slate-150 rounded-2xl">
-                    <p className="text-slate-400 mb-1">休憩入</p>
+                    <p className="text-slate-400 mb-1">{t('dashboard.breakStart')}</p>
                     <p className="font-mono text-sm text-slate-700">{punchState.breakStart || '--:--'}</p>
                   </div>
                   <div className="p-3 bg-slate-50 border border-slate-150 rounded-2xl">
-                    <p className="text-slate-400 mb-1">休憩出</p>
+                    <p className="text-slate-400 mb-1">{t('dashboard.breakEnd')}</p>
                     <p className="font-mono text-sm text-slate-700">{punchState.breakEnd || '--:--'}</p>
                   </div>
                   <div className="p-3 bg-slate-50 border border-slate-150 rounded-2xl">
-                    <p className="text-slate-400 mb-1">退勤</p>
+                    <p className="text-slate-400 mb-1">{t('dashboard.punchOut')}</p>
                     <p className="font-mono text-sm text-slate-700">{punchState.checkOut || '--:--'}</p>
                   </div>
                 </div>
@@ -605,7 +645,7 @@ export default function DashboardClient({
                     className="flex flex-col items-center justify-center p-5 rounded-2xl border text-sm font-bold shadow-sm transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-emerald-700 bg-emerald-50 border-emerald-100 hover:bg-emerald-100 hover:border-emerald-200"
                   >
                     <span className="text-3xl mb-2">🚗</span>
-                    <span>出勤</span>
+                    <span>{t('dashboard.punchIn')}</span>
                   </button>
                   
                   <button
@@ -614,7 +654,7 @@ export default function DashboardClient({
                     className="flex flex-col items-center justify-center p-5 rounded-2xl border text-sm font-bold shadow-sm transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-rose-700 bg-rose-50 border-rose-100 hover:bg-rose-100 hover:border-rose-200"
                   >
                     <span className="text-3xl mb-2">🏁</span>
-                    <span>退勤</span>
+                    <span>{t('dashboard.punchOut')}</span>
                   </button>
                   
                   <button
@@ -623,7 +663,7 @@ export default function DashboardClient({
                     className="flex flex-col items-center justify-center p-5 rounded-2xl border text-sm font-bold shadow-sm transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 bg-blue-50 border-blue-100 hover:bg-blue-100 hover:border-blue-200"
                   >
                     <span className="text-3xl mb-2">☕</span>
-                    <span>休憩開始</span>
+                    <span>{t('dashboard.breakStart')}</span>
                   </button>
                   
                   <button
@@ -632,7 +672,7 @@ export default function DashboardClient({
                     className="flex flex-col items-center justify-center p-5 rounded-2xl border text-sm font-bold shadow-sm transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-amber-700 bg-amber-50 border-amber-100 hover:bg-amber-100 hover:border-amber-200"
                   >
                     <span className="text-3xl mb-2">🍱</span>
-                    <span>休憩終了</span>
+                    <span>{t('dashboard.breakEnd')}</span>
                   </button>
                 </div>
               </div>
@@ -641,25 +681,25 @@ export default function DashboardClient({
 
           {/* Company Announcements Column */}
           <div className="lg:col-span-5">
-            <Card title="📢 会社からのお知らせ" className="h-full bg-white border border-slate-200 shadow-sm rounded-3xl p-6">
+            <Card title={`📢 ${t('dashboard.announcements')}`} className="h-full bg-white border border-slate-200 shadow-sm rounded-3xl p-6">
               <div className="space-y-4">
                 {announcementsLoading ? (
                   <div className="text-center py-8 text-slate-400 font-semibold text-xs animate-pulse">
-                    読み込み中...
+                    {t('common.loading')}
                   </div>
                 ) : announcements.length === 0 ? (
                   <div className="text-center py-8 text-slate-400 font-semibold text-xs border border-dashed border-slate-200 rounded-2xl bg-slate-50/30">
-                    お知らせはありません
+                    {t('dashboard.noAnnouncements')}
                   </div>
                 ) : (
                   announcements.map((a, idx) => {
-                    let tag = 'お知らせ';
+                    let tag = t('dashboard.announcementTag');
                     let tagColor = 'bg-blue-50 text-blue-755 border-blue-200/60';
                     if (a.type === 'urgent') {
-                      tag = '緊急';
+                      tag = t('dashboard.announcementUrgent');
                       tagColor = 'bg-rose-50 text-rose-700 border-rose-200/60';
                     } else if (a.type === 'warning') {
-                      tag = '注意';
+                      tag = t('dashboard.announcementWarning');
                       tagColor = 'bg-amber-50 text-amber-700 border-amber-200/60';
                     }
                     
@@ -671,14 +711,14 @@ export default function DashboardClient({
 
                     const senderName = a.showSenderName && a.sender
                       ? `${a.sender.lastName} ${a.sender.firstName}`
-                      : '会社';
+                      : t('dashboard.announcementCompany');
 
                     return (
                       <div 
                         key={a.id || idx} 
                         onClick={() => setActiveAnnouncementDetail(a)}
                         className="p-4 bg-slate-50/50 border border-slate-200 rounded-2xl hover:border-slate-300 transition-all hover:bg-slate-50 shadow-xs cursor-pointer select-none"
-                        title="クリックで詳細を表示"
+                        title={t('dashboard.clickToViewDetail')}
                       >
                         <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                           <span className="text-[10px] text-slate-400 font-bold">{dateStr}</span>
@@ -688,11 +728,11 @@ export default function DashboardClient({
                         <p className="text-[11px] text-slate-550 mt-1.5 leading-relaxed font-semibold">
                           {a.content.length > 80 ? `${a.content.substring(0, 80)}...` : a.content}
                           {a.content.length > 80 && (
-                            <span className="text-[9px] text-blue-500 font-bold ml-1 block">(クリックで全文を表示)</span>
+                            <span className="text-[9px] text-blue-500 font-bold ml-1 block">{t('dashboard.clickForFullText')}</span>
                           )}
                         </p>
                         <div className="mt-2 text-[9px] text-slate-400 font-bold">
-                          ✉️ 差出人: {senderName}
+                          ✉️ {t('dashboard.announcementSender').replace('{name}', senderName)}
                         </div>
                       </div>
                     );
@@ -712,7 +752,7 @@ export default function DashboardClient({
                 {/* Modal Header */}
                 <div className="p-6 border-b border-slate-100 flex-shrink-0 flex items-center justify-between bg-slate-50/50 rounded-t-3xl">
                   <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
-                    <span>📢</span> お知らせ詳細
+                    <span>📢</span> {t('dashboard.announcementDetailTitle')}
                   </h3>
                   <button 
                     onClick={() => setActiveAnnouncementDetail(null)}
@@ -726,15 +766,15 @@ export default function DashboardClient({
                 <div className="p-6 space-y-4 overflow-y-auto text-slate-800">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div className="text-xs text-slate-400 font-bold space-y-1">
-                      <p>📅 投稿日: {activeAnnouncementDetail.createdAt ? new Date(activeAnnouncementDetail.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '-'}</p>
-                      <p>✉️ 差出人: {activeAnnouncementDetail.showSenderName && activeAnnouncementDetail.sender ? `${activeAnnouncementDetail.sender?.lastName || ''} ${activeAnnouncementDetail.sender?.firstName || ''}`.trim() : '会社'}</p>
+                      <p>📅 {t('dashboard.postDate').replace('{date}', activeAnnouncementDetail.createdAt ? new Date(activeAnnouncementDetail.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '-')}</p>
+                      <p>✉️ {t('dashboard.announcementSender').replace('{name}', activeAnnouncementDetail.showSenderName && activeAnnouncementDetail.sender ? `${activeAnnouncementDetail.sender?.lastName || ''} ${activeAnnouncementDetail.sender?.firstName || ''}`.trim() : t('dashboard.announcementCompany'))}</p>
                     </div>
                     <span className={`px-2.5 py-1 rounded-lg text-xs font-black border ${
                       activeAnnouncementDetail.type === 'urgent' ? 'bg-red-50 border-red-200 text-red-700' :
                       activeAnnouncementDetail.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-700' :
                       'bg-slate-50 border-slate-200 text-slate-600'
                     }`}>
-                      {activeAnnouncementDetail.type === 'urgent' ? '緊急' : activeAnnouncementDetail.type === 'warning' ? '注意' : 'お知らせ'}
+                      {activeAnnouncementDetail.type === 'urgent' ? t('dashboard.announcementUrgent') : activeAnnouncementDetail.type === 'warning' ? t('dashboard.announcementWarning') : t('dashboard.announcementTag')}
                     </span>
                   </div>
 
@@ -750,7 +790,7 @@ export default function DashboardClient({
                       onClick={() => setActiveAnnouncementDetail(null)}
                       className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
                     >
-                      閉じる
+                      {t('common.close')}
                     </button>
                   </div>
                 </div>
@@ -770,8 +810,8 @@ export default function DashboardClient({
           <div className="flex items-center gap-3">
             <span className="text-xl">⚠️</span>
             <div>
-              <p className="font-bold text-sm">アクセス権限がありません</p>
-              <p className="text-xs text-amber-700 mt-0.5">指定されたページにアクセスするための権限が不足しているため、ダッシュボードに転送されました。</p>
+              <p className="font-bold text-sm">{t('dashboard.noPermissionTitle')}</p>
+              <p className="text-xs text-amber-700 mt-0.5">{t('dashboard.noPermissionDesc')}</p>
             </div>
           </div>
           <button 
@@ -786,33 +826,36 @@ export default function DashboardClient({
       {/* Header Overview KPI Ribbon - Redesigned with HSL Glowing Glassmorphism styles */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { label: '総従業員数', value: stats.totalEmp, color: 'text-slate-800', bg: 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:border-blue-300' },
-          { label: '出勤率 (本日)', value: `${stats.attendanceRate}%`, color: 'text-emerald-600 font-extrabold', bg: 'bg-emerald-50/40 border-emerald-100/80 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.1)] hover:border-emerald-300' },
-          { label: '休暇/休職中', value: `${stats.onLeaveCount} 名`, color: 'text-blue-600', bg: 'bg-blue-50/40 border-blue-100/80 shadow-[0_4px_20px_-4px_rgba(59,130,246,0.1)] hover:border-blue-300' },
+          { label: t('dashboard.statsTotalEmp'), value: stats.totalEmp, color: 'text-slate-800', bg: 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:border-blue-300', isWarning: false },
+          { label: t('dashboard.statsAttendanceRate'), value: `${stats.attendanceRate}%`, color: 'text-emerald-600 font-extrabold', bg: 'bg-emerald-50/40 border-emerald-100/80 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.1)] hover:border-emerald-300', isWarning: false },
+          { label: t('dashboard.statsOnLeave'), value: `${stats.onLeaveCount}${t('common.personUnit')}`, color: 'text-blue-600', bg: 'bg-blue-50/40 border-blue-100/80 shadow-[0_4px_20px_-4px_rgba(59,130,246,0.1)] hover:border-blue-300', isWarning: false },
           { 
-            label: '時間外警告 (今月)', 
-            value: `${stats.monthlyOTLimitAlerts.length} 名`, 
+            label: t('dashboard.statsOvertimeAlerts'), 
+            value: `${stats.monthlyOTLimitAlerts.length}${t('common.personUnit')}`, 
             color: stats.monthlyOTLimitAlerts.length > 0 ? 'text-red-600 animate-pulse font-extrabold' : 'text-slate-500', 
-            bg: stats.monthlyOTLimitAlerts.length > 0 ? 'bg-red-50/50 border-red-200 shadow-[0_4px_20px_-4px_rgba(239,68,68,0.15)] hover:border-red-400' : 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]' 
+            bg: stats.monthlyOTLimitAlerts.length > 0 ? 'bg-red-50/50 border-red-200 shadow-[0_4px_20px_-4px_rgba(239,68,68,0.15)] hover:border-red-400' : 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]',
+            isWarning: true
           },
           { 
-            label: 'Visa警告', 
-            value: `${stats.visaAlerts.length} 件`, 
+            label: t('dashboard.statsVisaAlerts'), 
+            value: `${stats.visaAlerts.length}${t('common.personUnit')}`, 
             color: stats.visaAlerts.length > 0 ? 'text-rose-600 font-extrabold' : 'text-slate-500', 
-            bg: stats.visaAlerts.length > 0 ? 'bg-rose-50/50 border-rose-200 shadow-[0_4px_20px_-4px_rgba(244,63,94,0.15)] hover:border-rose-400' : 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]' 
+            bg: stats.visaAlerts.length > 0 ? 'bg-rose-50/50 border-rose-200 shadow-[0_4px_20px_-4px_rgba(244,63,94,0.15)] hover:border-rose-400' : 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]',
+            isWarning: true
           },
           { 
-            label: '契約更新警告', 
-            value: `${stats.contractAlerts.length} 件`, 
+            label: t('dashboard.statsContractAlerts'), 
+            value: `${stats.contractAlerts.length}${t('common.personUnit')}`, 
             color: stats.contractAlerts.length > 0 ? 'text-amber-600 font-extrabold' : 'text-slate-500', 
-            bg: stats.contractAlerts.length > 0 ? 'bg-amber-50/50 border-amber-200 shadow-[0_4px_20px_-4px_rgba(245,158,11,0.15)] hover:border-amber-400' : 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]' 
+            bg: stats.contractAlerts.length > 0 ? 'bg-amber-50/50 border-amber-200 shadow-[0_4px_20px_-4px_rgba(245,158,11,0.15)] hover:border-amber-400' : 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]',
+            isWarning: true
           },
         ].map((s, idx) => (
           <div key={idx} className={`${s.bg} backdrop-blur-md rounded-2xl p-4 border transition-all duration-300 hover:-translate-y-1 hover:shadow-md cursor-default`}>
             <p className="text-xs text-slate-500 font-semibold mb-1">{s.label}</p>
             <div className="flex items-baseline justify-between mt-1">
               <p className={`text-2xl font-black tracking-tight ${s.color}`}>{s.value}</p>
-              {s.label.includes('警告') && parseInt(s.value.toString()) > 0 && (
+              {s.isWarning && parseInt(s.value.toString()) > 0 && (
                 <span className="flex h-2.5 w-2.5 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
@@ -826,9 +869,9 @@ export default function DashboardClient({
       {/* Tabs Menu - Premium Segmented Navigation */}
       <div className="flex border border-slate-200/80 bg-white/90 backdrop-blur-md p-1.5 rounded-2xl shadow-sm">
         {[
-          { id: 'attendance', label: '📅 勤怠・稼働状況', desc: '今日の出欠・休職モニタ & 稼働率推移' },
-          { id: 'overtime', label: '🕐 稼働時間・時間外労働', desc: '残業時間の監視・過重労働抑止' },
-          { id: 'compliance', label: '🛂 ビザ & 契約管理', desc: '期限切迫アラート・法的順守' },
+          { id: 'attendance', label: t('dashboard.tabAttendance'), desc: t('dashboard.tabAttendanceDesc') },
+          { id: 'overtime', label: t('dashboard.tabOvertime'), desc: t('dashboard.tabOvertimeDesc') },
+          { id: 'compliance', label: t('dashboard.tabCompliance'), desc: t('dashboard.tabComplianceDesc') },
         ].map(tab => (
           <button
             key={tab.id}
@@ -851,8 +894,8 @@ export default function DashboardClient({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Donut Chart with SVG Gradients and Premium Legend */}
             <div className="lg:col-span-1">
-              <Card title="出勤ステータス内訳 (本日)" className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl">
-                <p className="text-xs text-slate-400 -mt-2 mb-4">{`${formatDate(todayStr)} 現在`}</p>
+              <Card title={`📊 ${t('dashboard.attendanceRate')} (${t('dashboard.all')})`} className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+                <p className="text-xs text-slate-400 -mt-2 mb-4">{t('dashboard.asOf').replace('{date}', formatDate(todayStr))}</p>
                 <div className="flex flex-col items-center justify-center p-2">
                   <div className="relative w-44 h-44">
                     <svg width="100%" height="100%" viewBox="0 0 160 160" className="-rotate-90">
@@ -894,29 +937,29 @@ export default function DashboardClient({
                           strokeLinecap="butt"
                           className="transition-all duration-300 hover:stroke-[18px] cursor-pointer"
                         >
-                          <title>{`${item.label}: ${item.value}名 (${Math.round(item.percentage)}%)`}</title>
+                          <title>{`${item.label}: ${item.value}${t('common.personUnit')} (${Math.round(item.percentage)}%)`}</title>
                         </circle>
                       ))}
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <p className="text-3xl font-black text-slate-800 tracking-tight">{stats.attendanceRate}%</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">出勤率</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{t('dashboard.attendanceRate')}</p>
                     </div>
                   </div>
 
                   {/* Legends */}
                   <div className="w-full mt-6 grid grid-cols-2 gap-2">
                     {[
-                      { label: '出勤', count: stats.presentCount, color: 'bg-emerald-500', text: 'text-emerald-700' },
-                      { label: '遅刻', count: stats.lateCount, color: 'bg-orange-500', text: 'text-orange-700' },
-                      { label: '欠勤', count: stats.absentCount, color: 'bg-red-500', text: 'text-red-700' },
-                      { label: '休暇', count: stats.onLeaveCount, color: 'bg-blue-500', text: 'text-blue-700' },
-                      { label: '未打刻', count: stats.unregisteredCount, color: 'bg-slate-400', text: 'text-slate-600' },
+                      { label: t('status.present'), count: stats.presentCount, color: 'bg-emerald-500', text: 'text-emerald-700' },
+                      { label: t('status.late'), count: stats.lateCount, color: 'bg-orange-500', text: 'text-orange-700' },
+                      { label: t('status.absent'), count: stats.absentCount, color: 'bg-red-500', text: 'text-red-700' },
+                      { label: t('status.leave'), count: stats.onLeaveCount, color: 'bg-blue-500', text: 'text-blue-700' },
+                      { label: t('attendance.unregistered'), count: stats.unregisteredCount, color: 'bg-slate-400', text: 'text-slate-600' },
                     ].map(legend => (
                       <div key={legend.label} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/60 transition-colors">
                         <span className={`w-2.5 h-2.5 rounded-full ${legend.color}`} />
                         <span className="text-xs text-slate-600 font-semibold">{legend.label}</span>
-                        <span className="ml-auto text-xs font-black text-slate-800">{legend.count}名</span>
+                        <span className="ml-auto text-xs font-black text-slate-800">{legend.count}{t('common.personUnit')}</span>
                       </div>
                     ))}
                   </div>
@@ -927,17 +970,17 @@ export default function DashboardClient({
             {/* Detailed Roll Call Grid */}
             <div className="lg:col-span-2">
               <Card
-                title="本日稼働・出欠モニター"
+                title={t('dashboard.attendanceChartTitle')}
                 className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl"
                 action={
                   <div className="flex gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
                     {[
-                      { id: 'all', label: '全' },
-                      { id: 'present', label: '出勤' },
-                      { id: 'late', label: '遅刻' },
-                      { id: 'absent', label: '欠勤' },
-                      { id: 'leave', label: '休暇' },
-                      { id: 'unregistered', label: '未打刻' },
+                      { id: 'all', label: t('dashboard.all') },
+                      { id: 'present', label: t('status.present') },
+                      { id: 'late', label: t('status.late') },
+                      { id: 'absent', label: t('status.absent') },
+                      { id: 'leave', label: t('status.leave') },
+                      { id: 'unregistered', label: t('attendance.unregistered') },
                     ].map(btn => (
                       <button
                         key={btn.id}
@@ -954,7 +997,7 @@ export default function DashboardClient({
                   </div>
                 }
               >
-                <p className="text-xs text-slate-400 -mt-2 mb-4">本日の従業員リアルタイム出欠一覧</p>
+                <p className="text-xs text-slate-400 -mt-2 mb-4">{t('dashboard.attendanceChartDesc')}</p>
                 <div className="overflow-x-auto overflow-y-auto max-h-[380px] pr-2">
                   <table className="w-full table-fixed text-left border-collapse" style={{ minWidth: '680px' }}>
                     <colgroup>
@@ -967,67 +1010,71 @@ export default function DashboardClient({
                     </colgroup>
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50/50 text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">
-                        <th className="px-4 py-3">氏名</th>
-                        <th className="px-4 py-3">部署</th>
-                        <th className="px-4 py-3">出勤時間</th>
-                        <th className="px-4 py-3">退勤時間</th>
-                        <th className="px-4 py-3">ステータス</th>
-                        <th className="px-4 py-3">備考</th>
+                        <th className="px-4 py-3">{t('dashboard.colName')}</th>
+                        <th className="px-4 py-3">{t('dashboard.colDept')}</th>
+                        <th className="px-4 py-3">{t('dashboard.colCheckIn')}</th>
+                        <th className="px-4 py-3">{t('dashboard.colCheckOut')}</th>
+                        <th className="px-4 py-3">{t('dashboard.colStatus')}</th>
+                        <th className="px-4 py-3">{t('dashboard.colNotes')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {stats.rollCallList
-                        .filter(emp => {
-                          if (attendanceFilter === 'all') return true;
-                          if (attendanceFilter === 'present') return emp.rollStatus === 'PRESENT';
-                          if (attendanceFilter === 'late') return emp.rollStatus === 'LATE';
-                          if (attendanceFilter === 'absent') return emp.rollStatus === 'ABSENT';
-                          if (attendanceFilter === 'leave') return emp.rollStatus === 'LEAVE';
-                          if (attendanceFilter === 'unregistered') return emp.rollStatus === 'UNREGISTERED';
-                          return true;
-                        })
-                        .map(emp => (
-                          <tr key={emp.id} className="hover:bg-slate-50/40 transition-colors text-sm">
-                            <td className="px-4 py-3 font-semibold text-slate-800">
-                              {emp.lastName} {emp.firstName}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-slate-500 font-medium">{emp.department}</td>
-                            <td className="px-4 py-3 font-mono text-slate-600 text-xs font-semibold">{emp.checkIn}</td>
-                            <td className="px-4 py-3 font-mono text-slate-600 text-xs font-semibold">{emp.checkOut}</td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex px-2.5 py-0.5 text-xs rounded-lg font-bold ${
-                                emp.rollStatus === 'PRESENT' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                emp.rollStatus === 'LATE' ? 'bg-orange-50 text-orange-700 border border-orange-200 animate-pulse' :
-                                emp.rollStatus === 'ABSENT' ? 'bg-red-50 text-red-700 border border-red-200' :
-                                emp.rollStatus === 'LEAVE' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                                'bg-slate-100 text-slate-500 border border-slate-200'
-                              }`}>
-                                {emp.rollStatus === 'PRESENT' ? '出勤' :
-                                 emp.rollStatus === 'LATE' ? '遅刻' :
-                                 emp.rollStatus === 'ABSENT' ? '欠勤' :
-                                 emp.rollStatus === 'LEAVE' ? '休暇中' : '未打刻'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-slate-400 max-w-[150px] truncate">{emp.note || '-'}</td>
-                          </tr>
-                        ))}
-                      {stats.rollCallList.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="text-center text-slate-400 py-12 text-sm">
-                            該当する従業員はいません。
-                          </td>
-                        </tr>
-                      )}
+                      {paginatedRollCall.map(emp => (
+                         <tr key={emp.id} className="hover:bg-slate-50/40 transition-colors text-sm">
+                           <td className="px-4 py-3 font-semibold text-slate-800">
+                             {emp.lastName} {emp.firstName}
+                           </td>
+                           <td className="px-4 py-3 text-xs text-slate-500 font-medium">{emp.department}</td>
+                           <td className="px-4 py-3 font-mono text-slate-600 text-xs font-semibold">{emp.checkIn}</td>
+                           <td className="px-4 py-3 font-mono text-slate-600 text-xs font-semibold">{emp.checkOut}</td>
+                           <td className="px-4 py-3">
+                             <span className={`inline-flex px-2.5 py-0.5 text-xs rounded-lg font-bold ${
+                               emp.rollStatus === 'PRESENT' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                               emp.rollStatus === 'LATE' ? 'bg-orange-50 text-orange-700 border border-orange-200 animate-pulse' :
+                               emp.rollStatus === 'ABSENT' ? 'bg-red-50 text-red-700 border border-red-200' :
+                               emp.rollStatus === 'LEAVE' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                               'bg-slate-100 text-slate-500 border border-slate-200'
+                             }`}>
+                               {emp.rollStatus === 'PRESENT' ? t('status.present') :
+                                emp.rollStatus === 'LATE' ? t('status.late') :
+                                emp.rollStatus === 'ABSENT' ? t('status.absent') :
+                                emp.rollStatus === 'LEAVE' ? t('status.leave') : t('attendance.unregistered')}
+                             </span>
+                           </td>
+                           <td className="px-4 py-3 text-xs text-slate-400 max-w-[150px] truncate">{emp.note || '-'}</td>
+                         </tr>
+                       ))}
+                       {paginatedRollCall.length === 0 && (
+                         <tr>
+                           <td colSpan={6} className="text-center text-slate-400 py-12 text-sm">
+                             {t('dashboard.noRecords')}
+                           </td>
+                         </tr>
+                       )}
                     </tbody>
                   </table>
                 </div>
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-end gap-2 text-sm mt-4 border-t border-slate-100 pt-3">
+                   <button
+                     onClick={() => setPage(p => Math.max(p - 1, 1))}
+                     disabled={page === 1}
+                     className="px-3 py-1 rounded-lg bg-slate-50 border hover:bg-slate-100 disabled:opacity-50 text-xs font-bold text-slate-600"
+                   >{t('common.pagination.prev')}</button>
+                   <span className="text-xs font-bold text-slate-400">{t('common.pagination.pageInfo').replace('{current}', String(page)).replace('{total}', String(totalPages))}</span>
+                   <button
+                     onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+                     disabled={page === totalPages}
+                     className="px-3 py-1 rounded-lg bg-slate-50 border hover:bg-slate-100 disabled:opacity-50 text-xs font-bold text-slate-600"
+                   >{t('common.pagination.next')}</button>
+                 </div>
               </Card>
             </div>
           </div>
 
           {/* Redesigned 7-day Attendance Rate Trend - Line/Area Chart */}
-          <Card title="出勤率の推移 (直近7日間)" className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
-            <p className="text-xs text-slate-400 -mt-2 mb-6">稼働従業員数のデイリー変動監視</p>
+          <Card title={t('dashboard.attendanceHistoryTitle')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+            <p className="text-xs text-slate-400 -mt-2 mb-6">{t('dashboard.attendanceHistoryDesc')}</p>
             <div className="p-2">
               <div className="relative w-full">
                 {/* SVG Area Line Chart */}
@@ -1111,8 +1158,8 @@ export default function DashboardClient({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Overtime SVG Chart - Redesigned with Rounded SVG Gradients */}
           <div className="lg:col-span-2">
-            <Card title="直近7日間の総残業時間トレンド" className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
-              <p className="text-xs text-slate-400 -mt-2 mb-4">全従業員の合計時間外勤務時間</p>
+            <Card title={t('dashboard.overtimeTrendTitle')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+              <p className="text-xs text-slate-400 -mt-2 mb-4">{t('dashboard.overtimeTrendDesc')}</p>
               <div className="p-2">
                 <div className="relative w-full">
                   <svg className="w-full h-auto aspect-[5/2]" viewBox="0 0 500 200">
@@ -1159,7 +1206,7 @@ export default function DashboardClient({
                           <g className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                             <rect x={x - 25} y={y - 26} width="76" height="20" rx="5" fill="#1e293b" />
                             <text x={x + 13} y={y - 13} fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">
-                              {day.totalOT}h (平 {day.avgOT}h)
+                              {day.totalOT}h {t('dashboard.overtimeAverage').replace('{hours}', String(day.avgOT))}
                             </text>
                           </g>
 
@@ -1177,10 +1224,10 @@ export default function DashboardClient({
           {/* Overtime Alerts (Cảnh báo quá giờ) */}
           <div className="lg:col-span-1">
             <Card
-              title="⚠️ 時間外勤務の警告"
+              title={t('dashboard.overtimeWarningTitle')}
               className="bg-white border border-slate-200/60 shadow-sm rounded-2xl"
             >
-              <p className="text-xs text-slate-400 -mt-2 mb-4">今月の残業時間 (20h超でアラート、45h限度)</p>
+              <p className="text-xs text-slate-400 -mt-2 mb-4">{t('dashboard.overtimeWarningDesc')}</p>
               <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
                 {stats.monthlyOTLimitAlerts.map(emp => {
                   const percent = Math.min((emp.monthlyOT / 45) * 100, 100);
@@ -1214,8 +1261,8 @@ export default function DashboardClient({
                         />
                       </div>
                       <div className="flex justify-between text-[9px] text-slate-400 font-extrabold mt-1">
-                        <span>時間外: 0h</span>
-                        <span className={isLimitExceeded ? 'text-red-500 font-black' : ''}>36協定限度: 45h</span>
+                        <span>{t('dashboard.overtimeLabel').replace('{hours}', '0')}</span>
+                        <span className={isLimitExceeded ? 'text-red-500 font-black' : ''}>{t('dashboard.overtimeLimit')}</span>
                       </div>
                     </div>
                   );
@@ -1223,7 +1270,7 @@ export default function DashboardClient({
                 {stats.monthlyOTLimitAlerts.length === 0 && (
                   <div className="text-center py-10 bg-slate-50 border border-slate-100 rounded-2xl">
                     <span className="text-3xl">✅</span>
-                    <p className="text-sm text-slate-500 mt-2 font-bold">過重労働の懸念がある社員はいません</p>
+                    <p className="text-sm text-slate-500 mt-2 font-bold">{t('dashboard.noOvertimeAlerts')}</p>
                   </div>
                 )}
               </div>
@@ -1237,15 +1284,15 @@ export default function DashboardClient({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Visa Monitoring Panel */}
           <Card
-            title={`🛂 在留カード（ビザ）期限監視 (${stats.visaAlerts.length}件)`}
+            title={t('dashboard.visaExpiryMonitorTitle').replace('{count}', String(stats.visaAlerts.length))}
             className="bg-white border border-slate-200/60 shadow-sm rounded-2xl"
             action={
               <Link href="/residence-cards" className="text-xs text-blue-600 hover:text-blue-800 font-bold">
-                詳細一覧を表示 →
+                {t('dashboard.viewDetails')}
               </Link>
             }
           >
-            <p className="text-xs text-slate-400 -mt-2 mb-4">{`対象外国籍従業員数: ${stats.totalForeignForce}名中`}</p>
+            <p className="text-xs text-slate-400 -mt-2 mb-4">{t('dashboard.visaMonitorDesc').replace('{total}', String(stats.totalForeignForce))}</p>
             <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
               {stats.visaAlerts.map(emp => (
                 <div key={emp.id} className="p-3.5 bg-white border border-slate-200 rounded-2xl hover:shadow-sm hover:border-slate-300 transition-all flex flex-col justify-between gap-3">
@@ -1257,7 +1304,9 @@ export default function DashboardClient({
                         <span className="px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 text-[10px] rounded font-extrabold">{emp.residenceStatus}</span>
                       </div>
                       <p className="text-xs text-slate-500 mt-1 font-semibold">
-                        カード番号: <span className="font-mono">{emp.residenceCardNumber || '-'}</span> | 満了日: {formatDate(emp.residenceExpiry)}
+                        {t('dashboard.visaCardNo')
+                          .replace('{number}', emp.residenceCardNumber || '-')
+                          .replace('{date}', formatDate(emp.residenceExpiry))}
                       </p>
                     </div>
                     
@@ -1278,15 +1327,15 @@ export default function DashboardClient({
                       />
                     </div>
                     <div className="flex justify-between text-[9px] text-slate-400 font-extrabold">
-                      <span>切迫 (30日前)</span>
-                      <span>警告 (90日前)</span>
-                      <span>安全範囲</span>
+                      <span>{t('dashboard.visaLevelUrgent')}</span>
+                      <span>{t('dashboard.visaLevelWarning')}</span>
+                      <span>{t('dashboard.visaLevelSafe')}</span>
                     </div>
                   </div>
 
                   <div className="flex justify-end gap-2 border-t border-slate-100 pt-2.5">
                     <Link href={`/employees`} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-xs text-white rounded-lg shadow-sm font-bold transition-colors">
-                      情報を更新
+                      {t('dashboard.updateInfo')}
                     </Link>
                   </div>
                 </div>
@@ -1294,7 +1343,7 @@ export default function DashboardClient({
               {stats.visaAlerts.length === 0 && (
                 <div className="text-center py-12 bg-slate-50 border border-slate-100 rounded-2xl">
                   <span className="text-2xl">🎉</span>
-                  <p className="text-sm text-slate-500 mt-2 font-bold">在留カード期限切れの従業員はいません</p>
+                  <p className="text-sm text-slate-500 mt-2 font-bold">{t('dashboard.noVisaAlerts')}</p>
                 </div>
               )}
             </div>
@@ -1302,15 +1351,15 @@ export default function DashboardClient({
 
           {/* Contract Expiry Monitoring Panel */}
           <Card
-            title={`📋 雇用契約期限監視 (${stats.contractAlerts.length}件)`}
+            title={t('dashboard.contractExpiryMonitorTitle').replace('{count}', String(stats.contractAlerts.length))}
             className="bg-white border border-slate-200/60 shadow-sm rounded-2xl"
             action={
               <Link href="/contracts" className="text-xs text-blue-600 hover:text-blue-800 font-bold">
-                契約管理ページ →
+                {t('dashboard.contractPageLink')}
               </Link>
             }
           >
-            <p className="text-xs text-slate-400 -mt-2 mb-4">{`有期契約対象者: ${stats.totalContractForce}名中`}</p>
+            <p className="text-xs text-slate-400 -mt-2 mb-4">{t('dashboard.contractMonitorDesc').replace('{total}', String(stats.totalContractForce))}</p>
             <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
               {stats.contractAlerts.map(emp => (
                 <div key={emp.id} className="p-3.5 bg-white border border-slate-200 rounded-2xl hover:shadow-sm hover:border-slate-300 transition-all flex flex-col justify-between gap-3">
@@ -1322,7 +1371,9 @@ export default function DashboardClient({
                         <span className="px-1.5 py-0.5 bg-purple-50 border border-purple-200 text-purple-700 text-[10px] rounded font-extrabold">{emp.contractType}</span>
                       </div>
                       <p className="text-xs text-slate-500 mt-1 font-semibold">
-                        契約期間: {formatDate(emp.contractStartDate)} 〜 {formatDate(emp.contractEndDate)}
+                        {t('dashboard.contractDuration')
+                          .replace('{start}', formatDate(emp.contractStartDate))
+                          .replace('{end}', formatDate(emp.contractEndDate))}
                       </p>
                     </div>
                     
@@ -1343,15 +1394,15 @@ export default function DashboardClient({
                       />
                     </div>
                     <div className="flex justify-between text-[9px] text-slate-400 font-extrabold">
-                      <span>満了/超過</span>
-                      <span>切迫 (30日前)</span>
-                      <span>警告 (90日前)</span>
+                      <span>{t('dashboard.contractLevelExpired')}</span>
+                      <span>{t('dashboard.visaLevelUrgent')}</span>
+                      <span>{t('dashboard.visaLevelWarning')}</span>
                     </div>
                   </div>
 
                   <div className="flex justify-end gap-2 border-t border-slate-100 pt-2.5">
                     <Link href={`/employees`} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-xs text-white rounded-lg shadow-sm font-bold transition-colors">
-                      雇用契約を更新
+                      {t('dashboard.renewContract')}
                     </Link>
                   </div>
                 </div>
@@ -1359,7 +1410,7 @@ export default function DashboardClient({
               {stats.contractAlerts.length === 0 && (
                 <div className="text-center py-12 bg-slate-50 border border-slate-100 rounded-2xl">
                   <span className="text-2xl">🎉</span>
-                  <p className="text-sm text-slate-500 mt-2 font-bold">契約更新期限切れの従業員はいません</p>
+                  <p className="text-sm text-slate-500 mt-2 font-bold">{t('dashboard.noContractAlerts')}</p>
                 </div>
               )}
             </div>
@@ -1368,16 +1419,16 @@ export default function DashboardClient({
       )}
 
       {/* Quick Actions Panel - Premium visual upgrade */}
-      <Card title="クイックリンク" className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+      <Card title={t('dashboard.quickLinks')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
           {[
-            { href: '/employees', label: '従業員管理', icon: '👥', color: 'text-blue-600 bg-blue-50/60 border-blue-100 hover:border-blue-300' },
-            { href: '/attendance', label: '勤怠管理', icon: '🕐', color: 'text-green-600 bg-green-50/60 border-green-100 hover:border-green-300' },
-            { href: '/leave', label: '休暇管理', icon: '🏖️', color: 'text-teal-600 bg-teal-50/60 border-teal-100 hover:border-teal-300' },
-            { href: '/payroll', label: '給与計算', icon: '💰', color: 'text-yellow-600 bg-yellow-50/60 border-yellow-100 hover:border-yellow-300' },
-            { href: '/contracts', label: '契約管理', icon: '📋', color: 'text-purple-600 bg-purple-50/60 border-purple-100 hover:border-purple-300' },
-            { href: '/residence-cards', label: '外国人管理', icon: '🛂', color: 'text-rose-600 bg-rose-50/60 border-rose-100 hover:border-rose-300' },
-            { href: '/departments', label: '部署管理', icon: '🏢', color: 'text-indigo-600 bg-indigo-50/60 border-indigo-100 hover:border-indigo-300' },
+            { href: '/employees', label: t('nav.employees'), icon: '👥', color: 'text-blue-600 bg-blue-50/60 border-blue-100 hover:border-blue-300' },
+            { href: '/attendance', label: t('nav.attendance'), icon: '🕐', color: 'text-green-600 bg-green-50/60 border-green-100 hover:border-green-300' },
+            { href: '/leave', label: t('nav.leave'), icon: '🏖️', color: 'text-teal-600 bg-teal-50/60 border-teal-100 hover:border-teal-300' },
+            { href: '/payroll', label: t('nav.payroll'), icon: '💰', color: 'text-yellow-600 bg-yellow-50/60 border-yellow-100 hover:border-yellow-300' },
+            { href: '/contracts', label: t('nav.contracts'), icon: '📋', color: 'text-purple-600 bg-purple-50/60 border-purple-100 hover:border-purple-300' },
+            { href: '/residence-cards', label: t('nav.foreigners'), icon: '🛂', color: 'text-rose-600 bg-rose-50/60 border-rose-100 hover:border-rose-300' },
+            { href: '/departments', label: t('nav.departments'), icon: '🏢', color: 'text-indigo-600 bg-indigo-50/60 border-indigo-100 hover:border-indigo-300' },
           ].map((a, idx) => (
             <Link key={idx} href={a.href}
               className={`flex flex-col items-center gap-3.5 p-5 rounded-2xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${a.color}`}>
@@ -1397,7 +1448,7 @@ export default function DashboardClient({
               {/* Modal Header */}
               <div className="p-6 border-b border-slate-100 flex-shrink-0 flex items-center justify-between bg-slate-50/50 rounded-t-3xl">
                 <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
-                  <span>📢</span> お知らせ詳細
+                  <span>📢</span> {t('dashboard.announcementDetailTitle')}
                 </h3>
                 <button 
                   onClick={() => setActiveAnnouncementDetail(null)}
@@ -1411,15 +1462,15 @@ export default function DashboardClient({
               <div className="p-6 space-y-4 overflow-y-auto text-slate-800">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="text-xs text-slate-400 font-bold space-y-1">
-                    <p>📅 投稿日: {activeAnnouncementDetail.createdAt ? new Date(activeAnnouncementDetail.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '-'}</p>
-                    <p>✉️ 差出人: {activeAnnouncementDetail.showSenderName && activeAnnouncementDetail.sender ? `${activeAnnouncementDetail.sender?.lastName || ''} ${activeAnnouncementDetail.sender?.firstName || ''}`.trim() : '会社'}</p>
+                    <p>📅 {t('dashboard.postDate').replace('{date}', activeAnnouncementDetail.createdAt ? new Date(activeAnnouncementDetail.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '-')}</p>
+                    <p>✉️ {t('dashboard.announcementSender').replace('{name}', activeAnnouncementDetail.showSenderName && activeAnnouncementDetail.sender ? `${activeAnnouncementDetail.sender?.lastName || ''} ${activeAnnouncementDetail.sender?.firstName || ''}`.trim() : t('dashboard.announcementCompany'))}</p>
                   </div>
                   <span className={`px-2.5 py-1 rounded-lg text-xs font-black border ${
                     activeAnnouncementDetail.type === 'urgent' ? 'bg-red-50 border-red-200 text-red-700' :
                     activeAnnouncementDetail.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-700' :
                     'bg-slate-50 border-slate-200 text-slate-600'
                   }`}>
-                    {activeAnnouncementDetail.type === 'urgent' ? '緊急' : activeAnnouncementDetail.type === 'warning' ? '注意' : 'お知らせ'}
+                    {activeAnnouncementDetail.type === 'urgent' ? t('dashboard.announcementUrgent') : activeAnnouncementDetail.type === 'warning' ? t('dashboard.announcementWarning') : t('dashboard.announcementTag')}
                   </span>
                 </div>
 
@@ -1435,7 +1486,7 @@ export default function DashboardClient({
                     onClick={() => setActiveAnnouncementDetail(null)}
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
                   >
-                    閉じる
+                    {t('common.close')}
                   </button>
                 </div>
               </div>

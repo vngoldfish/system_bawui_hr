@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return errorResponse('Unauthorized', 401);
     }
-    const isEmployee = user.role === 'EMPLOYEE';
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployee = user.role === 'EMPLOYEE' || viewMode === 'employee';
 
     const { searchParams } = new URL(request.url);
     let employeeId = searchParams.get('employeeId');
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
       employeeId = user.id;
     }
 
-    let where: any = {};
+    const where: any = {};
 
     if (employeeId) {
       where.employeeId = employeeId;
@@ -81,7 +82,8 @@ export async function POST(request: NextRequest) {
       return errorResponse('Unauthorized', 401);
     }
     
-    if (!hasPermission('payroll:edit', user as any)) {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    if (viewMode === 'employee' || !hasPermission('payroll:edit', user as any)) {
       return errorResponse('Forbidden', 403);
     }
 

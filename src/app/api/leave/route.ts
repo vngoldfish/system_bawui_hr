@@ -12,14 +12,40 @@ export async function GET(request: NextRequest) {
       return errorResponse('Unauthorized', 401);
     }
 
+    const dbUser = await prisma.employee.findUnique({
+      where: { id: user.id },
+    });
+
+    if (!dbUser) {
+      return errorResponse('Unauthorized', 401);
+    }
+
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get('employeeId');
     const status = searchParams.get('status');
 
-    let where: any = {};
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployee = dbUser.role === 'EMPLOYEE' || viewMode === 'employee';
+    const isDeptManager = dbUser.role === 'DEPARTMENT_MANAGER' && viewMode !== 'employee';
 
-    if (user.role === 'EMPLOYEE') {
-      where.employeeId = user.id;
+    const where: any = {};
+
+    if (isEmployee) {
+      where.employeeId = dbUser.id;
+    } else if (isDeptManager) {
+      if (employeeId) {
+        const targetEmp = await prisma.employee.findUnique({
+          where: { id: employeeId },
+        });
+        if (!targetEmp || targetEmp.departmentId !== dbUser.departmentId) {
+          return errorResponse('Forbidden', 403);
+        }
+        where.employeeId = employeeId;
+      } else {
+        where.employee = {
+          departmentId: dbUser.departmentId,
+        };
+      }
     } else if (employeeId) {
       where.employeeId = employeeId;
     }
@@ -55,7 +81,9 @@ export async function POST(request: NextRequest) {
 
     // Regular employee can only request leave for themselves
     let targetEmployeeId = data.employeeId;
-    if (user.role === 'EMPLOYEE') {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployeeMode = user.role === 'EMPLOYEE' || viewMode === 'employee';
+    if (isEmployeeMode) {
       targetEmployeeId = user.id;
     }
 
@@ -98,7 +126,16 @@ export async function PUT(request: NextRequest) {
       return errorResponse('Unauthorized', 401);
     }
 
-    if (user.role === 'EMPLOYEE') {
+    const dbUser = await prisma.employee.findUnique({
+      where: { id: user.id },
+    });
+
+    if (!dbUser) {
+      return errorResponse('Unauthorized', 401);
+    }
+
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    if (dbUser.role === 'EMPLOYEE' || viewMode === 'employee') {
       return errorResponse('Forbidden', 403);
     }
 
@@ -109,11 +146,32 @@ export async function PUT(request: NextRequest) {
       return errorResponse('Invalid parameters', 400);
     }
 
+    // Retrieve the leave request to verify department if DEPARTMENT_MANAGER
+    if (dbUser.role === 'DEPARTMENT_MANAGER') {
+      const leave = await prisma.leaveRequest.findUnique({
+        where: { id },
+        include: { employee: true },
+      });
+
+      if (!leave) {
+        return errorResponse('Leave request not found', 404);
+      }
+
+      if (leave.employee.departmentId !== dbUser.departmentId) {
+        return errorResponse('Forbidden', 403);
+      }
+
+      // Do not allow department managers to approve their own leave request
+      if (leave.employeeId === dbUser.id) {
+        return errorResponse('Cannot approve your own leave request', 403);
+      }
+    }
+
     const requestRecord = await prisma.leaveRequest.update({
       where: { id },
       data: {
         status,
-        approvedBy: user.id,
+        approvedBy: dbUser.id,
       },
     });
 

@@ -1,6 +1,7 @@
 'use client';
 
 import Portal from '@/components/common/Portal';
+import { useI18n } from '@/lib/i18n';
 
 interface DeleteConfirmDialogProps {
   isOpen: boolean;
@@ -10,6 +11,8 @@ interface DeleteConfirmDialogProps {
 }
 
 export default function DeleteConfirmDialog({ isOpen, employeeName, onConfirm, onCancel }: DeleteConfirmDialogProps) {
+  const { t } = useI18n();
+
   if (!isOpen) return null;
 
   return (
@@ -23,17 +26,17 @@ export default function DeleteConfirmDialog({ isOpen, employeeName, onConfirm, o
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-slate-800">従業員の削除</h2>
+            <h2 className="text-lg font-semibold text-slate-800">{t('deleteConfirm.title')}</h2>
           </div>
           <p className="text-slate-600 mb-6">
-            <span className="font-medium text-slate-800">{employeeName}</span> を削除してもよろしいですか？この操作は取り消せません。
+            {t('deleteConfirm.prompt').replace('{employeeName}', employeeName)}
           </p>
           <div className="flex justify-end gap-3">
             <button onClick={onCancel} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">
-              キャンセル
+              {t('deleteConfirm.cancel')}
             </button>
             <button onClick={onConfirm} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-              削除
+              {t('deleteConfirm.delete')}
             </button>
           </div>
         </div>

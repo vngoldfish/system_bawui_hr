@@ -14,7 +14,8 @@ export async function PUT(
     if (!user) {
       return errorResponse('Unauthorized', 401);
     }
-    if (user.role === 'EMPLOYEE') {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    if (user.role === 'EMPLOYEE' || viewMode === 'employee') {
       return errorResponse('Forbidden', 403);
     }
 

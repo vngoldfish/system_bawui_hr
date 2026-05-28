@@ -6,6 +6,9 @@ export interface LoggedUser {
   email: string;
   role: string;
   permissions: string[];
+  avatar?: string;
+  language?: string;
+  nationality?: string;
 }
 
 // Client-side helper to read and parse the session_user cookie

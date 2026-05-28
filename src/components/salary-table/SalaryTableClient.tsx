@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
+import { useI18n } from '@/lib/i18n';
 
 interface RateItem {
   id: string; name: string; nameKana: string;
@@ -89,24 +90,55 @@ const prefectures = [
   '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
 ];
 
-const categoryLabel = (c: string) =>
-  c === 'insurance' ? '社会保険' : c === 'tax' ? '税金' :
-  c === 'allowance' ? '手当' : '控除';
-
 const categoryColor = (c: string) =>
   c === 'insurance' ? 'bg-blue-100 text-blue-700' :
   c === 'tax' ? 'bg-red-100 text-red-700' :
   c === 'allowance' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700';
 
+const getItemTranslation = (id: string, fallbackName: string, fallbackDesc: string, t: any) => {
+  switch (id) {
+    case 'employment':
+      return { name: t('benefits.employmentInsurance'), desc: t('salaryTable.generalBusiness') };
+    case 'workers':
+      return { name: t('benefits.workersComp'), desc: t('salaryTable.generalBusinessNoEmp') };
+    case 'resident_tax':
+      return { name: t('payroll.residentTaxSubject'), desc: t('salaryTable.specialCollection') };
+    case 'transport':
+      return { name: t('benefits.commutingAllowance'), desc: t('salaryTable.commuteLimit') };
+    case 'housing':
+      return { name: t('benefits.housingAllowance'), desc: t('salaryTable.housingSubLabel') };
+    case 'meal':
+      return { name: t('benefits.mealAllowance'), desc: t('salaryTable.mealSubLabel') };
+    case 'family':
+      return { name: t('benefits.familyAllowance'), desc: t('salaryTable.familySubLabel') };
+    case 'overtime':
+      return { name: t('benefits.overtimeAllowance'), desc: t('salaryTable.overtimeSubLabel') };
+    case 'late_night': {
+      const isVi = t('benefits.mealAllowance').includes('ăn');
+      const isEn = t('benefits.mealAllowance').includes('Meal');
+      const isZh = t('benefits.mealAllowance').includes('餐');
+      const isTh = t('benefits.mealAllowance').includes('อาหาร');
+      let name = fallbackName;
+      if (isVi) name = 'Phụ cấp làm đêm';
+      else if (isEn) name = 'Late-night Allowance';
+      else if (isZh) name = '深夜津贴';
+      else if (isTh) name = 'ค่ากะดึก';
+      return { name, desc: t('salaryTable.lateNightSubLabel') };
+    }
+    default:
+      return { name: fallbackName, desc: fallbackDesc };
+  }
+};
+
 function logChange(
   setChangeLog: React.Dispatch<React.SetStateAction<ChangeLog[]>>,
-  itemId: string, itemName: string, field: string, oldVal: string, newVal: string, reason: string
+  itemId: string, itemName: string, field: string, oldVal: string, newVal: string, reason: string, user: string
 ) {
   const now = new Date();
   const ts = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   setChangeLog(prev => [{
     id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    itemId, itemName, field, oldValue: oldVal, newValue: newVal, reason, timestamp: ts, user: '管理者',
+    itemId, itemName, field, oldValue: oldVal, newValue: newVal, reason, timestamp: ts, user,
   }, ...prev]);
 }
 
@@ -117,17 +149,20 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
   changeLog: ChangeLog[];
   setChangeLog: React.Dispatch<React.SetStateAction<ChangeLog[]>>;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(settings);
   const [reason, setReason] = useState('');
 
   const handleSave = () => {
     if (!reason.trim()) return;
-    if (draft.baseRate !== settings.baseRate) logChange(setChangeLog, 'health', '健康保険', '基本保険料率', `${settings.baseRate}%`, `${draft.baseRate}%`, reason);
-    if (draft.careInsuranceRate !== settings.careInsuranceRate) logChange(setChangeLog, 'health', '健康保険', '介護保険料率', `${settings.careInsuranceRate}%`, `${draft.careInsuranceRate}%`, reason);
-    if (draft.prefecture !== settings.prefecture) logChange(setChangeLog, 'health', '健康保険', '都道府県', settings.prefecture, draft.prefecture, reason);
-    if (draft.standardMonthlyMin !== settings.standardMonthlyMin) logChange(setChangeLog, 'health', '健康保険', '標準報酬月額 下限', `¥${settings.standardMonthlyMin.toLocaleString()}`, `¥${draft.standardMonthlyMin.toLocaleString()}`, reason);
-    if (draft.standardMonthlyMax !== settings.standardMonthlyMax) logChange(setChangeLog, 'health', '健康保険', '標準報酬月額 上限', `¥${settings.standardMonthlyMax.toLocaleString()}`, `¥${draft.standardMonthlyMax.toLocaleString()}`, reason);
+    const adminLabel = t('salaryTable.historyAdmin');
+    const healthLabel = t('salaryTable.healthTitle');
+    if (draft.baseRate !== settings.baseRate) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.baseRate'), `${settings.baseRate}%`, `${draft.baseRate}%`, reason, adminLabel);
+    if (draft.careInsuranceRate !== settings.careInsuranceRate) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.careTotal'), `${settings.careInsuranceRate}%`, `${draft.careInsuranceRate}%`, reason, adminLabel);
+    if (draft.prefecture !== settings.prefecture) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.prefecture'), settings.prefecture, draft.prefecture, reason, adminLabel);
+    if (draft.standardMonthlyMin !== settings.standardMonthlyMin) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.standardMin'), `¥${settings.standardMonthlyMin.toLocaleString()}`, `¥${draft.standardMonthlyMin.toLocaleString()}`, reason, adminLabel);
+    if (draft.standardMonthlyMax !== settings.standardMonthlyMax) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.standardMax'), `¥${settings.standardMonthlyMax.toLocaleString()}`, `¥${draft.standardMonthlyMax.toLocaleString()}`, reason, adminLabel);
     onChange(draft);
     setEditing(false);
     setReason('');
@@ -139,21 +174,21 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
   const careEmployee = (settings.careInsuranceRate / 2).toFixed(2);
 
   return (
-    <Card title="健康保険（協会けんぽ）">
+    <Card title={t('salaryTable.healthTitle')}>
       <div className="flex justify-between items-center mb-4">
         <div>
-          <p className="text-xs text-slate-500">全国健康保険協会管掌健康保険</p>
+          <p className="text-xs text-slate-500">{t('salaryTable.healthSub')}</p>
         </div>
         {editing ? (
           <div className="flex gap-2">
             <button onClick={() => { setEditing(false); setDraft(settings); setReason(''); }}
-              className="px-3 py-1.5 text-xs bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300">キャンセル</button>
+              className="px-3 py-1.5 text-xs bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300">{t('salaryTable.cancelBtn')}</button>
             <button onClick={handleSave} disabled={!reason.trim()}
-              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40">保存</button>
+              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40">{t('salaryTable.saveBtn')}</button>
           </div>
         ) : (
           <button onClick={() => { setDraft(settings); setEditing(true); }}
-            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">編集</button>
+            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">{t('salaryTable.editBtn')}</button>
         )}
       </div>
 
@@ -161,7 +196,7 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
         {/* Left: Settings */}
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-slate-500">都道府県</label>
+            <label className="text-xs font-medium text-slate-500">{t('salaryTable.prefecture')}</label>
             {editing ? (
               <select value={draft.prefecture} onChange={e => setDraft(p => ({ ...p, prefecture: e.target.value }))}
                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm">
@@ -172,7 +207,7 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
             )}
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500">基本保険料率 (%)</label>
+            <label className="text-xs font-medium text-slate-500">{t('salaryTable.baseRate')}</label>
             {editing ? (
               <input type="number" step="0.01" value={draft.baseRate}
                 onChange={e => setDraft(p => ({ ...p, baseRate: Number(e.target.value) }))}
@@ -182,7 +217,7 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
             )}
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500">介護保険料率（40歳以上）(%)</label>
+            <label className="text-xs font-medium text-slate-500">{t('salaryTable.careTotal')}</label>
             {editing ? (
               <input type="number" step="0.01" value={draft.careInsuranceRate}
                 onChange={e => setDraft(p => ({ ...p, careInsuranceRate: Number(e.target.value) }))}
@@ -193,7 +228,7 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-500">標準報酬月額 下限</label>
+              <label className="text-xs font-medium text-slate-500">{t('salaryTable.standardMin')}</label>
               {editing ? (
                 <input type="number" step="1000" value={draft.standardMonthlyMin}
                   onChange={e => setDraft(p => ({ ...p, standardMonthlyMin: Number(e.target.value) }))}
@@ -203,7 +238,7 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
               )}
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500">標準報酬月額 上限</label>
+              <label className="text-xs font-medium text-slate-500">{t('salaryTable.standardMax')}</label>
               {editing ? (
                 <input type="number" step="10000" value={draft.standardMonthlyMax}
                   onChange={e => setDraft(p => ({ ...p, standardMonthlyMax: Number(e.target.value) }))}
@@ -215,8 +250,8 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
           </div>
           {editing && (
             <div>
-              <label className="text-xs font-medium text-red-600">変更理由 *</label>
-              <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} placeholder="変更理由を入力..."
+              <label className="text-xs font-medium text-red-600">{t('salaryTable.reasonRequired')}</label>
+              <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} placeholder={t('salaryTable.reasonPlaceholder')}
                 className="w-full mt-1 px-3 py-2 border border-red-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 resize-none" />
             </div>
           )}
@@ -224,18 +259,18 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
 
         {/* Right: Calculation breakdown */}
         <div className="bg-slate-50 rounded-lg p-4">
-          <h4 className="text-xs font-semibold text-slate-600 mb-3">負担内訳</h4>
+          <h4 className="text-xs font-semibold text-slate-600 mb-3">{t('salaryTable.burdenBreakdown')}</h4>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-slate-500">基本保険料率 合計</span><span className="font-medium">{settings.baseRate}%</span></div>
-            <div className="flex justify-between pl-4"><span className="text-blue-600">会社負担（1/2）</span><span className="font-medium text-blue-600">{companyHalf}%</span></div>
-            <div className="flex justify-between pl-4"><span className="text-orange-600">従業員負担（1/2）</span><span className="font-medium text-orange-600">{employeeHalf}%</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">{t('salaryTable.totalRate')}</span><span className="font-medium">{settings.baseRate}%</span></div>
+            <div className="flex justify-between pl-4"><span className="text-blue-600">{t('salaryTable.companyHalf')}</span><span className="font-medium text-blue-600">{companyHalf}%</span></div>
+            <div className="flex justify-between pl-4"><span className="text-orange-600">{t('salaryTable.employeeHalf')}</span><span className="font-medium text-orange-600">{employeeHalf}%</span></div>
             <div className="border-t border-slate-200 my-2" />
-            <div className="flex justify-between"><span className="text-slate-500">介護保険料率 合計（40歳以上）</span><span className="font-medium">{settings.careInsuranceRate}%</span></div>
-            <div className="flex justify-between pl-4"><span className="text-blue-600">会社負担（1/2）</span><span className="font-medium text-blue-600">{careCompany}%</span></div>
-            <div className="flex justify-between pl-4"><span className="text-orange-600">従業員負担（1/2）</span><span className="font-medium text-orange-600">{careEmployee}%</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">{t('salaryTable.careTotal')}</span><span className="font-medium">{settings.careInsuranceRate}%</span></div>
+            <div className="flex justify-between pl-4"><span className="text-blue-600">{t('salaryTable.companyHalf')}</span><span className="font-medium text-blue-600">{careCompany}%</span></div>
+            <div className="flex justify-between pl-4"><span className="text-orange-600">{t('salaryTable.employeeHalf')}</span><span className="font-medium text-orange-600">{careEmployee}%</span></div>
             <div className="border-t border-slate-200 my-2" />
-            <div className="flex justify-between font-medium"><span className="text-slate-700">40歳未満 合計負担率</span><span>{settings.baseRate}%</span></div>
-            <div className="flex justify-between font-medium"><span className="text-slate-700">40歳以上 合計負担率</span><span>{(settings.baseRate + settings.careInsuranceRate).toFixed(2)}%</span></div>
+            <div className="flex justify-between font-medium"><span className="text-slate-700">{t('salaryTable.under40Rate')}</span><span>{settings.baseRate}%</span></div>
+            <div className="flex justify-between font-medium"><span className="text-slate-700">{t('salaryTable.over40Rate')}</span><span>{(settings.baseRate + settings.careInsuranceRate).toFixed(2)}%</span></div>
           </div>
         </div>
       </div>
@@ -250,43 +285,46 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
   changeLog: ChangeLog[];
   setChangeLog: React.Dispatch<React.SetStateAction<ChangeLog[]>>;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(settings);
   const [reason, setReason] = useState('');
 
   const handleSave = () => {
     if (!reason.trim()) return;
-    if (draft.totalRate !== settings.totalRate) logChange(setChangeLog, 'pension', '厚生年金', '保険料率合計', `${settings.totalRate}%`, `${draft.totalRate}%`, reason);
-    if (draft.companyRate !== settings.companyRate) logChange(setChangeLog, 'pension', '厚生年金', '会社負担率', `${settings.companyRate}%`, `${draft.companyRate}%`, reason);
-    if (draft.employeeRate !== settings.employeeRate) logChange(setChangeLog, 'pension', '厚生年金', '従業員負担率', `${settings.employeeRate}%`, `${draft.employeeRate}%`, reason);
-    if (draft.standardMonthlyMin !== settings.standardMonthlyMin) logChange(setChangeLog, 'pension', '厚生年金', '標準報酬月額 下限', `¥${settings.standardMonthlyMin.toLocaleString()}`, `¥${draft.standardMonthlyMin.toLocaleString()}`, reason);
-    if (draft.standardMonthlyMax !== settings.standardMonthlyMax) logChange(setChangeLog, 'pension', '厚生年金', '標準報酬月額 上限', `¥${settings.standardMonthlyMax.toLocaleString()}`, `¥${draft.standardMonthlyMax.toLocaleString()}`, reason);
+    const adminLabel = t('salaryTable.historyAdmin');
+    const pensionLabel = t('salaryTable.pensionTitle');
+    if (draft.totalRate !== settings.totalRate) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.totalRate'), `${settings.totalRate}%`, `${draft.totalRate}%`, reason, adminLabel);
+    if (draft.companyRate !== settings.companyRate) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.pensionCompany'), `${settings.companyRate}%`, `${draft.companyRate}%`, reason, adminLabel);
+    if (draft.employeeRate !== settings.employeeRate) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.pensionEmployee'), `${settings.employeeRate}%`, `${draft.employeeRate}%`, reason, adminLabel);
+    if (draft.standardMonthlyMin !== settings.standardMonthlyMin) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.standardMin'), `¥${settings.standardMonthlyMin.toLocaleString()}`, `¥${draft.standardMonthlyMin.toLocaleString()}`, reason, adminLabel);
+    if (draft.standardMonthlyMax !== settings.standardMonthlyMax) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.standardMax'), `¥${settings.standardMonthlyMax.toLocaleString()}`, `¥${draft.standardMonthlyMax.toLocaleString()}`, reason, adminLabel);
     onChange(draft);
     setEditing(false);
     setReason('');
   };
 
   return (
-    <Card title="厚生年金（日本年金機構）">
+    <Card title={t('salaryTable.pensionTitle')}>
       <div className="flex justify-between items-center mb-4">
-        <p className="text-xs text-slate-500">厚生年金保険料率（平成29年9月以降の料率）</p>
+        <p className="text-xs text-slate-500">{t('salaryTable.pensionSub')}</p>
         {editing ? (
           <div className="flex gap-2">
             <button onClick={() => { setEditing(false); setDraft(settings); setReason(''); }}
-              className="px-3 py-1.5 text-xs bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300">キャンセル</button>
+              className="px-3 py-1.5 text-xs bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300">{t('salaryTable.cancelBtn')}</button>
             <button onClick={handleSave} disabled={!reason.trim()}
-              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40">保存</button>
+              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40">{t('salaryTable.saveBtn')}</button>
           </div>
         ) : (
           <button onClick={() => { setDraft(settings); setEditing(true); }}
-            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">編集</button>
+            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">{t('salaryTable.editBtn')}</button>
         )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-slate-500">保険料率 合計 (%)</label>
+            <label className="text-xs font-medium text-slate-500">{t('salaryTable.pensionTotal')}</label>
             {editing ? (
               <input type="number" step="0.01" value={draft.totalRate}
                 onChange={e => {
@@ -300,7 +338,7 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-blue-600">会社負担率 (%)</label>
+              <label className="text-xs font-medium text-blue-600">{t('salaryTable.pensionCompany')}</label>
               {editing ? (
                 <input type="number" step="0.01" value={draft.companyRate}
                   onChange={e => setDraft(p => ({ ...p, companyRate: Number(e.target.value) }))}
@@ -310,7 +348,7 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
               )}
             </div>
             <div>
-              <label className="text-xs font-medium text-orange-600">従業員負担率 (%)</label>
+              <label className="text-xs font-medium text-orange-600">{t('salaryTable.pensionEmployee')}</label>
               {editing ? (
                 <input type="number" step="0.01" value={draft.employeeRate}
                   onChange={e => setDraft(p => ({ ...p, employeeRate: Number(e.target.value) }))}
@@ -322,7 +360,7 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-500">標準報酬月額 下限</label>
+              <label className="text-xs font-medium text-slate-500">{t('salaryTable.standardMin')}</label>
               {editing ? (
                 <input type="number" step="1000" value={draft.standardMonthlyMin}
                   onChange={e => setDraft(p => ({ ...p, standardMonthlyMin: Number(e.target.value) }))}
@@ -332,7 +370,7 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
               )}
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500">標準報酬月額 上限</label>
+              <label className="text-xs font-medium text-slate-500">{t('salaryTable.standardMax')}</label>
               {editing ? (
                 <input type="number" step="10000" value={draft.standardMonthlyMax}
                   onChange={e => setDraft(p => ({ ...p, standardMonthlyMax: Number(e.target.value) }))}
@@ -344,23 +382,23 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
           </div>
           {editing && (
             <div>
-              <label className="text-xs font-medium text-red-600">変更理由 *</label>
-              <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} placeholder="変更理由を入力..."
+              <label className="text-xs font-medium text-red-600">{t('salaryTable.reasonRequired')}</label>
+              <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} placeholder={t('salaryTable.reasonPlaceholder')}
                 className="w-full mt-1 px-3 py-2 border border-red-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 resize-none" />
             </div>
           )}
         </div>
 
         <div className="bg-slate-50 rounded-lg p-4">
-          <h4 className="text-xs font-semibold text-slate-600 mb-3">負担内訳</h4>
+          <h4 className="text-xs font-semibold text-slate-600 mb-3">{t('salaryTable.burdenBreakdown')}</h4>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-slate-500">保険料率 合計</span><span className="font-bold text-lg">{settings.totalRate}%</span></div>
-            <div className="flex justify-between pl-4"><span className="text-blue-600">会社負担（1/2）</span><span className="font-medium text-blue-600">{settings.companyRate}%</span></div>
-            <div className="flex justify-between pl-4"><span className="text-orange-600">従業員負担（1/2）</span><span className="font-medium text-orange-600">{settings.employeeRate}%</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">{t('salaryTable.totalRate')}</span><span className="font-bold text-lg">{settings.totalRate}%</span></div>
+            <div className="flex justify-between pl-4"><span className="text-blue-600">{t('salaryTable.companyHalf')}</span><span className="font-medium text-blue-600">{settings.companyRate}%</span></div>
+            <div className="flex justify-between pl-4"><span className="text-orange-600">{t('salaryTable.employeeHalf')}</span><span className="font-medium text-orange-600">{settings.employeeRate}%</span></div>
             <div className="border-t border-slate-200 my-2" />
-            <p className="text-xs text-slate-500">例: 標準報酬月額 300,000円の場合</p>
-            <div className="flex justify-between"><span className="text-blue-600">会社負担額</span><span>¥{Math.round(300000 * settings.companyRate / 100).toLocaleString()}</span></div>
-            <div className="flex justify-between"><span className="text-orange-600">従業員負担額</span><span>¥{Math.round(300000 * settings.employeeRate / 100).toLocaleString()}</span></div>
+            <p className="text-xs text-slate-500">{t('salaryTable.pensionExample')}</p>
+            <div className="flex justify-between"><span className="text-blue-600">{t('salaryTable.companyBurden')}</span><span>¥{Math.round(300000 * settings.companyRate / 100).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-orange-600">{t('salaryTable.employeeBurden')}</span><span>¥{Math.round(300000 * settings.employeeRate / 100).toLocaleString()}</span></div>
           </div>
         </div>
       </div>
@@ -375,20 +413,23 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
   changeLog: ChangeLog[];
   setChangeLog: React.Dispatch<React.SetStateAction<ChangeLog[]>>;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(brackets);
   const [reason, setReason] = useState('');
 
   const handleSave = () => {
     if (!reason.trim()) return;
+    const adminLabel = t('salaryTable.historyAdmin');
+    const taxLabel = t('salaryTable.taxTitle');
     draft.forEach((b, i) => {
       const orig = brackets[i];
       if (!orig) return;
       if (orig.rate !== b.rate) {
-        logChange(setChangeLog, 'income_tax', '所得税', `税率(${orig.min}万円〜)`, `${orig.rate}%`, `${b.rate}%`, reason);
+        logChange(setChangeLog, 'income_tax', taxLabel, `${t('salaryTable.taxRate')}(${orig.min}${t('salaryTable.aboveSuffix')})`, `${orig.rate}%`, `${b.rate}%`, reason, adminLabel);
       }
       if (orig.deduction !== b.deduction) {
-        logChange(setChangeLog, 'income_tax', '所得税', `控除額(${orig.min}万円〜)`, `¥${orig.deduction.toLocaleString()}`, `¥${b.deduction.toLocaleString()}`, reason);
+        logChange(setChangeLog, 'income_tax', taxLabel, `${t('salaryTable.taxDeduction')}(${orig.min}${t('salaryTable.aboveSuffix')})`, `¥${orig.deduction.toLocaleString()}`, `¥${b.deduction.toLocaleString()}`, reason, adminLabel);
       }
     });
     onChange(draft);
@@ -397,19 +438,19 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
   };
 
   return (
-    <Card title="所得税（源泉徴収税額表）">
+    <Card title={t('salaryTable.taxTitle')}>
       <div className="flex justify-between items-center mb-4">
-        <p className="text-xs text-slate-500">給与所得の源泉徴収税額表（月額表・甲欄）</p>
+        <p className="text-xs text-slate-500">{t('salaryTable.taxSub')}</p>
         {editing ? (
           <div className="flex gap-2">
             <button onClick={() => { setEditing(false); setDraft(brackets); setReason(''); }}
-              className="px-3 py-1.5 text-xs bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300">キャンセル</button>
+              className="px-3 py-1.5 text-xs bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300">{t('salaryTable.cancelBtn')}</button>
             <button onClick={handleSave} disabled={!reason.trim()}
-              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40">保存</button>
+              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40">{t('salaryTable.saveBtn')}</button>
           </div>
         ) : (
           <button onClick={() => { setDraft(brackets); setEditing(true); }}
-            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">編集</button>
+            className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">{t('salaryTable.editBtn')}</button>
         )}
       </div>
 
@@ -417,10 +458,10 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
         <table className="w-full">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">課税対象月額（万円）</th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-slate-500">税率 (%)</th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-slate-500">控除額 (円)</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">備考</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">{t('salaryTable.bracketCol')}</th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-slate-500">{t('salaryTable.rateCol')}</th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-slate-500">{t('salaryTable.deductionCol')}</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">{t('salaryTable.memoCol')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -437,10 +478,10 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
                       <input type="number" value={b.max ?? ''} onChange={e => {
                         const v = e.target.value === '' ? null : Number(e.target.value);
                         setDraft(p => p.map((x, j) => j === i ? { ...x, max: v } : x));
-                      }} placeholder="上限なし" className="w-20 px-2 py-1 border border-slate-300 rounded text-sm" />
+                      }} placeholder={t('salaryTable.noLimit')} className="w-20 px-2 py-1 border border-slate-300 rounded text-sm" />
                     </div>
                   ) : (
-                    <span>{b.min.toLocaleString()}万 〜 {b.max ? `${b.max.toLocaleString()}万` : '以上'}</span>
+                    <span>{b.min.toLocaleString()}万 〜 {b.max ? `${b.max.toLocaleString()}万` : t('salaryTable.aboveSuffix')}</span>
                   )}
                 </td>
                 <td className="px-4 py-2 text-sm text-right">
@@ -464,7 +505,7 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
                   )}
                 </td>
                 <td className="px-4 py-2 text-xs text-slate-500">
-                  {b.rate === 5 ? '最低税率' : b.rate === 45 ? '最高税率' : ''}
+                  {b.rate === 5 ? t('salaryTable.lowestTax') : b.rate === 45 ? t('salaryTable.highestTax') : ''}
                 </td>
               </tr>
             ))}
@@ -474,24 +515,24 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
 
       {editing && (
         <div className="mt-4">
-          <label className="text-xs font-medium text-red-600">変更理由 *</label>
-          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} placeholder="変更理由を入力..."
+          <label className="text-xs font-medium text-red-600">{t('salaryTable.reasonRequired')}</label>
+          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} placeholder={t('salaryTable.reasonPlaceholder')}
             className="w-full mt-1 px-3 py-2 border border-red-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 resize-none" />
         </div>
       )}
 
       {/* Tax calculation example */}
       <div className="mt-4 bg-slate-50 rounded-lg p-4">
-        <h4 className="text-xs font-semibold text-slate-600 mb-3">計算例</h4>
+        <h4 className="text-xs font-semibold text-slate-600 mb-3">{t('salaryTable.calcExample')}</h4>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[20, 40, 80].map(salary => {
             const bracket = brackets.find(b => salary >= b.min && (b.max === null || salary <= b.max));
             const tax = bracket ? Math.max(0, Math.round(salary * 10000 * bracket.rate / 100 - bracket.deduction)) : 0;
             return (
               <div key={salary} className="bg-white rounded-lg p-3 border border-slate-200">
-                <p className="text-xs text-slate-500">月給 {salary}万円</p>
+                <p className="text-xs text-slate-500">{t('payroll.baseSalaryLabel')} {salary}{t('salaryTable.aboveSuffix')}</p>
                 <p className="text-lg font-bold text-red-600">¥{tax.toLocaleString()}</p>
-                <p className="text-xs text-slate-400">税率{bracket?.rate}% / 控除¥{bracket?.deduction.toLocaleString()}</p>
+                <p className="text-xs text-slate-400">{t('salaryTable.taxRate')}{bracket?.rate}% / {t('salaryTable.taxDeduction')} ¥{bracket?.deduction.toLocaleString()}</p>
               </div>
             );
           })}
@@ -505,53 +546,56 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
 function EditModal({ item, onSave, onClose }: {
   item: RateItem; onSave: (updated: RateItem, reason: string) => void; onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState({ ...item });
   const [reason, setReason] = useState('');
+
+  const trans = getItemTranslation(item.id, item.name, item.description, t);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={e => e.stopPropagation()}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-slate-800">{item.name} - 編集</h3>
+            <h3 className="text-lg font-bold text-slate-800">{trans.name} - {t('salaryTable.editBtn')}</h3>
             <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
           </div>
-          <p className="text-xs text-slate-500 mb-4">{item.description}</p>
+          <p className="text-xs text-slate-500 mb-4">{trans.desc}</p>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-slate-600">会社負担率 (%)</label>
+              <label className="text-sm font-medium text-slate-600">{t('salaryTable.companyRate')}</label>
               <input type="number" step="0.01" value={draft.companyRate}
                 onChange={e => setDraft(p => ({ ...p, companyRate: Number(e.target.value) }))}
                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-600">従業員負担率 (%)</label>
+              <label className="text-sm font-medium text-slate-600">{t('salaryTable.employeeRate')}</label>
               <input type="number" step="0.01" value={draft.employeeRate}
                 onChange={e => setDraft(p => ({ ...p, employeeRate: Number(e.target.value) }))}
                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-600">会社負担額 (円)</label>
+              <label className="text-sm font-medium text-slate-600">{t('salaryTable.companyFixed')}</label>
               <input type="number" step="100" value={draft.companyFixed}
                 onChange={e => setDraft(p => ({ ...p, companyFixed: Number(e.target.value) }))}
                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-600">従業員負担額 (円)</label>
+              <label className="text-sm font-medium text-slate-600">{t('salaryTable.employeeFixed')}</label>
               <input type="number" step="100" value={draft.employeeFixed}
                 onChange={e => setDraft(p => ({ ...p, employeeFixed: Number(e.target.value) }))}
                 className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
             </div>
             <div>
-              <label className="text-sm font-medium text-red-600">変更理由 (必須) *</label>
-              <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} placeholder="変更理由を入力..."
+              <label className="text-sm font-medium text-red-600">{t('salaryTable.reasonRequired')}</label>
+              <textarea value={reason} onChange={e => setReason(e.target.value)} rows={2} placeholder={t('salaryTable.reasonPlaceholder')}
                 className="w-full mt-1 px-3 py-2 border border-red-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 resize-none" />
             </div>
           </div>
           <div className="flex justify-end gap-3 mt-6">
-            <button onClick={onClose} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 text-sm">キャンセル</button>
+            <button onClick={onClose} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 text-sm">{t('salaryTable.cancelBtn')}</button>
             <button onClick={() => { if (reason.trim()) onSave(draft, reason); }} disabled={!reason.trim()}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-40">保存</button>
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-40">{t('salaryTable.saveBtn')}</button>
           </div>
         </div>
       </div>
@@ -561,6 +605,7 @@ function EditModal({ item, onSave, onClose }: {
 
 // ─── Main Component ───────────────────────────────────────────────
 export default function SalaryTableClient() {
+  const { t, locale } = useI18n();
   const [rates, setRates] = useState<RateItem[]>(defaultRates);
   const [health, setHealth] = useState<HealthInsuranceSettings>(defaultHealth);
   const [pension, setPension] = useState<PensionSettings>(defaultPension);
@@ -574,10 +619,12 @@ export default function SalaryTableClient() {
   const handleSaveRate = (updated: RateItem, reason: string) => {
     const original = rates.find(r => r.id === updated.id);
     if (!original) return;
-    if (original.companyRate !== updated.companyRate) logChange(setChangeLog, updated.id, updated.name, '会社負担率', `${original.companyRate}%`, `${updated.companyRate}%`, reason);
-    if (original.employeeRate !== updated.employeeRate) logChange(setChangeLog, updated.id, updated.name, '従業員負担率', `${original.employeeRate}%`, `${updated.employeeRate}%`, reason);
-    if (original.companyFixed !== updated.companyFixed) logChange(setChangeLog, updated.id, updated.name, '会社負担額', `¥${original.companyFixed.toLocaleString()}`, `¥${updated.companyFixed.toLocaleString()}`, reason);
-    if (original.employeeFixed !== updated.employeeFixed) logChange(setChangeLog, updated.id, updated.name, '従業員負担額', `¥${original.employeeFixed.toLocaleString()}`, `¥${updated.employeeFixed.toLocaleString()}`, reason);
+    const trans = getItemTranslation(updated.id, updated.name, updated.description, t);
+    const adminLabel = t('salaryTable.historyAdmin');
+    if (original.companyRate !== updated.companyRate) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.companyRate'), `${original.companyRate}%`, `${updated.companyRate}%`, reason, adminLabel);
+    if (original.employeeRate !== updated.employeeRate) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.employeeRate'), `${original.employeeRate}%`, `${updated.employeeRate}%`, reason, adminLabel);
+    if (original.companyFixed !== updated.companyFixed) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.companyFixed'), `¥${original.companyFixed.toLocaleString()}`, `¥${updated.companyFixed.toLocaleString()}`, reason, adminLabel);
+    if (original.employeeFixed !== updated.employeeFixed) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.employeeFixed'), `¥${original.employeeFixed.toLocaleString()}`, `¥${updated.employeeFixed.toLocaleString()}`, reason, adminLabel);
     setRates(prev => prev.map(r => r.id === updated.id ? updated : r));
     setEditingItem(null);
     setSaved(true);
@@ -597,17 +644,17 @@ export default function SalaryTableClient() {
       {saved && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
           <span className="text-green-600 text-lg">&#10003;</span>
-          <span className="text-sm font-medium text-green-800">変更を保存しました（変更履歴に記録されています）</span>
+          <span className="text-sm font-medium text-green-800">{t('salaryTable.savedSuccess')}</span>
         </div>
       )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: '会社負担 保険率合計', value: `${stats.insCo.toFixed(2)}%`, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: '従業員負担 保険率合計', value: `${stats.insEm.toFixed(2)}%`, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: '設定項目数', value: `${stats.total}項目`, color: 'text-slate-600', bg: 'bg-slate-50' },
-          { label: '変更履歴', value: `${stats.changes}件`, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: t('salaryTable.companyInsTotal'), value: `${stats.insCo.toFixed(2)}%`, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: t('salaryTable.employeeInsTotal'), value: `${stats.insEm.toFixed(2)}%`, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: t('salaryTable.configItems'), value: `${stats.total} ${t('salaryTable.itemUnit')}`, color: 'text-slate-600', bg: 'bg-slate-50' },
+          { label: t('salaryTable.changeHistory'), value: `${stats.changes} ${t('payroll.degreeSuffix') || ''}`, color: 'text-purple-600', bg: 'bg-purple-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-200`}>
             <p className="text-xs text-slate-500 mb-1">{s.label}</p>
@@ -617,121 +664,148 @@ export default function SalaryTableClient() {
       </div>
 
       {/* Three main insurance/tax sections */}
-      <HealthInsuranceSection settings={health} onChange={setHealth} changeLog={changeLog} setChangeLog={setChangeLog} />
-      <PensionSection settings={pension} onChange={setPension} changeLog={changeLog} setChangeLog={setChangeLog} />
-      <IncomeTaxSection brackets={taxBrackets} onChange={setTaxBrackets} changeLog={changeLog} setChangeLog={setChangeLog} />
+      <div className="space-y-6 mt-6">
+        <HealthInsuranceSection settings={health} onChange={setHealth} changeLog={changeLog} setChangeLog={setChangeLog} />
+        <PensionSection settings={pension} onChange={setPension} changeLog={changeLog} setChangeLog={setChangeLog} />
+        <IncomeTaxSection brackets={taxBrackets} onChange={setTaxBrackets} changeLog={changeLog} setChangeLog={setChangeLog} />
+      </div>
 
       {/* Category Filter + Change Log toggle */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap mt-6">
         <button onClick={() => setActiveCategory('all')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeCategory === 'all' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>すべて</button>
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeCategory === 'all' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{t('payroll.filterClear')}</button>
         {['insurance', 'tax', 'allowance'].map(cat => (
           <button key={cat} onClick={() => setActiveCategory(cat)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeCategory === cat ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{categoryLabel(cat)}</button>
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeCategory === cat ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{t('salaryTable.' + cat)}</button>
         ))}
         <div className="flex-1" />
         <button onClick={() => setShowLog(!showLog)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showLog ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'}`}>変更履歴 ({changeLog.length})</button>
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showLog ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'}`}>{t('salaryTable.changeHistory')} ({changeLog.length})</button>
       </div>
 
       {/* Other Rates Table */}
-      <Card title="雇用保険・労災保険・手当 一覧">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">項目名</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">種別</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-blue-600 uppercase">会社負担率</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-orange-600 uppercase">従業員負担率</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-blue-600 uppercase">会社負担額</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-orange-600 uppercase">従業員負担額</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">備考</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map(item => (
-                <tr key={item.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3"><p className="text-sm font-medium text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.nameKana}</p></td>
-                  <td className="px-4 py-3 text-center"><span className={`px-2 py-0.5 text-xs rounded ${categoryColor(item.category)}`}>{categoryLabel(item.category)}</span></td>
-                  <td className="px-4 py-3 text-sm text-right font-medium text-blue-600">{item.companyRate > 0 ? `${item.companyRate}%` : '-'}</td>
-                  <td className="px-4 py-3 text-sm text-right font-medium text-orange-600">{item.employeeRate > 0 ? `${item.employeeRate}%` : '-'}</td>
-                  <td className="px-4 py-3 text-sm text-right text-blue-600">{item.companyFixed > 0 ? `¥${item.companyFixed.toLocaleString()}` : '-'}</td>
-                  <td className="px-4 py-3 text-sm text-right text-orange-600">{item.employeeFixed > 0 ? `¥${item.employeeFixed.toLocaleString()}` : '-'}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500 max-w-[200px]">{item.description}</td>
-                  <td className="px-4 py-3 text-center">
-                    <button onClick={() => setEditingItem(item)} className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100">編集</button>
-                  </td>
+      <div className="mt-6">
+        <Card title={t('salaryTable.otherRatesTitle')}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('salaryTable.itemName')}</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('salaryTable.itemType')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-blue-600 uppercase">{t('salaryTable.companyRate')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-orange-600 uppercase">{t('salaryTable.employeeRate')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-blue-600 uppercase">{t('salaryTable.companyFixed')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-orange-600 uppercase">{t('salaryTable.employeeFixed')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('salaryTable.memo')}</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('paymentMethods.colActions')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map(item => {
+                  const trans = getItemTranslation(item.id, item.name, item.description, t);
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-slate-800">{trans.name}</p>
+                        {locale === 'ja' && <p className="text-xs text-slate-400">{item.nameKana}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 text-xs rounded ${categoryColor(item.category)}`}>
+                          {t('salaryTable.' + item.category)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right font-medium text-blue-600">{item.companyRate > 0 ? `${item.companyRate}%` : '-'}</td>
+                      <td className="px-4 py-3 text-sm text-right font-medium text-orange-600">{item.employeeRate > 0 ? `${item.employeeRate}%` : '-'}</td>
+                      <td className="px-4 py-3 text-sm text-right text-blue-600">{item.companyFixed > 0 ? `¥${item.companyFixed.toLocaleString()}` : '-'}</td>
+                      <td className="px-4 py-3 text-sm text-right text-orange-600">{item.employeeFixed > 0 ? `¥${item.employeeFixed.toLocaleString()}` : '-'}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500 max-w-[200px]">{trans.desc}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button onClick={() => setEditingItem(item)} className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100">{t('salaryTable.editBtn')}</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
 
       {/* Summary */}
-      <Card title="会社負担 vs 従業員負担 サマリー">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-blue-50 rounded-xl p-5">
-            <h4 className="text-sm font-semibold text-blue-800 mb-3">会社負担</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span>健康保険</span><span className="font-medium">{(health.baseRate / 2).toFixed(2)}%</span></div>
-              <div className="flex justify-between"><span>厚生年金</span><span className="font-medium">{pension.companyRate}%</span></div>
-              {rates.filter(r => r.companyRate > 0).map(r => (
-                <div key={r.id} className="flex justify-between"><span>{r.name}</span><span className="font-medium">{r.companyRate}%</span></div>
-              ))}
-              {rates.filter(r => r.companyFixed > 0).map(r => (
-                <div key={r.id} className="flex justify-between"><span>{r.name}</span><span className="font-medium">¥{r.companyFixed.toLocaleString()}</span></div>
-              ))}
+      <div className="mt-6">
+        <Card title={t('salaryTable.summaryTitle')}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-blue-50 rounded-xl p-5">
+              <h4 className="text-sm font-semibold text-blue-800 mb-3">{t('salaryTable.companyBurden')}</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span>{t('salaryTable.healthTitle')}</span><span className="font-medium">{(health.baseRate / 2).toFixed(2)}%</span></div>
+                <div className="flex justify-between>"><span>{t('salaryTable.pensionTitle')}</span><span className="font-medium">{pension.companyRate}%</span></div>
+                {rates.filter(r => r.companyRate > 0).map(r => {
+                  const trans = getItemTranslation(r.id, r.name, r.description, t);
+                  return (
+                    <div key={r.id} className="flex justify-between"><span>{trans.name}</span><span className="font-medium">{r.companyRate}%</span></div>
+                  );
+                })}
+                {rates.filter(r => r.companyFixed > 0).map(r => {
+                  const trans = getItemTranslation(r.id, r.name, r.description, t);
+                  return (
+                    <div key={r.id} className="flex justify-between"><span>{trans.name}</span><span className="font-medium">¥{r.companyFixed.toLocaleString()}</span></div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="bg-orange-50 rounded-xl p-5">
+              <h4 className="text-sm font-semibold text-orange-800 mb-3">{t('salaryTable.employeeBurden')}</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span>{t('salaryTable.healthTitle')}</span><span className="font-medium">{(health.baseRate / 2).toFixed(2)}%</span></div>
+                <div className="flex justify-between"><span>{t('salaryTable.pensionTitle')}</span><span className="font-medium">{pension.employeeRate}%</span></div>
+                {rates.filter(r => r.employeeRate > 0).map(r => {
+                  const trans = getItemTranslation(r.id, r.name, r.description, t);
+                  return (
+                    <div key={r.id} className="flex justify-between"><span>{trans.name}</span><span className="font-medium">{r.employeeRate}%</span></div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-          <div className="bg-orange-50 rounded-xl p-5">
-            <h4 className="text-sm font-semibold text-orange-800 mb-3">従業員負担</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span>健康保険</span><span className="font-medium">{(health.baseRate / 2).toFixed(2)}%</span></div>
-              <div className="flex justify-between"><span>厚生年金</span><span className="font-medium">{pension.employeeRate}%</span></div>
-              {rates.filter(r => r.employeeRate > 0).map(r => (
-                <div key={r.id} className="flex justify-between"><span>{r.name}</span><span className="font-medium">{r.employeeRate}%</span></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       {/* Change Log */}
       {showLog && (
-        <Card title="変更履歴">
-          {changeLog.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-8">変更履歴はありません</p>
-          ) : (
-            <div className="space-y-3">
-              {changeLog.map(log => (
-                <div key={log.id} className="flex gap-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-slate-800">{log.itemName}</span>
-                      <span className="text-xs text-slate-400">-</span>
-                      <span className="text-xs text-slate-500">{log.field}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-red-500 line-through">{log.oldValue}</span>
-                      <span className="text-slate-400">&rarr;</span>
-                      <span className="text-green-600 font-medium">{log.newValue}</span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">理由: {log.reason}</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-slate-400">{log.timestamp}</span>
-                      <span className="text-xs text-slate-400">|</span>
-                      <span className="text-xs text-slate-400">{log.user}</span>
+        <div className="mt-6">
+          <Card title={t('salaryTable.changeHistoryTitle')}>
+            {changeLog.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-8">{t('salaryTable.noChangeHistory')}</p>
+            ) : (
+              <div className="space-y-3">
+                {changeLog.map(log => (
+                  <div key={log.id} className="flex gap-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium text-slate-800">{log.itemName}</span>
+                        <span className="text-xs text-slate-400">-</span>
+                        <span className="text-xs text-slate-500">{log.field}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-red-500 line-through">{log.oldValue}</span>
+                        <span className="text-slate-400">&rarr;</span>
+                        <span className="text-green-600 font-medium">{log.newValue}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">{t('salaryTable.historyReason')}: {log.reason}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-slate-400">{log.timestamp}</span>
+                        <span className="text-xs text-slate-400">|</span>
+                        <span className="text-xs text-slate-400">{log.user}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
       )}
 
       {editingItem && <EditModal item={editingItem} onSave={handleSaveRate} onClose={() => setEditingItem(null)} />}

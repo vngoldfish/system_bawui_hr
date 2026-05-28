@@ -48,6 +48,9 @@ export async function POST(request: NextRequest) {
       email: employee.email,
       role: employee.role,
       permissions,
+      avatar: employee.avatar || '',
+      language: employee.language || 'ja',
+      nationality: employee.nationality || '日本',
     };
 
     // Serialize and set cookie

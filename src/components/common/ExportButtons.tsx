@@ -1,6 +1,7 @@
 'use client';
 
 import { RefObject, useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 
 interface ExportButtonsProps {
   data: Record<string, unknown>[];
@@ -11,6 +12,7 @@ interface ExportButtonsProps {
 }
 
 export default function ExportButtons({ data, columns, fileName, tableRef, rowsPerPage: rowsPerPageProp }: ExportButtonsProps) {
+  const { t } = useI18n();
   const [showModal, setShowModal] = useState(false);
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [pageCount, setPageCount] = useState(0);
@@ -63,8 +65,8 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
     const margin = 10;
     const imgW = pdfW - margin * 2;
 
-    const companyName = '株式会社ロング';
-    const companyAddress = '〒100-0001 東京都千代田区千代田1-1-1 ロングビル3F';
+    const companyName = t('common.companyName');
+    const companyAddress = t('common.companyAddress');
 
     const headerHtml = `<tr style="background:#334155;color:white;">${columns.map(c => `<th style="padding:8px 12px;text-align:left;border:1px solid #475569;">${c.header}</th>`).join('')}</tr>`;
     const rowHtml = (row: Record<string, unknown>, i: number) =>
@@ -131,7 +133,7 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-xl shadow-xl p-6 w-80" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-slate-800 mb-4">PDF出力ページ選択</h3>
+            <h3 className="text-lg font-bold text-slate-800 mb-4">{t('common.exportPdfTitle')}</h3>
 
             <div className="space-y-2 mb-4">
               {Array.from({ length: pageCount }, (_, i) => i + 1).map(page => {
@@ -147,7 +149,7 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
                       className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
                     />
                     <span className="text-sm text-slate-700">
-                      ページ {page} <span className="text-slate-400">({start}〜{end}件目)</span>
+                      {t('common.exportPageLabel').replace('{page}', String(page)).replace('{start}', String(start)).replace('{end}', String(end))}
                     </span>
                   </label>
                 );
@@ -158,7 +160,7 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
               onClick={toggleAll}
               className="text-sm text-blue-600 hover:text-blue-800 mb-4"
             >
-              {selectedPages.length === pageCount ? '全て解除' : '全て選択'}
+              {selectedPages.length === pageCount ? t('common.uncheckAll') : t('common.checkAll')}
             </button>
 
             <div className="flex gap-2">
@@ -166,14 +168,14 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
                 onClick={() => setShowModal(false)}
                 className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
               >
-                キャンセル
+                {t('common.cancel')}
               </button>
               <button
                 onClick={() => { setShowModal(false); exportToPdf(selectedPages); }}
                 disabled={selectedPages.length === 0}
                 className="flex-1 px-4 py-2 bg-rose-600 text-white rounded-lg text-sm hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                出力 ({selectedPages.length}ページ)
+                {t('common.exportBtn').replace('{pages}', String(selectedPages.length))}
               </button>
             </div>
           </div>

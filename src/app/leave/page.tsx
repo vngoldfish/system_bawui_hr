@@ -30,7 +30,9 @@ export default async function LeavePage() {
     redirect('/login');
   }
   
-  const isEmployee = dbUser.role === 'EMPLOYEE';
+  const viewMode = cookieStore.get('view_mode')?.value || 'admin';
+  const isEmployee = dbUser.role === 'EMPLOYEE' || viewMode === 'employee';
+  const isDeptManager = dbUser.role === 'DEPARTMENT_MANAGER' && viewMode !== 'employee';
   
   // Fetch employees list
   let employees = [];
@@ -46,6 +48,25 @@ export default async function LeavePage() {
       department: dept?.name || '未所属',
       position: pos?.name || '一般社員',
     }];
+  } else if (isDeptManager) {
+    const dbEmployees = await prisma.employee.findMany({
+      where: {
+        departmentId: dbUser.departmentId,
+      },
+      include: {
+        department: true,
+        position: true,
+      },
+    });
+    employees = dbEmployees.map(emp => ({
+      id: emp.id,
+      firstName: emp.firstName,
+      lastName: emp.lastName,
+      firstNameKana: emp.firstNameKana || '',
+      lastNameKana: emp.lastNameKana || '',
+      department: emp.department?.name || '未所属',
+      position: emp.position?.name || '役職なし',
+    }));
   } else {
     const dbEmployees = await prisma.employee.findMany({
       include: {
@@ -65,9 +86,13 @@ export default async function LeavePage() {
   }
   
   // Fetch leave requests
-  let where: any = {};
+  const where: any = {};
   if (isEmployee) {
     where.employeeId = dbUser.id;
+  } else if (isDeptManager) {
+    where.employee = {
+      departmentId: dbUser.departmentId,
+    };
   }
   
   const dbLeaves = await prisma.leaveRequest.findMany({
@@ -89,7 +114,7 @@ export default async function LeavePage() {
   return (
     <DashboardLayout title="休暇管理" subtitle={isEmployee ? `${dbUser.lastName} ${dbUser.firstName} さんの休暇申請` : "休暇申請の管理と承認"}>
       <div className="space-y-6">
-        <LeaveClient employees={employees} initialLeaves={leaves} isEmployeeMode={isEmployee} />
+        <LeaveClient employees={employees} initialLeaves={leaves} isEmployeeMode={isEmployee} currentUserId={dbUser.id} />
       </div>
     </DashboardLayout>
   );

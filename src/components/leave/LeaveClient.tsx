@@ -1,4 +1,5 @@
 'use client';
+import { useI18n } from '@/lib/i18n';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import Card from '@/components/common/Card';
@@ -22,38 +23,27 @@ interface LeaveBalance {
 
 const PAGE_SIZE = 10;
 
-const typeOptions = [
-  { value: 'ANNUAL', label: '有給休暇' },
-  { value: 'SICK', label: '病気休暇' },
-  { value: 'PERSONAL', label: '特別休暇' },
-];
 
-const statusOptions = [
-  { value: 'PENDING', label: '承認待ち' },
-  { value: 'APPROVED', label: '承認済み' },
-  { value: 'REJECTED', label: '却下' },
-];
 
 const typeColor = (t: string) =>
   t === 'ANNUAL' ? 'bg-blue-100 text-blue-700' :
   t === 'SICK' ? 'bg-orange-100 text-orange-700' :
   t === 'PERSONAL' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700';
 
-const typeLabel = (t: string) =>
-  t === 'ANNUAL' ? '有給休暇' : t === 'SICK' ? '病気休暇' : t === 'PERSONAL' ? '特別休暇' : t;
+
 
 const statusColor = (s: string) =>
   s === 'APPROVED' ? 'bg-green-100 text-green-800' :
   s === 'REJECTED' ? 'bg-red-100 text-red-800' :
   s === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 'bg-slate-100 text-slate-800';
 
-const statusLabel = (s: string) =>
-  s === 'APPROVED' ? '承認済み' : s === 'REJECTED' ? '却下' : s === 'PENDING' ? '承認待ち' : s;
+
 
 function FilterDropdown({ options, selected, onSelect, onClose }: {
   options: { value: string; label: string }[]; selected: string[];
   onSelect: (values: string[]) => void; onClose: () => void;
 }) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
@@ -72,7 +62,7 @@ function FilterDropdown({ options, selected, onSelect, onClose }: {
         </label>
       ))}
       {selected.length > 0 && (
-        <button onClick={() => onSelect([])} className="w-full mt-1 px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-100 rounded border-t border-slate-100">クリア</button>
+        <button onClick={() => onSelect([])} className="w-full mt-1 px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-100 rounded border-t border-slate-100">{t('common.clear')}</button>
       )}
     </div>
   );
@@ -84,11 +74,12 @@ function FilterTh({ label, filterKey, options, activeFilter, columnFilters, onFi
   onFilterChange: (key: string, values: string[]) => void; onActiveFilterChange: (key: string | null) => void;
   widthClass?: string;
 }) {
+  const { t } = useI18n();
   const hasFilter = (columnFilters[filterKey]?.length ?? 0) > 0;
   const isActive = activeFilter === filterKey;
   return (
     <th className={`px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer select-none relative ${widthClass || ''}`}
-      onDoubleClick={() => onActiveFilterChange(isActive ? null : filterKey)} title="ダブルクリックでフィルター">
+      onDoubleClick={() => onActiveFilterChange(isActive ? null : filterKey)} title={t('leave.doubleClickFilter')}>
       <div className="flex items-center gap-1">
         <span>{label}</span>
         {hasFilter && <svg className="w-3.5 h-3.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" /></svg>}
@@ -98,7 +89,32 @@ function FilterTh({ label, filterKey, options, activeFilter, columnFilters, onFi
   );
 }
 
-export default function LeaveClient({ employees, initialLeaves, isEmployeeMode = false }: { employees: Employee[]; initialLeaves: LeaveRequest[]; isEmployeeMode?: boolean }) {
+export default function LeaveClient({
+  employees,
+  initialLeaves,
+  isEmployeeMode = false,
+  currentUserId,
+}: {
+  employees: Employee[];
+  initialLeaves: LeaveRequest[];
+  isEmployeeMode?: boolean;
+  currentUserId?: string;
+}) {
+  const { t } = useI18n();
+  const typeOptions = [
+    { value: 'ANNUAL', label: t('leave.annual') },
+    { value: 'SICK', label: t('leave.sick') },
+    { value: 'PERSONAL', label: t('leave.special') },
+  ];
+  const statusOptions = [
+    { value: 'PENDING', label: t('common.pending') },
+    { value: 'APPROVED', label: t('common.approved') },
+    { value: 'REJECTED', label: t('common.rejected') },
+  ];
+  const typeLabel = (typeVal: string) =>
+    typeVal === 'ANNUAL' ? t('leave.annual') : typeVal === 'SICK' ? t('leave.sick') : typeVal === 'PERSONAL' ? t('leave.special') : typeVal;
+  const statusLabel = (statusVal: string) =>
+    statusVal === 'APPROVED' ? t('common.approved') : statusVal === 'REJECTED' ? t('common.rejected') : statusVal === 'PENDING' ? t('common.pending') : statusVal;
   const [leaves, setLeaves] = useState(initialLeaves);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -128,7 +144,7 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
       if (res.ok) {
         setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: 'APPROVED' } : l));
       } else {
-        alert('承認に失敗しました');
+        alert(t('leave.approveFailed'));
       }
     } catch (e) {
       console.error(e);
@@ -145,7 +161,7 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
       if (res.ok) {
         setLeaves(prev => prev.map(l => l.id === id ? { ...l, status: 'REJECTED' } : l));
       } else {
-        alert('却下に失敗しました');
+        alert(t('leave.rejectFailed'));
       }
     } catch (e) {
       console.error(e);
@@ -186,11 +202,11 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
           reason: '' 
         });
       } else {
-        alert(body.error || '申請に失敗しました');
+        alert(body.error || t('leave.applyFailed'));
       }
     } catch (error) {
       console.error('Failed to submit leave:', error);
-      alert('申請中にエラーが発生しました');
+      alert(t('leave.applyError'));
     }
   };
 
@@ -245,11 +261,11 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: '承認待ち', value: stats.pending, color: 'text-yellow-600', bg: 'bg-yellow-50' },
-          { label: '承認済み', value: stats.approved, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: '却下', value: stats.rejected, color: 'text-red-600', bg: 'bg-red-50' },
-          { label: '総申請数', value: stats.total, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: '承認済日数', value: `${stats.totalDays}日`, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: t('common.pending'), value: stats.pending, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+          { label: t('common.approved'), value: stats.approved, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: t('common.rejected'), value: stats.rejected, color: 'text-red-600', bg: 'bg-red-50' },
+          { label: t('leave.totalRequests'), value: stats.total, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: t('leave.approvedDays'), value: `${stats.totalDays}${t('common.dayUnit')}`, color: 'text-purple-600', bg: 'bg-purple-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-200`}>
             <p className="text-xs text-slate-500 mb-1">{s.label}</p>
@@ -259,55 +275,55 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
       </div>
 
       {/* New Leave Request */}
-      <Card title="休暇申請一覧">
+      <Card title={t('leave.list')}>
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <input type="text" placeholder="名前・理由で検索..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+            <input type="text" placeholder={t('leave.searchPlaceholder')} value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
               className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" />
           </div>
           {activeFilterCount > 0 && (
             <button onClick={() => { setColumnFilters({}); setCurrentPage(1); }}
-              className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg border border-red-200">フィルタークリア ({activeFilterCount})</button>
+              className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg border border-red-200">{t('common.clear')} ({activeFilterCount})</button>
           )}
           <button onClick={() => setShowNewForm(!showNewForm)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-            新規申請
+            {t('leave.newRequest')}
           </button>
           <ExportButtons
             data={filtered.map(l => {
               const emp = employees.find(e => e.id === l.employeeId);
               return {
                 name: emp ? `${emp.lastName} ${emp.firstName}` : '', type: typeLabel(l.type),
-                startDate: l.startDate, endDate: l.endDate, days: `${l.days}日`,
+                startDate: l.startDate, endDate: l.endDate, days: `${l.days}${t('common.dayUnit')}`,
                 reason: l.reason, status: statusLabel(l.status),
               };
             })}
             columns={[
-              { header: '氏名', key: 'name' }, { header: '種類', key: 'type' },
-              { header: '開始日', key: 'startDate' }, { header: '終了日', key: 'endDate' },
-              { header: '日数', key: 'days' }, { header: '理由', key: 'reason' },
-              { header: '状態', key: 'status' },
+              { header: t('leave.colName'), key: 'name' }, { header: t('leave.colType'), key: 'type' },
+              { header: t('leave.colPeriod') + ' (Start)', key: 'startDate' }, { header: t('leave.colPeriod') + ' (End)', key: 'endDate' },
+              { header: t('leave.colDays'), key: 'days' }, { header: t('leave.colReason'), key: 'reason' },
+              { header: t('leave.colStatus'), key: 'status' },
             ]}
-            fileName="休暇申請一覧"
+            fileName={t('leave.exportFileName')}
           />
         </div>
 
         {/* New Form */}
         {showNewForm && (
           <div className="mb-5 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h4 className="text-sm font-semibold text-blue-800 mb-3">新規休暇申請</h4>
+            <h4 className="text-sm font-semibold text-blue-800 mb-3">{t('leave.claim')}</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {isEmployeeMode ? (
                 <div className="px-3 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm font-semibold text-slate-650 flex items-center">
-                  申請者: {employees[0]?.lastName} {employees[0]?.firstName}
+                  {t('leave.applicantLabel').replace('{name}', `${employees[0]?.lastName} ${employees[0]?.firstName}`)}
                 </div>
               ) : (
                 <select value={newLeave.employeeId} onChange={e => setNewLeave(prev => ({ ...prev, employeeId: e.target.value }))}
                   className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
-                  <option value="">従業員を選択</option>
+                  <option value="">{t('leave.selectEmployee')}</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.lastName} {e.firstName} ({e.department})</option>)}
                 </select>
               )}
@@ -315,7 +331,7 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
                 className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
                 {typeOptions.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
-              <input type="text" placeholder="理由" value={newLeave.reason} onChange={e => setNewLeave(prev => ({ ...prev, reason: e.target.value }))}
+              <input type="text" placeholder={t('leave.reasonPlaceholder')} value={newLeave.reason} onChange={e => setNewLeave(prev => ({ ...prev, reason: e.target.value }))}
                 className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
               <input type="date" value={newLeave.startDate} onChange={e => setNewLeave(prev => ({ ...prev, startDate: e.target.value }))}
                 className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
@@ -323,9 +339,9 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
                 className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
               <div className="flex gap-2">
                 <button onClick={handleSubmitNew}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">申請</button>
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">{t('leave.claim')}</button>
                 <button onClick={() => setShowNewForm(false)}
-                  className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 text-sm">キャンセル</button>
+                  className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 text-sm">{t('common.cancel')}</button>
               </div>
             </div>
           </div>
@@ -346,19 +362,19 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
             </colgroup>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <FilterTh label="氏名" filterKey="name" options={nameOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">部署</th>
-                <FilterTh label="種類" filterKey="type" options={typeOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">期間</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">日数</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">理由</th>
-                <FilterTh label="状態" filterKey="status" options={statusOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">操作</th>
+                <FilterTh label={t('leave.colName')} filterKey="name" options={nameOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('leave.colDept')}</th>
+                <FilterTh label={t('leave.colType')} filterKey="type" options={typeOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('leave.colPeriod')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('leave.colDays')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('leave.colReason')}</th>
+                <FilterTh label={t('leave.colStatus')} filterKey="status" options={statusOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('leave.colActions')}</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
               {paginated.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-400">該当する申請が見つかりません</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-400">{t('leave.noRequests')}</td></tr>
               ) : paginated.map(leave => {
                 const emp = employees.find(e => e.id === leave.employeeId);
                 return (
@@ -372,16 +388,16 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
                     <td className="px-4 py-3 text-sm text-slate-500">{emp?.department}</td>
                     <td className="px-4 py-3"><span className={`px-2 py-0.5 text-xs rounded ${typeColor(leave.type)}`}>{typeLabel(leave.type)}</span></td>
                     <td className="px-4 py-3 text-sm text-slate-600">{leave.startDate} ～ {leave.endDate}</td>
-                    <td className="px-4 py-3 text-sm text-center font-medium">{leave.days}日</td>
+                    <td className="px-4 py-3 text-sm text-center font-medium">{leave.days}{t('common.dayUnit')}</td>
                     <td className="px-4 py-3 text-sm text-slate-500 max-w-[200px] truncate">{leave.reason}</td>
                     <td className="px-4 py-3"><span className={`px-2 py-0.5 text-xs rounded ${statusColor(leave.status)}`}>{statusLabel(leave.status)}</span></td>
                     <td className="px-4 py-3 text-center">
-                      {leave.status === 'PENDING' && !isEmployeeMode && (
+                      {leave.status === 'PENDING' && !isEmployeeMode && leave.employeeId !== currentUserId && (
                         <div className="flex gap-1 justify-center">
                           <button onClick={() => handleApprove(leave.id)}
-                            className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors">承認</button>
+                            className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors">{t('leave.approveBtn')}</button>
                           <button onClick={() => handleReject(leave.id)}
-                            className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors">却下</button>
+                            className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors">{t('leave.rejectBtn')}</button>
                         </div>
                       )}
                     </td>
@@ -394,23 +410,28 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
 
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-200">
-            <p className="text-sm text-slate-500">{filtered.length} 件中 {(currentPage - 1) * PAGE_SIZE + 1}〜{Math.min(currentPage * PAGE_SIZE, filtered.length)} 件を表示</p>
+            <p className="text-sm text-slate-500">
+              {t('common.paginationText')
+                .replace('{total}', String(filtered.length))
+                .replace('{start}', String((currentPage - 1) * PAGE_SIZE + 1))
+                .replace('{end}', String(Math.min(currentPage * PAGE_SIZE, filtered.length)))}
+            </p>
             <div className="flex gap-1">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">前へ</button>
+                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">{t('common.prev')}</button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                 <button key={page} onClick={() => setCurrentPage(page)}
                   className={`px-3 py-1.5 text-sm rounded-lg ${page === currentPage ? 'bg-blue-600 text-white' : 'border border-slate-300 hover:bg-slate-50'}`}>{page}</button>
               ))}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">次へ</button>
+                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">{t('common.next')}</button>
             </div>
           </div>
         )}
       </Card>
 
       {/* Leave Balances */}
-      <Card title="残り休暇日数">
+      <Card title={t('leave.balance')}>
         <div className="overflow-x-auto">
           <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '600px' }}>
             <colgroup>
@@ -422,11 +443,11 @@ export default function LeaveClient({ employees, initialLeaves, isEmployeeMode =
             </colgroup>
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">氏名</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">部署</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">有給 (残/合計)</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">病気 (残/合計)</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">特別 (残/合計)</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('leave.colName')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('leave.colDept')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('leave.colAnnual')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('leave.colSick')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('leave.colSpecial')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

@@ -11,6 +11,9 @@ export interface SessionUser {
   email: string;
   role: string;
   permissions: string[];
+  avatar?: string;
+  language?: string;
+  nationality?: string;
 }
 
 export function signToken(payload: any): string {

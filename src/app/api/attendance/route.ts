@@ -17,9 +17,11 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date');
     const month = searchParams.get('month');
 
-    let where: any = {};
+    const where: any = {};
 
-    if (user.role === 'EMPLOYEE') {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployeeMode = user.role === 'EMPLOYEE' || viewMode === 'employee';
+    if (isEmployeeMode) {
       where.employeeId = user.id;
     } else if (employeeId) {
       where.employeeId = employeeId;
@@ -77,7 +79,9 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return errorResponse('Unauthorized', 401);
     }
-    if (user.role === 'EMPLOYEE') {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployeeMode = user.role === 'EMPLOYEE' || viewMode === 'employee';
+    if (isEmployeeMode) {
       return errorResponse('Forbidden', 403);
     }
 
@@ -132,7 +136,9 @@ export async function PUT(request: NextRequest) {
     if (!user) {
       return errorResponse('Unauthorized', 401);
     }
-    if (user.role === 'EMPLOYEE') {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployeeMode = user.role === 'EMPLOYEE' || viewMode === 'employee';
+    if (isEmployeeMode) {
       return errorResponse('Forbidden', 403);
     }
 

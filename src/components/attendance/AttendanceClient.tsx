@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Card from '@/components/common/Card';
 import { formatDate, cn } from '@/lib/utils';
 import Portal from '@/components/common/Portal';
+import { useI18n } from '@/lib/i18n';
+import { getAttendanceText, weekDayLabelsMap, dayNamesMap } from '@/lib/translations/attendance';
 
 interface EmployeeContract {
   id: string;
@@ -72,14 +74,12 @@ interface AttendanceClientProps {
 }
 
 const statusOptions = [
-  { value: 'PRESENT', label: '出勤', color: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/50' },
-  { value: 'LATE', label: '遅刻', color: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50' },
-  { value: 'EARLY_LEAVE', label: '早退', color: 'bg-yellow-500', text: 'text-yellow-750 dark:text-yellow-350', bg: 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-100 dark:border-yellow-900/50' },
-  { value: 'ABSENT', label: '欠勤', color: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', bg: 'bg-rose-50 dark:bg-rose-950/30 border-rose-100 dark:border-rose-900/50' },
-  { value: 'HOLIDAY', label: '休暇', color: 'bg-sky-500', text: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-50 dark:bg-sky-950/30 border-sky-100 dark:border-sky-900/50' },
+  { value: 'PRESENT', color: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/50' },
+  { value: 'LATE', color: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50' },
+  { value: 'EARLY_LEAVE', color: 'bg-yellow-500', text: 'text-yellow-750 dark:text-yellow-350', bg: 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-100 dark:border-yellow-900/50' },
+  { value: 'ABSENT', color: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', bg: 'bg-rose-50 dark:bg-rose-950/30 border-rose-100 dark:border-rose-900/50' },
+  { value: 'HOLIDAY', color: 'bg-sky-500', text: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-50 dark:bg-sky-950/30 border-sky-100 dark:border-sky-900/50' },
 ];
-
-const statusLabel = (s: string) => statusOptions.find(o => o.value === s)?.label || s;
 
 export function applyRounding(dateVal: Date | string | null | undefined, policy: string, roundUp: boolean): Date | null {
   if (!dateVal) return null;
@@ -177,18 +177,30 @@ function calculateContractAwareOvertime(
   return Math.max(0, Math.round((workHours - standard) * 10) / 10);
 }
 
-function getWorkDayLabel(contract: EmployeeContract | null, holiday: Holiday | null, dateStr: string) {
-  if (holiday) return `祝日: ${holiday.name}`;
-  if (!isContractWorkDay(contract, dateStr)) return '契約休日';
-  return '契約勤務日';
+function getWorkDayLabel(contract: EmployeeContract | null, holiday: Holiday | null, dateStr: string, locale: string) {
+  if (holiday) return `${getAttendanceText('workDayHoliday', locale)}: ${holiday.name}`;
+  if (!isContractWorkDay(contract, dateStr)) return getAttendanceText('workDayContractHoliday', locale);
+  return getAttendanceText('workDayContractWorkDay', locale);
 }
 
 export default function AttendanceClient({ initialRecords, employees, holidays, isEmployeeMode = false }: AttendanceClientProps) {
+  const { t, locale } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [records, setRecords] = useState<AttendanceRecord[]>(initialRecords);
   
   const [roundingPolicy, setRoundingPolicy] = useState<string>('exact');
+
+  const getStatusLabel = (s: string) => {
+    switch (s) {
+      case 'PRESENT': return t('status.present');
+      case 'LATE': return t('status.late');
+      case 'EARLY_LEAVE': return t('status.earlyLeave');
+      case 'ABSENT': return t('status.absent');
+      case 'HOLIDAY': return t('status.leave');
+      default: return s;
+    }
+  };
 
   // Load company rounding policy on mount
   useEffect(() => {
@@ -511,8 +523,8 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
         alerts.push({
           id: `missing-out-${dateStr}`,
           date: dateStr,
-          title: '退勤打刻漏れ',
-          description: '出勤データはありますが、退勤時刻が入力されていません。',
+          title: getAttendanceText('alertMissingOutTitle', locale),
+          description: getAttendanceText('alertMissingOutDesc', locale),
           severity: 'error',
           record: rec,
         });
@@ -541,8 +553,8 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           alerts.push({
             id: `overwork-${dateStr}`,
             date: dateStr,
-            title: '長時間労働アラート',
-            description: `実労働時間が${actualHours.toFixed(1)}時間に達しています（要休憩・業務調整）。`,
+            title: getAttendanceText('alertOverworkTitle', locale),
+            description: getAttendanceText('alertOverworkDesc', locale).replace('{hours}', actualHours.toFixed(1)),
             severity: 'warning',
             record: rec,
           });
@@ -555,8 +567,8 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           alerts.push({
             id: `break-short-8h-${dateStr}`,
             date: dateStr,
-            title: '休憩時間不足 (労基法第34条)',
-            description: `労働時間が8時間超ですが、休憩が${breakMins}分しかありません（法律上60分以上必須）。`,
+            title: getAttendanceText('alertBreakShortTitle', locale),
+            description: getAttendanceText('alertBreakShort8hDesc', locale).replace('{breakMins}', String(breakMins)),
             severity: 'error',
             record: rec,
           });
@@ -564,8 +576,8 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           alerts.push({
             id: `break-short-6h-${dateStr}`,
             date: dateStr,
-            title: '休憩時間不足 (労基法第34条)',
-            description: `労働時間が6時間超ですが、休憩が${breakMins}分しかありません（法律上45分以上必須）。`,
+            title: getAttendanceText('alertBreakShortTitle', locale),
+            description: getAttendanceText('alertBreakShort6hDesc', locale).replace('{breakMins}', String(breakMins)),
             severity: 'error',
             record: rec,
           });
@@ -577,8 +589,8 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
         alerts.push({
           id: `late-notes-${dateStr}`,
           date: dateStr,
-          title: '遅刻理由の未入力',
-          description: '遅刻として処理されていますが、備考欄に理由が記載されていません。',
+          title: getAttendanceText('alertLateNotesTitle', locale),
+          description: getAttendanceText('alertLateNotesDesc', locale),
           severity: 'info',
           record: rec,
         });
@@ -586,7 +598,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     });
 
     return alerts.sort((a, b) => b.date.localeCompare(a.date));
-  }, [monthRecords, selectedEmployee, roundingPolicy]);
+  }, [monthRecords, selectedEmployee, roundingPolicy, locale]);
 
   // Weekly work distribution analytics data (Mon-Sun averages)
   const weeklyWorkDistribution = useMemo(() => {
@@ -604,12 +616,12 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
       }
     });
 
-    const daysJP = ['月', '火', '水', '木', '金', '土', '日'];
+    const daysJP = weekDayLabelsMap[locale] || weekDayLabelsMap.ja;
     return daysJP.map((label, idx) => {
       const avg = counts[idx] > 0 ? Math.round((sums[idx] / counts[idx]) * 10) / 10 : 0;
       return { label, avg };
     });
-  }, [monthRecords, roundingPolicy]);
+  }, [monthRecords, roundingPolicy, locale]);
 
   // Open modal
   const openModal = (date: string, record?: AttendanceRecord) => {
@@ -654,7 +666,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           const rStart = applyRounding(start, roundingPolicy, true);
           const rEnd = applyRounding(end, roundingPolicy, false);
           if (!rStart || !rEnd) return 0;
-          let totalMinutes = (rEnd.getTime() - rStart.getTime()) / (1000 * 60);
+          const totalMinutes = (rEnd.getTime() - rStart.getTime()) / (1000 * 60);
           if (totalMinutes <= 0) return 0;
           let breakMinutes = defaultHasBreak ? 60 : 0;
           if (defaultHasBreak && defaultBreakStart && defaultBreakEnd) {
@@ -697,7 +709,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
       const rEnd = applyRounding(end, roundingPolicy, false);
       if (!rStart || !rEnd) return 0;
 
-      let totalMinutes = (rEnd.getTime() - rStart.getTime()) / (1000 * 60);
+      const totalMinutes = (rEnd.getTime() - rStart.getTime()) / (1000 * 60);
       if (totalMinutes <= 0) return 0;
 
       let breakMinutes = 0;
@@ -783,7 +795,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
       closeModal();
     } catch (error) {
       console.error('Failed to save attendance:', error);
-      alert('保存に失敗しました');
+      alert(getAttendanceText('punchSaveError', locale));
     }
   };
 
@@ -794,7 +806,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
     const dateISO = `${todayStr}T00:00:00.000Z`;
 
-    let data: any = {
+    const data: any = {
       employeeId: selectedEmployee.id,
       date: dateISO,
     };
@@ -803,7 +815,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
       const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0);
       data.checkIn = timeStr;
       data.status = isLate ? 'LATE' : 'PRESENT';
-      data.notes = isLate ? '自動判定: 遅刻出勤' : '';
+      data.notes = isLate ? getAttendanceText('autoLateReason', locale) : '';
     } else if (action === 'BREAK_START') {
       data.checkIn = todayRecord?.checkIn ? new Date(todayRecord.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '09:00';
       data.breakStart = timeStr;
@@ -824,8 +836,8 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
       data.checkOut = `${todayStr}T${timeStr}:00`;
       
       // Calculate overtime hours using rounding policy
-      let rStart = todayRecord?.checkIn ? applyRounding(new Date(todayRecord.checkIn), roundingPolicy, true) : applyRounding(new Date(`${todayStr}T09:00:00`), roundingPolicy, true);
-      let rEnd = applyRounding(now, roundingPolicy, false);
+      const rStart = todayRecord?.checkIn ? applyRounding(new Date(todayRecord.checkIn), roundingPolicy, true) : applyRounding(new Date(`${todayStr}T09:00:00`), roundingPolicy, true);
+      const rEnd = applyRounding(now, roundingPolicy, false);
       
       let workMinutes = 0;
       if (rStart && rEnd) {
@@ -886,7 +898,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
       });
     } catch (e) {
       console.error(e);
-      alert('打刻の保存に失敗しました');
+      alert(getAttendanceText('punchSaveError', locale));
     }
   };
 
@@ -916,13 +928,13 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     return `${opt.bg} hover:shadow-sm`;
   };
 
-  // Helper to format Japanese dates with weekday coloring
+  // Helper to format dates with weekday coloring
   const formatJapaneseDate = (dateStr: string) => {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
     const m = d.getMonth() + 1;
     const day = d.getDate();
-    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    const dayNames = dayNamesMap[locale] || dayNamesMap.ja;
     const dayIdx = d.getDay();
     const dayName = dayNames[dayIdx];
 
@@ -930,11 +942,31 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     if (dayIdx === 0) colorClass = 'text-rose-600 font-extrabold'; // Sun
     if (dayIdx === 6) colorClass = 'text-sky-600 font-extrabold'; // Sat
 
-    return (
-      <span className={colorClass}>
-        {m}月{day}日 <span className="text-[10px] opacity-75">({dayName})</span>
-      </span>
-    );
+    if (locale === 'ja') {
+      return (
+        <span className={colorClass}>
+          {m}{'\u6708'}{day}{'\u65e5'} <span className="text-[10px] opacity-75">({dayName})</span>
+        </span>
+      );
+    } else if (locale === 'zh') {
+      return (
+        <span className={colorClass}>
+          {m}{'\u6708'}{day}{'\u65e5'} <span className="text-[10px] opacity-75">({dayName})</span>
+        </span>
+      );
+    } else if (locale === 'vi' || locale === 'th') {
+      return (
+        <span className={colorClass}>
+          {day}/{m} <span className="text-[10px] opacity-75">({dayName})</span>
+        </span>
+      );
+    } else {
+      return (
+        <span className={colorClass}>
+          {m}/{day} <span className="text-[10px] opacity-75">({dayName})</span>
+        </span>
+      );
+    }
   };
 
   // Percentage calculations for Overtime Meter (36 Agreement - 45h limit)
@@ -953,22 +985,22 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
         {/* Header KPI Overview */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           {[
-            { label: '総従業員数', value: employees.length, color: 'text-slate-800 dark:text-slate-100', bg: 'bg-white/80 dark:bg-slate-900/60 border-slate-200/50 shadow-sm' },
-            { label: '本日出勤者', value: todayStats.present + todayStats.late + todayStats.earlyLeave, color: 'text-emerald-600 font-extrabold', bg: 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-100/50 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.06)]' },
-            { label: '遅刻者', value: todayStats.late, color: 'text-amber-600 font-extrabold', bg: 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-100/50 shadow-[0_4px_20px_-4px_rgba(245,158,11,0.06)]' },
-            { label: '早退者', value: todayStats.earlyLeave, color: 'text-yellow-600 font-extrabold', bg: 'bg-yellow-50/40 dark:bg-yellow-950/20 border-yellow-100/50 shadow-[0_4px_20px_-4px_rgba(234,179,8,0.06)]' },
-            { label: '欠勤者', value: todayStats.absent, color: 'text-rose-650 font-extrabold', bg: 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-100/50 shadow-[0_4px_20px_-4px_rgba(244,63,94,0.06)]' },
-            { label: '休暇取得者', value: todayStats.leave, color: 'text-sky-600 font-extrabold', bg: 'bg-sky-50/40 dark:bg-sky-950/20 border-sky-100/50 shadow-[0_4px_20px_-4px_rgba(14,165,233,0.06)]' },
+            { label: getAttendanceText('totalEmployees', locale), value: employees.length, color: 'text-slate-800 dark:text-slate-100', bg: 'bg-white/80 dark:bg-slate-900/60 border-slate-200/50 shadow-sm' },
+            { label: getAttendanceText('presentToday', locale), value: todayStats.present + todayStats.late + todayStats.earlyLeave, color: 'text-emerald-600 font-extrabold', bg: 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-100/50 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.06)]' },
+            { label: getAttendanceText('lateEmployees', locale), value: todayStats.late, color: 'text-amber-600 font-extrabold', bg: 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-100/50 shadow-[0_4px_20px_-4px_rgba(245,158,11,0.06)]' },
+            { label: getAttendanceText('earlyLeaveEmployees', locale), value: todayStats.earlyLeave, color: 'text-yellow-600 font-extrabold', bg: 'bg-yellow-50/40 dark:bg-yellow-950/20 border-yellow-100/50 shadow-[0_4px_20px_-4px_rgba(234,179,8,0.06)]' },
+            { label: getAttendanceText('absentEmployees', locale), value: todayStats.absent, color: 'text-rose-650 font-extrabold', bg: 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-100/50 shadow-[0_4px_20px_-4px_rgba(244,63,94,0.06)]' },
+            { label: getAttendanceText('leaveEmployees', locale), value: todayStats.leave, color: 'text-sky-600 font-extrabold', bg: 'bg-sky-50/40 dark:bg-sky-950/20 border-sky-100/50 shadow-[0_4px_20px_-4px_rgba(14,165,233,0.06)]' },
           ].map((s, idx) => (
             <div key={idx} className={`${s.bg} rounded-2xl p-4 border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md cursor-default`}>
               <p className="text-[10px] text-slate-500 font-semibold mb-1 uppercase tracking-wider">{s.label}</p>
-              <p className={`text-xl font-black mt-1 tracking-tight ${s.color}`}>{s.value} <span className="text-xs font-normal text-slate-400">名</span></p>
+              <p className={`text-xl font-black mt-1 tracking-tight ${s.color}`}>{s.value} <span className="text-xs font-normal text-slate-400">{getAttendanceText('staffUnit', locale)}</span></p>
             </div>
           ))}
         </div>
 
         {/* Search & Filter card */}
-        <Card title="出退勤モニター ＆ 従業員選択" className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/50 shadow-sm rounded-2xl p-4">
+        <Card title={getAttendanceText('cardTitle', locale)} className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/50 shadow-sm rounded-2xl p-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -976,7 +1008,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
               </svg>
               <input
                 type="text"
-                placeholder="従業員名、コード、フリガナで検索..."
+                placeholder={getAttendanceText('searchPlaceholder', locale)}
                 value={empSearch}
                 onChange={e => setEmpSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
@@ -987,7 +1019,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
               onChange={e => setEmpDeptFilter(e.target.value)}
               className="px-3.5 py-2.5 border border-slate-200 bg-white dark:bg-slate-800 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
             >
-              <option value="ALL">すべての部署</option>
+              <option value="ALL">{getAttendanceText('allDepts', locale)}</option>
               {departments.map(d => (
                 <option key={d} value={d}>{d}</option>
               ))}
@@ -1026,19 +1058,19 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                 
                 <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
                   <span className="px-2 py-0.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-650 dark:text-slate-300 text-[10px] rounded-lg font-bold">
-                    {emp.department?.name || '無所属'}
+                    {emp.department?.name || getAttendanceText('unassigned', locale)}
                   </span>
                   
                   {/* Status Indicator */}
                   {statusTag ? (
                     <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black border flex items-center gap-1 ${statusTag.bg} ${statusTag.text}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${statusTag.color} animate-pulse`} />
-                      {statusTag.label}
+                      {getStatusLabel(statusTag.value)}
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-850 text-slate-400 border border-slate-200 dark:border-slate-700 text-[9px] rounded-lg font-bold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-                      未打刻
+                      {getAttendanceText('noPunch', locale)}
                     </span>
                   )}
                 </div>
@@ -1062,7 +1094,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
               onClick={() => { setSelectedEmployee(null); router.push('/attendance'); }} 
               className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl px-3.5 py-2 transition-colors cursor-pointer"
             >
-              ← 従業員選択へ戻る
+              {getAttendanceText('backToSelect', locale)}
             </button>
           )}
           <div>
@@ -1071,7 +1103,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
               <span className="text-xs font-normal text-slate-400 ml-2 font-mono">({selectedEmployee.employeeCode})</span>
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
-              {selectedEmployee.department?.name || '無所属'} <span className="text-slate-300 dark:text-slate-750">|</span> {selectedEmployee.position?.name || '役職なし'}
+              {selectedEmployee.department?.name || getAttendanceText('unassigned', locale)} <span className="text-slate-300 dark:text-slate-750">|</span> {selectedEmployee.position?.name || getAttendanceText('noPosition', locale)}
             </div>
           </div>
         </div>
@@ -1079,12 +1111,12 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
         {/* Selected Employee Monthly Stats */}
         <div className="flex flex-wrap gap-2.5 bg-slate-50/50 dark:bg-slate-850/50 p-2 rounded-2xl border border-slate-200/50 dark:border-slate-800 self-start md:self-center">
           {[
-            { label: '実労働時間', value: `${monthlySummary.totalWorkHours}h`, color: 'text-slate-800 dark:text-slate-200' },
-            { label: '残業時間', value: `${monthlySummary.totalOT}h`, color: monthlySummary.totalOT > 36 ? 'text-rose-600 font-black' : monthlySummary.totalOT > 20 ? 'text-amber-600' : 'text-slate-750' },
-            { label: '休日出勤', value: `${monthlySummary.holidayWorkDays}日`, color: monthlySummary.holidayWorkDays > 0 ? 'text-rose-650 font-black' : 'text-slate-750' },
-            { label: '契約外出勤', value: `${monthlySummary.contractRestWorkDays}日`, color: monthlySummary.contractRestWorkDays > 0 ? 'text-violet-650 font-black' : 'text-slate-750' },
-            { label: '遅刻回数', value: `${monthlySummary.lateDays}回`, color: monthlySummary.lateDays > 0 ? 'text-rose-650' : 'text-slate-750' },
-            { label: '休暇日数', value: `${monthlySummary.holidays}日`, color: 'text-sky-650' }
+            { label: t('attendance.workHours'), value: `${monthlySummary.totalWorkHours}h`, color: 'text-slate-800 dark:text-slate-200' },
+            { label: t('attendance.otHours'), value: `${monthlySummary.totalOT}h`, color: monthlySummary.totalOT > 36 ? 'text-rose-600 font-black' : monthlySummary.totalOT > 20 ? 'text-amber-600' : 'text-slate-750' },
+            { label: t('attendance.holidayWork'), value: `${monthlySummary.holidayWorkDays}${t('common.dayUnit')}`, color: monthlySummary.holidayWorkDays > 0 ? 'text-rose-650 font-black' : 'text-slate-750' },
+            { label: t('attendance.contractRestWork'), value: `${monthlySummary.contractRestWorkDays}${t('common.dayUnit')}`, color: monthlySummary.contractRestWorkDays > 0 ? 'text-violet-650 font-black' : 'text-slate-750' },
+            { label: t('attendance.lateDays'), value: `${monthlySummary.lateDays}${t('common.timesUnit')}`, color: monthlySummary.lateDays > 0 ? 'text-rose-650' : 'text-slate-750' },
+            { label: t('attendance.leaveDays'), value: `${monthlySummary.holidays}${t('common.dayUnit')}`, color: 'text-sky-650' }
           ].map((stat, i) => (
             <div key={i} className="text-center px-4 py-1.5 border-r border-slate-200 dark:border-slate-800/80 last:border-0">
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{stat.label}</p>
@@ -1109,7 +1141,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   onChange={e => setSelectedYear(parseInt(e.target.value))} 
                   className="px-3.5 py-2 border border-slate-200 bg-white dark:bg-slate-850 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
                 >
-                  {years.map(y => <option key={y} value={y}>{y}年</option>)}
+                  {years.map(y => <option key={y} value={y}>{locale === 'ja' || locale === 'zh' ? `${y}${getAttendanceText('yearUnit', locale)}` : `${getAttendanceText('yearUnit', locale)}${y}`}</option>)}
                 </select>
                 
                 {/* Tabbed Capsule for months */}
@@ -1126,7 +1158,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                       onClick={() => setSelectedMonth(m)} 
                       className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${selectedMonth === m ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm font-black' : 'text-slate-650 hover:text-slate-950 dark:hover:text-white'}`}
                     >
-                      {m}月
+                      {locale === 'ja' || locale === 'zh' ? `${m}${getAttendanceText('monthUnit', locale)}` : `${getAttendanceText('monthUnit', locale)}${m}`}
                     </button>
                   ))}
                   <button 
@@ -1148,7 +1180,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                       : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-750'
                   }`}
                 >
-                  ⚙️ 勤務パターン設定
+                  {getAttendanceText('patternSettings', locale)}
                 </button>
               )}
               
@@ -1158,13 +1190,13 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   onClick={() => { setViewMode('box'); localStorage.setItem('attendanceViewMode', 'box'); }} 
                   className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${viewMode === 'box' ? 'bg-white dark:bg-slate-800 shadow text-blue-650 dark:text-blue-400 font-black' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                  カレンダー
+                  {getAttendanceText('calendarView', locale)}
                 </button>
                 <button 
                   onClick={() => { setViewMode('list'); localStorage.setItem('attendanceViewMode', 'list'); }} 
                   className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-800 shadow text-blue-650 dark:text-blue-400 font-black' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                  タイムライン
+                  {getAttendanceText('timelineView', locale)}
                 </button>
               </div>
 
@@ -1178,7 +1210,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                     : "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400"
                 )}
               >
-                {rightSidebarCollapsed ? '📊 統計・打刻を表示' : '📊 統計・打刻を非表示'}
+                {rightSidebarCollapsed ? getAttendanceText('showStats', locale) : getAttendanceText('hideStats', locale)}
               </button>
             </div>
 
@@ -1186,12 +1218,12 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
             {showSettingsDrawer && (
               <div className="mt-4 p-4.5 bg-slate-50/50 dark:bg-slate-850/20 border border-slate-200/60 dark:border-slate-800 rounded-2xl animate-fadeIn space-y-4 text-xs text-slate-700 dark:text-slate-300">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-slate-200/60 dark:border-slate-800 pb-2">
-                  <span className="font-black text-slate-800 dark:text-slate-200 text-sm">今月のデフォルト勤務パターン</span>
-                  <span className="text-[10px] text-slate-450 dark:text-slate-400">※新しく打刻する日の初期値（出勤時間・休憩）をカスタマイズします</span>
+                  <span className="font-black text-slate-800 dark:text-slate-200 text-sm">{getAttendanceText('defaultPatternTitle', locale)}</span>
+                  <span className="text-[10px] text-slate-450 dark:text-slate-400">{getAttendanceText('defaultPatternDesc', locale)}</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">出勤パターン開始</label>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{getAttendanceText('defaultClockIn', locale)}</label>
                     <input 
                       type="time" 
                       value={tempCheckIn} 
@@ -1200,7 +1232,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">基本退勤時間</label>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{getAttendanceText('defaultClockOut', locale)}</label>
                     <input 
                       type="time" 
                       value={tempCheckOut} 
@@ -1209,7 +1241,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">休憩</label>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">{getAttendanceText('defaultBreak', locale)}</label>
                     <div className="flex items-center gap-2 py-2">
                       <input 
                         type="checkbox" 
@@ -1218,7 +1250,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                         onChange={e => setTempHasBreak(e.target.checked)} 
                         className="rounded border-slate-350 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                       />
-                      <label htmlFor="tempHasBreak" className="font-black text-slate-750 dark:text-slate-300 cursor-pointer">休憩をとる</label>
+                      <label htmlFor="tempHasBreak" className="font-black text-slate-750 dark:text-slate-300 cursor-pointer">{getAttendanceText('takeBreak', locale)}</label>
                     </div>
                   </div>
                 </div>
@@ -1226,7 +1258,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                 {tempHasBreak && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pl-4.5 border-l-2 border-blue-500/50 animate-fadeIn">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-450 dark:text-slate-400 mb-1">休憩開始</label>
+                      <label className="block text-[10px] font-bold text-slate-450 dark:text-slate-400 mb-1">{getAttendanceText('modalBreakStart', locale)}</label>
                       <input 
                         type="time" 
                         value={tempBreakStart} 
@@ -1235,7 +1267,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-450 dark:text-slate-400 mb-1">休憩終了</label>
+                      <label className="block text-[10px] font-bold text-slate-450 dark:text-slate-400 mb-1">{getAttendanceText('modalBreakEnd', locale)}</label>
                       <input 
                         type="time" 
                         value={tempBreakEnd} 
@@ -1252,7 +1284,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                     onClick={() => setShowSettingsDrawer(false)} 
                     className="px-4 py-2 border border-slate-250 dark:border-slate-700 rounded-xl text-slate-650 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 font-bold cursor-pointer"
                   >
-                    キャンセル
+                    {t('common.cancel')}
                   </button>
                   <button 
                     type="button" 
@@ -1262,7 +1294,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                     }} 
                     className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black cursor-pointer shadow-sm"
                   >
-                    設定パターンを保存
+                    {getAttendanceText('saveSettings', locale)}
                   </button>
                 </div>
               </div>
@@ -1272,14 +1304,14 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           {/* Calendar / Log Sheet */}
           <Card className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-5">
             <h3 className="text-xs font-bold text-slate-450 dark:text-slate-400 uppercase tracking-widest mb-4">
-              {selectedYear}年{selectedMonth}月 出勤ログ ({daysInMonth.length}日間)
+              {locale === 'ja' || locale === 'zh' ? `${selectedYear}${getAttendanceText('yearUnit', locale)}${selectedMonth}${getAttendanceText('monthUnit', locale)}` : `${getAttendanceText('monthUnit', locale)}${selectedMonth} ${getAttendanceText('yearUnit', locale)}${selectedYear}`} {getAttendanceText('attendanceLog', locale)} ({daysInMonth.length}{getAttendanceText('daysUnit', locale)})
             </h3>
 
             {viewMode === 'box' ? (
               <div className="space-y-5">
                 <div className="grid grid-cols-7 gap-1.5">
                   {/* Weekday headers */}
-                  {['月', '火', '水', '木', '金', '土', '日'].map(w => (
+                  {(weekDayLabelsMap[locale] || weekDayLabelsMap.ja).map(w => (
                     <div key={w} className="text-center text-[10px] font-bold text-slate-400 py-1">{w}</div>
                   ))}
 
@@ -1292,7 +1324,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                     const contract = getActiveContractForDate(selectedEmployee, date);
                     const holiday = getHolidayForDate(holidays, date);
                     const contractWorkDay = isContractWorkDay(contract, date);
-                    const dayLabel = getWorkDayLabel(contract, holiday, date);
+                    const dayLabel = getWorkDayLabel(contract, holiday, date, locale);
                     const workHours = record ? calculateRecordWorkHours(record.checkIn, record.checkOut, record.breakStart, record.breakEnd, roundingPolicy) : 0;
                     const otHours = calculateContractAwareOvertime(record, contract, holiday, roundingPolicy);
                     const formattedWork = Math.round(workHours * 10) / 10;
@@ -1312,7 +1344,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                           }`}>{day}</div>
                           {(holiday || !contractWorkDay) && (
                             <span className={`px-1 py-0.5 rounded text-[7px] font-black border truncate max-w-[54px] ${holiday ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-violet-100 text-violet-700 border-violet-200'}`} title={dayLabel}>
-                              {holiday ? '祝日' : '契休'}
+                              {holiday ? getAttendanceText('workDayHoliday', locale) : getAttendanceText('contractOff', locale)}
                             </span>
                           )}
                         </div>
@@ -1326,24 +1358,24 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                             
                             {record.checkIn && record.checkOut && (
                               <div className="text-[10px] md:text-xs font-black text-slate-700 dark:text-slate-300 bg-black/5 dark:bg-white/5 py-0.5 rounded leading-normal">
-                                <div>実: {formattedWork}h</div>
-                                {formattedOt > 0 && <div className="text-orange-650 dark:text-orange-450 font-black">残: {formattedOt}h</div>}
+                                <div>{getAttendanceText('actualLabel', locale)}{formattedWork}h</div>
+                                {formattedOt > 0 && <div className="text-orange-650 dark:text-orange-450 font-black">{getAttendanceText('otLabel', locale)}{formattedOt}h</div>}
                               </div>
                             )}
                             
                             <div className="flex flex-col items-center gap-0.5">
                               <span className={`inline-block px-1 rounded text-[8px] md:text-[9px] font-black border ${statusOptions.find(o => o.value === record.status)?.text || 'text-slate-500'}`}>
-                                {statusLabel(record.status)}
+                                {getStatusLabel(record.status)}
                               </span>
                               {(holiday || !contractWorkDay) && (
                                 <span className="text-[8px] md:text-[9px] font-black text-rose-600 dark:text-rose-400 truncate max-w-full" title={dayLabel}>
-                                  {holiday ? '休日残業' : '契約外残業'}
+                                  {holiday ? getAttendanceText('timelineHoliday', locale) : getAttendanceText('outOfContractOt', locale)}
                                 </span>
                               )}
                             </div>
                           </div>
                         ) : (
-                          <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 font-black mb-1">未打刻</span>
+                          <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 font-black mb-1">{getAttendanceText('noPunch', locale)}</span>
                         )}
                       </button>
                     );
@@ -1355,20 +1387,20 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   {statusOptions.map(opt => (
                     <div key={opt.value} className="flex items-center gap-1.5">
                       <span className={`w-2.5 h-2.5 rounded border ${opt.color.replace('500', '200')} ${opt.color}`} />
-                      <span className="text-slate-550 dark:text-slate-400">{opt.label}</span>
+                      <span className="text-slate-550 dark:text-slate-400">{getStatusLabel(opt.value)}</span>
                     </div>
                   ))}
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded" />
-                    <span className="text-slate-550 dark:text-slate-400">未打刻</span>
+                    <span className="text-slate-550 dark:text-slate-400">{getAttendanceText('legendUnrecorded', locale)}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 bg-rose-100 border border-rose-300 rounded" />
-                    <span className="text-rose-650 dark:text-rose-400">祝日・赤日</span>
+                    <span className="text-rose-650 dark:text-rose-400">{getAttendanceText('legendHoliday', locale)}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 bg-violet-100 border border-violet-300 rounded" />
-                    <span className="text-violet-650 dark:text-violet-400">契約休日</span>
+                    <span className="text-violet-650 dark:text-violet-400">{getAttendanceText('legendContractOff', locale)}</span>
                   </div>
                 </div>
               </div>
@@ -1379,7 +1411,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   const contract = getActiveContractForDate(selectedEmployee, date);
                   const holiday = getHolidayForDate(holidays, date);
                   const contractWorkDay = isContractWorkDay(contract, date);
-                  const dayLabel = getWorkDayLabel(contract, holiday, date);
+                  const dayLabel = getWorkDayLabel(contract, holiday, date, locale);
                   const workHours = record ? calculateRecordWorkHours(record.checkIn, record.checkOut, record.breakStart, record.breakEnd, roundingPolicy) : 0;
                   const otHours = calculateContractAwareOvertime(record, contract, holiday, roundingPolicy);
                   const formattedWork = Math.round(workHours * 10) / 10;
@@ -1401,12 +1433,12 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                           </div>
                           {record && (
                             <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black border ${statusOptions.find(o => o.value === record.status)?.bg} ${statusOptions.find(o => o.value === record.status)?.text}`}>
-                              {statusLabel(record.status)}
+                              {getStatusLabel(record.status)}
                             </span>
                           )}
                           {(holiday || !contractWorkDay) && (
                             <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black border ${holiday ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-violet-100 text-violet-700 border-violet-200'}`} title={dayLabel}>
-                              {holiday ? '祝日・休日残業' : '契約休日'}
+                              {holiday ? getAttendanceText('timelineHoliday', locale) : getAttendanceText('timelineContractOff', locale)}
                             </span>
                           )}
                         </div>
@@ -1419,8 +1451,8 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                               <span>{record.checkIn ? new Date(record.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
                               <span className="text-slate-300 dark:text-slate-600">→</span>
                               {record.breakStart && record.breakEnd && (
-                                <span className="text-[10px] text-slate-400 flex items-center gap-0.5 bg-slate-50 dark:bg-slate-850 px-1.5 py-0.2 rounded border border-slate-100 dark:border-slate-700">
-                                  休憩 ({new Date(record.breakStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}〜{new Date(record.breakEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})
+                                <span className="text-[10px] text-slate-450 flex items-center gap-0.5 bg-slate-50 dark:bg-slate-850 px-1.5 py-0.2 rounded border border-slate-100 dark:border-slate-700">
+                                  {getAttendanceText('timelineBreak', locale)} ({new Date(record.breakStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}〜{new Date(record.breakEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})
                                 </span>
                               )}
                               <span className="text-slate-300 dark:text-slate-600">→</span>
@@ -1431,14 +1463,14 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                             {record.checkIn && record.checkOut && (
                               <div className="flex items-center gap-2">
                                 <span className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 text-blue-650 dark:text-blue-400 rounded-lg font-black text-[10px]">
-                                  実働: {formattedWork}h
+                                  {getAttendanceText('actualLabel', locale)}{formattedWork}h
                                 </span>
                                 <span className={`px-2.5 py-1 rounded-lg font-black text-[10px] border ${
                                   formattedOt > 0 
                                     ? 'bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/50 text-orange-650 dark:text-orange-400 shadow-sm' 
                                     : 'bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-800 text-slate-450 dark:text-slate-400'
                                 }`}>
-                                  残業: {formattedOt}h
+                                  {getAttendanceText('otLabel', locale)}{formattedOt}h
                                 </span>
                               </div>
                             )}
@@ -1452,12 +1484,12 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                           </div>
                         ) : (
                           <div className="flex-1 text-xs text-slate-400 font-bold bg-slate-50 dark:bg-slate-850 border border-slate-100 dark:border-slate-800 px-3 py-1 rounded-xl w-fit">
-                            未記録（休日または未打刻）
+                            {getAttendanceText('timelineUnrecorded', locale)}
                           </div>
                         )}
 
                         <button className="text-[10px] text-blue-650 dark:text-blue-400 font-bold border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 px-2.5 py-1.5 rounded-xl transition-colors shrink-0">
-                          {isEmployeeMode ? '詳細' : '編集'}
+                          {isEmployeeMode ? getAttendanceText('btnDetail', locale) : getAttendanceText('btnEdit', locale)}
                         </button>
                       </div>
                     </div>
@@ -1480,7 +1512,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
 
             <div className="text-center relative">
               <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase">
-                打刻ステーション
+                {getAttendanceText('punchStation', locale)}
               </span>
               
               {/* Digital Clock */}
@@ -1488,8 +1520,8 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                 <p className="text-3xl font-black tracking-widest font-mono tabular-nums leading-none">
                   {currentTime ? currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '00:00:00'}
                 </p>
-                <p className="text-[10px] text-slate-400 font-semibold mt-1">
-                  {currentTime ? currentTime.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }) : '---'}
+                <p className="text-[10px] text-slate-450 mt-1">
+                  {currentTime ? currentTime.toLocaleDateString(locale === 'vi' ? 'vi-VN' : locale === 'zh' ? 'zh-CN' : locale === 'th' ? 'th-TH' : locale === 'en' ? 'en-US' : 'ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }) : '---'}
                 </p>
               </div>
 
@@ -1502,10 +1534,10 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   'bg-rose-500'
                 }`} />
                 <span className="text-[10px] font-black tracking-wide uppercase">
-                  {clockStatus === 'WORKING' ? '勤務中' :
-                   clockStatus === 'ON_BREAK' ? '休憩中' :
-                   clockStatus === 'CLOCKED_OUT' ? '退勤済' :
-                   '未出勤'}
+                  {clockStatus === 'WORKING' ? getAttendanceText('statusWorking', locale) :
+                   clockStatus === 'ON_BREAK' ? getAttendanceText('statusOnBreak', locale) :
+                   clockStatus === 'CLOCKED_OUT' ? getAttendanceText('statusClockedOut', locale) :
+                   getAttendanceText('statusNotClockedIn', locale)}
                 </span>
               </div>
 
@@ -1517,10 +1549,10 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   className={`py-3.5 rounded-2xl text-xs font-black shadow transition-all duration-200 cursor-pointer ${
                     clockStatus === 'NOT_CLOCKED_IN'
                       ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-95 text-white'
-                      : 'bg-white/5 text-slate-500 border border-white/5 cursor-not-allowed'
+                      : 'bg-white/5 text-slate-550 border border-white/5 cursor-not-allowed'
                   }`}
                 >
-                  出 勤
+                  {getAttendanceText('btnClockIn', locale)}
                 </button>
                 <button
                   onClick={() => handleQuickClock('CLOCK_OUT')}
@@ -1528,10 +1560,10 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   className={`py-3.5 rounded-2xl text-xs font-black shadow transition-all duration-200 cursor-pointer ${
                     clockStatus === 'WORKING'
                       ? 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white'
-                      : 'bg-white/5 text-slate-500 border border-white/5 cursor-not-allowed'
+                      : 'bg-white/5 text-slate-550 border border-white/5 cursor-not-allowed'
                   }`}
                 >
-                  退 勤
+                  {getAttendanceText('btnClockOut', locale)}
                 </button>
                 <button
                   onClick={() => handleQuickClock('BREAK_START')}
@@ -1539,10 +1571,10 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   className={`py-3.5 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${
                     clockStatus === 'WORKING'
                       ? 'bg-white/10 hover:bg-white/15 active:scale-95 text-white border border-white/10'
-                      : 'bg-white/5 text-slate-500 border border-white/5 cursor-not-allowed'
+                      : 'bg-white/5 text-slate-550 border border-white/5 cursor-not-allowed'
                   }`}
                 >
-                  休憩開始
+                  {getAttendanceText('btnBreakStart', locale)}
                 </button>
                 <button
                   onClick={() => handleQuickClock('BREAK_END')}
@@ -1550,17 +1582,17 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   className={`py-3.5 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${
                     clockStatus === 'ON_BREAK'
                       ? 'bg-white/10 hover:bg-white/15 active:scale-95 text-white border border-white/10'
-                      : 'bg-white/5 text-slate-500 border border-white/5 cursor-not-allowed'
+                      : 'bg-white/5 text-slate-550 border border-white/5 cursor-not-allowed'
                   }`}
                 >
-                  休憩終了
+                  {getAttendanceText('btnBreakEnd', locale)}
                 </button>
               </div>
             </div>
           </Card>
 
           {/* 36 Agreement Limit Gauge */}
-          <Card title="36協定・残業制限監視" className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-5">
+          <Card title={getAttendanceText('otLimitTitle', locale)} className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-5">
             <div className="flex items-center gap-5">
               {/* Circular SVG Gauge */}
               <div className="relative w-20 h-20 shrink-0">
@@ -1594,10 +1626,10 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
               {/* Progress Text */}
               <div>
                 <h4 className="text-xs font-bold text-slate-750 dark:text-slate-350">
-                  今月の時間外労働進捗率
+                  {getAttendanceText('otProgressTitle', locale)}
                 </h4>
                 <p className="text-[10px] text-slate-450 dark:text-slate-400 mt-1">
-                  労働基準法第36条に基づく月間制限枠（原則45時間）に対する消化率。
+                  {getAttendanceText('otProgressDesc', locale)}
                 </p>
                 <div className="mt-2 flex items-center gap-1.5">
                   <span className={`px-1.5 py-0.2 rounded text-[8px] font-black border ${
@@ -1605,7 +1637,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                     monthlySummary.totalOT < 36 ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 text-amber-700' :
                     'bg-rose-50 dark:bg-rose-950/20 border-rose-200 text-rose-700'
                   }`}>
-                    {otLimitPercentage.toFixed(0)}% 消化
+                    {otLimitPercentage.toFixed(0)}{getAttendanceText('otProgressUsed', locale)}
                   </span>
                 </div>
               </div>
@@ -1613,7 +1645,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           </Card>
 
           {/* Weekly Work Hours Distribution (Horizontal SVG Bars) */}
-          <Card title="曜日別平均労働時間" className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-5">
+          <Card title={getAttendanceText('avgHoursTitle', locale)} className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-5">
             <div className="space-y-2">
               {weeklyWorkDistribution.map((w, i) => {
                 const maxVal = 10; // reference max hours
@@ -1628,7 +1660,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                         style={{ width: `${barWidth}%` }} 
                       />
                       {/* 8-hour marker line */}
-                      <div className="absolute left-[80%] top-0 bottom-0 w-[1.5px] bg-red-400/60 border-dashed border-l border-red-500/20" title="法定内8時間" />
+                      <div className="absolute left-[80%] top-0 bottom-0 w-[1.5px] bg-red-400/60 border-dashed border-l border-red-500/20" title={getAttendanceText('legal8h', locale)} />
                     </div>
                     <span className="w-8 text-right font-mono font-bold text-slate-700 dark:text-slate-350">{w.avg}h</span>
                   </div>
@@ -1636,24 +1668,24 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
               })}
               <div className="flex justify-between text-[8px] text-slate-400 font-semibold pt-1 border-t border-slate-100 dark:border-slate-800">
                 <span>0h</span>
-                <span>8h (所定)</span>
+                <span>{getAttendanceText('scheduled8h', locale)}</span>
                 <span>10h+</span>
               </div>
             </div>
           </Card>
 
           {/* Labor Compliance Scanner Panel */}
-          <Card title="労務コンプライアンス監査" className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-5">
+          <Card title={getAttendanceText('complianceTitle', locale)} className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-5">
             {complianceAlerts.length === 0 ? (
               <div className="text-center py-5">
                 <svg className="w-8 h-8 text-emerald-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p className="text-xs font-bold text-emerald-600">
-                  コンプライアンス監査クリア
+                  {getAttendanceText('complianceClear', locale)}
                 </p>
                 <p className="text-[10px] text-slate-450 dark:text-slate-400 mt-0.5">
-                  今月の打刻エラーや労基法違反の警告はありません。
+                  {getAttendanceText('complianceNoAlerts', locale)}
                 </p>
               </div>
             ) : (
@@ -1678,14 +1710,14 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                         <span className="text-[11px] font-black tracking-wide uppercase">{alert.title}</span>
                       </div>
                       <span className="text-[9px] font-mono font-bold opacity-60">
-                        {alert.date.split('-')[1]}月{alert.date.split('-')[2]}日
+                        {locale === 'ja' || locale === 'zh' ? `${alert.date.split('-')[1]}\u6708${alert.date.split('-')[2]}\u65e5` : `${alert.date.split('-')[2]}/${alert.date.split('-')[1]}`}
                       </span>
                     </div>
                     <p className="text-[10px] opacity-80 mt-1 leading-relaxed">
                       {alert.description}
                     </p>
                     <div className="mt-1.5 text-[9px] font-bold text-blue-650 dark:text-blue-400 flex items-center gap-1">
-                      <span>{isEmployeeMode ? 'クリックして詳細を表示' : 'クリックして修正する'}</span>
+                      <span>{isEmployeeMode ? getAttendanceText('complianceDetailLink', locale) : getAttendanceText('complianceEditLink', locale)}</span>
                       <span>→</span>
                     </div>
                   </div>
@@ -1706,13 +1738,13 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn" onClick={closeModal} />
           <div className="relative bg-white rounded-3xl border border-slate-100 shadow-2xl w-full max-w-md mx-auto p-6 animate-fadeIn">
             <h2 className="text-base font-black text-slate-800 mb-4 pb-3 border-b border-slate-100 uppercase tracking-wide">
-              {editingRecord ? (isEmployeeMode ? '勤怠詳細' : '勤怠を編集') : (isEmployeeMode ? '勤怠詳細' : '勤怠を入力')} — {formatDate(selectedDate)}
+              {editingRecord ? (isEmployeeMode ? getAttendanceText('modalDetailTitle', locale) : getAttendanceText('modalEditTitle', locale)) : (isEmployeeMode ? getAttendanceText('modalDetailTitle', locale) : getAttendanceText('modalInputTitle', locale))} — {formatDate(selectedDate)}
             </h2>
 
             <form onSubmit={e => { if (isEmployeeMode) { e.preventDefault(); return; } handleSave(e); }} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">日付</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">{getAttendanceText('modalDate', locale)}</label>
                   <input
                     type="date"
                     value={formDate}
@@ -1723,7 +1755,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">出勤時刻</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">{getAttendanceText('modalClockIn', locale)}</label>
                   <input
                     type="time"
                     value={formCheckIn}
@@ -1736,7 +1768,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">退勤（日付）</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">{getAttendanceText('modalClockOutDate', locale)}</label>
                   <input
                     type="date"
                     value={formCheckOutDate}
@@ -1746,7 +1778,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">退勤（時刻）</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">{getAttendanceText('modalClockOutTime', locale)}</label>
                   <input
                     type="time"
                     value={formCheckOutTime}
@@ -1768,13 +1800,13 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                     className="rounded border-slate-350 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
                     disabled={isEmployeeMode}
                   />
-                  <label htmlFor="hasBreak" className="text-xs font-bold text-slate-750 cursor-pointer disabled:text-slate-400">休憩時間あり (昼休みなど)</label>
+                  <label htmlFor="hasBreak" className="text-xs font-bold text-slate-750 cursor-pointer disabled:text-slate-400">{getAttendanceText('modalHasBreak', locale)}</label>
                 </div>
                 
                 {formHasBreak && (
                   <div className="grid grid-cols-2 gap-3.5 pl-6 border-l-2 border-blue-500/60 animate-fadeIn">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1">休憩開始</label>
+                      <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1">{getAttendanceText('modalBreakStart', locale)}</label>
                       <input
                         type="time"
                         value={formBreakStart}
@@ -1784,7 +1816,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1">休憩終了</label>
+                      <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1">{getAttendanceText('modalBreakEnd', locale)}</label>
                       <input
                         type="time"
                         value={formBreakEnd}
@@ -1808,12 +1840,12 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                     className="rounded border-slate-350 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
                     disabled={isEmployeeMode}
                   />
-                  <label htmlFor="splitShift" className="text-xs font-bold text-slate-750 cursor-pointer disabled:text-slate-400">中抜けあり (私用での一時帰宅など)</label>
+                  <label htmlFor="splitShift" className="text-xs font-bold text-slate-750 cursor-pointer disabled:text-slate-400">{getAttendanceText('modalHasSplit', locale)}</label>
                 </div>
                 
                 {formSplitShift && (
                   <div className="pl-6 border-l-2 border-orange-500/60 animate-fadeIn space-y-2">
-                    <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1">中抜け控除時間 (h)</label>
+                    <label className="block text-[10px] font-bold text-slate-450 uppercase mb-1">{getAttendanceText('modalSplitHours', locale)}</label>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -1825,30 +1857,30 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                         className="w-24 px-2.5 py-1.5 border border-slate-200 rounded-xl text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-50 disabled:text-slate-500"
                         disabled={isEmployeeMode}
                       />
-                      <span className="text-xs font-bold text-slate-500">時間</span>
+                      <span className="text-xs font-bold text-slate-500">{getAttendanceText('modalHoursUnit', locale)}</span>
                     </div>
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">勤務状態</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">{getAttendanceText('modalStatus', locale)}</label>
                 <select
                   value={formStatus}
                   onChange={e => setFormStatus(e.target.value)}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer disabled:bg-slate-50 disabled:text-slate-500"
                   disabled={isEmployeeMode}
                 >
-                  {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{getStatusLabel(opt.value)}</option>)}
                 </select>
               </div>
 
               {/* Overtime Hours Input (with manual override control) */}
               <div className="p-4 bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/50 rounded-2xl flex items-center justify-between shadow-sm">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-bold text-slate-650 dark:text-slate-350 uppercase">残業時間 (時間)</span>
+                  <span className="text-xs font-bold text-slate-650 dark:text-slate-350 uppercase">{getAttendanceText('modalOtLabel', locale)}</span>
                   <p className="text-[9px] text-slate-450 dark:text-slate-400 font-semibold">
-                    {isManualOvertime ? `※自動計算: ${calculatedOvertime}h (手動変更中)` : '※実働8時間超過分 (自動計算)'}
+                    {isManualOvertime ? getAttendanceText('modalOtManual', locale).replace('{hours}', String(calculatedOvertime)) : getAttendanceText('modalOtAuto', locale)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1875,31 +1907,31 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                       }}
                       className="text-[9px] font-bold text-blue-600 dark:text-blue-400 hover:underline border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800 rounded px-1.5 py-0.5 cursor-pointer"
                     >
-                      リセット
+                      {getAttendanceText('modalReset', locale)}
                     </button>
                   )}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">備考（中抜け・遅刻の事由など）</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">{getAttendanceText('modalNotes', locale)}</label>
                 <textarea
                   value={formNotes}
                   onChange={e => setFormNotes(e.target.value)}
                   rows={2}
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 resize-none disabled:bg-slate-50 disabled:text-slate-500"
-                  placeholder="例: 中抜け11:00-13:00、交通機関の遅延、早退事由等..."
+                  placeholder={getAttendanceText('modalNotesPlaceholder', locale)}
                   disabled={isEmployeeMode}
                 />
               </div>
 
               <div className="flex gap-2.5 border-t border-slate-100 pt-4 mt-6">
                 {isEmployeeMode ? (
-                  <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-sm cursor-pointer text-center">閉じる</button>
+                  <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-sm cursor-pointer text-center">{getAttendanceText('modalClose', locale)}</button>
                 ) : (
                   <>
-                    <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer">キャンセル</button>
-                    <button type="submit" className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-sm cursor-pointer">保存する</button>
+                    <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer">{getAttendanceText('modalCancel', locale)}</button>
+                    <button type="submit" className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-sm cursor-pointer">{getAttendanceText('modalSave', locale)}</button>
                   </>
                 )}
               </div>

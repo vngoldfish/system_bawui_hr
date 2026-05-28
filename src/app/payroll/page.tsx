@@ -29,7 +29,8 @@ export default async function PayrollPage() {
     redirect('/login');
   }
 
-  const isEmployee = dbUser.role === 'EMPLOYEE';
+  const viewMode = cookieStore.get('view_mode')?.value || 'admin';
+  const isEmployee = dbUser.role === 'EMPLOYEE' || viewMode === 'employee';
 
   if (isEmployee) {
     const hireDate = new Date(dbUser.hireDate);
@@ -117,7 +118,7 @@ export default async function PayrollPage() {
     if (records.length === 0) {
       const hire = new Date(dbUser.hireDate);
       const now = new Date();
-      let current = new Date(hire.getFullYear(), hire.getMonth(), 1);
+      const current = new Date(hire.getFullYear(), hire.getMonth(), 1);
       const generated: any[] = [];
       
       while (current <= now) {

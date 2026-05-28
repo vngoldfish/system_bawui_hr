@@ -6,6 +6,7 @@ import ExportButtons from '@/components/common/ExportButtons';
 import { formatCurrency } from '@/lib/utils';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
+import { useI18n } from '@/lib/i18n';
 
 interface Employee {
   id: string; employeeCode: string; firstName: string; lastName: string; firstNameKana: string; lastNameKana: string;
@@ -27,6 +28,16 @@ interface PayrollRecord {
   status: string;
   paymentDate?: string;
 }
+
+const getDisplayMonth = (monthStr: string, loc: string) => {
+  try {
+    const [year, month] = monthStr.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    return date.toLocaleDateString(loc, { year: 'numeric', month: 'long' });
+  } catch (e) {
+    return monthStr;
+  }
+};
 
 const PAGE_SIZE = 10;
 
@@ -101,6 +112,7 @@ function FilterTh({ label, filterKey, options, activeFilter, columnFilters, onFi
 }
 
 function PayslipModal({ record, employee, onClose }: { record: PayrollRecord; employee: Employee; onClose: () => void }) {
+  const { t, locale } = useI18n();
   const [emailing, setEmailing] = useState(false);
   const [emailStatus, setEmailStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
@@ -121,10 +133,10 @@ function PayslipModal({ record, employee, onClose }: { record: PayrollRecord; em
       const imgWidth = 210;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      pdf.save(`給与明細書_${employee.lastName}_${employee.firstName}_${record.month}.pdf`);
+      pdf.save(`${t('payroll.payslipTitle')}_${employee.lastName}_${employee.firstName}_${record.month}.pdf`);
     } catch (e) {
       console.error(e);
-      alert('PDFダウンロードに失敗しました。');
+      alert(t('payroll.exportPdfFailed'));
     }
   };
 
@@ -150,9 +162,7 @@ function PayslipModal({ record, employee, onClose }: { record: PayrollRecord; em
     }
   };
 
-  // Convert month to Japanese display e.g. 2026年05月
-  const [yearStr, monthStr] = record.month.split('-');
-  const displayMonth = `${yearStr}年${monthStr}月`;
+  const displayMonth = getDisplayMonth(record.month, locale);
 
   // Format date to local date string
   const formatPayday = (dateStrOrObj: any) => {
@@ -176,24 +186,24 @@ function PayslipModal({ record, employee, onClose }: { record: PayrollRecord; em
           <div className="flex gap-2">
             <button onClick={handlePrint} className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer">
               <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-              印刷
+              {t('payroll.printBtn')}
             </button>
             <button onClick={handleDownloadPDF} className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer">
               <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              PDFダウンロード
+              {t('payroll.pdfDownloadBtn')}
             </button>
             <button onClick={handleSendEmail} disabled={emailing} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer">
               {emailing ? (
-                <span>送信中...</span>
+                <span>{t('payroll.emailSending')}</span>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                  メール送信
+                  {t('payroll.emailSendBtn')}
                 </>
               )}
             </button>
-            {emailStatus === 'success' && <span className="text-green-600 text-xs flex items-center gap-1 font-semibold">✅ 送信完了</span>}
-            {emailStatus === 'error' && <span className="text-red-600 text-xs flex items-center gap-1 font-semibold">❌ 送信失敗</span>}
+            {emailStatus === 'success' && <span className="text-green-600 text-xs flex items-center gap-1 font-semibold">{t('payroll.emailSuccess')}</span>}
+            {emailStatus === 'error' && <span className="text-red-600 text-xs flex items-center gap-1 font-semibold">{t('payroll.emailFailed')}</span>}
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -205,47 +215,47 @@ function PayslipModal({ record, employee, onClose }: { record: PayrollRecord; em
           
           {/* Header Block */}
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold border-b-2 border-slate-800 pb-2 inline-block px-12 tracking-widest text-slate-800 print:text-black print:border-black">給与明細書</h2>
-            <p className="text-lg font-semibold mt-2 text-slate-700 print:text-black">{displayMonth}度</p>
+            <h2 className="text-2xl font-bold border-b-2 border-slate-800 pb-2 inline-block px-12 tracking-widest text-slate-800 print:text-black print:border-black">{t('payroll.payslipTitle')}</h2>
+            <p className="text-lg font-semibold mt-2 text-slate-700 print:text-black">{displayMonth}</p>
           </div>
 
           {/* Employee & Company Info Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 border border-slate-300 p-4 rounded-xl print:rounded-none print:border-black">
             <div className="space-y-2 text-sm text-slate-700 print:text-black">
-              <div className="flex"><span className="w-28 font-medium text-slate-500 print:text-black">従業員番号:</span><span className="font-bold">{employee.employeeCode}</span></div>
-              <div className="flex"><span className="w-28 font-medium text-slate-500 print:text-black">氏名:</span><span className="text-base font-bold">{employee.lastName} {employee.firstName} 殿</span></div>
-              <div className="flex"><span className="w-28 font-medium text-slate-500 print:text-black">所属/役職:</span><span>{employee.department} / {employee.position}</span></div>
+              <div className="flex"><span className="w-28 font-medium text-slate-500 print:text-black">{t('payroll.employeeCode')}:</span><span className="font-bold">{employee.employeeCode}</span></div>
+              <div className="flex"><span className="w-28 font-medium text-slate-500 print:text-black">{t('payroll.colName')}:</span><span className="text-base font-bold">{locale === 'vi' || locale === 'en' ? t('payroll.recipientSuffix') + ' ' : ''}{employee.lastName} {employee.firstName}{locale === 'ja' || locale === 'zh' ? ' ' + t('payroll.recipientSuffix') : ''}</span></div>
+              <div className="flex"><span className="w-28 font-medium text-slate-500 print:text-black">{t('payroll.deptPos')}:</span><span>{employee.department} / {employee.position}</span></div>
             </div>
             <div className="space-y-2 text-sm text-slate-700 print:text-black md:text-right md:border-l md:border-slate-200 md:pl-6 print:border-black">
-              <div className="font-bold text-base">株式会社　BAWUI</div>
-              <div>〒100-0005 東京都千代田区丸の内1-1-1</div>
-              <div className="flex md:justify-end"><span className="w-28 font-medium text-slate-500 print:text-black text-left md:text-right mr-2">支給日:</span><span className="font-semibold">{record.paymentDate ? formatPayday(record.paymentDate) : '2026/05/25'}</span></div>
+              <div className="font-bold text-base">{t('payroll.companyName')}</div>
+              <div>{t('payroll.companyAddress')}</div>
+              <div className="flex md:justify-end"><span className="w-28 font-medium text-slate-500 print:text-black text-left md:text-right mr-2">{t('payroll.payDate')}:</span><span className="font-semibold">{record.paymentDate ? formatPayday(record.paymentDate) : '2026/05/25'}</span></div>
             </div>
           </div>
 
           {/* Attendance Section (勤怠) */}
           <div className="mb-6">
-            <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【勤怠】</h3>
+            <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【{t('payroll.attendanceHeader')}】</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse border border-slate-300 print:border-black">
                 <thead>
                   <tr className="bg-slate-50 print:bg-slate-100">
-                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">出勤日数</th>
-                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">欠勤日数</th>
-                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">有給取得日数</th>
-                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">所定労働時間</th>
-                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">実労働時間</th>
-                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">残業時間</th>
+                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">{t('payroll.workDays')}</th>
+                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">{t('payroll.absentDays')}</th>
+                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">{t('payroll.paidLeaveDays')}</th>
+                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">{t('payroll.prescribedHours')}</th>
+                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">{t('payroll.actualHours')}</th>
+                    <th className="border border-slate-300 p-2 text-center font-medium print:border-black">{t('payroll.overtimeHours')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-slate-300 p-2.5 text-center font-bold text-sm print:border-black">{record.workDays} 日</td>
-                    <td className="border border-slate-300 p-2.5 text-center font-bold text-sm text-red-600 print:text-black print:border-black">{record.absentDays || 0} 日</td>
-                    <td className="border border-slate-300 p-2.5 text-center font-bold text-sm print:border-black">{22 - record.workDays - (record.absentDays || 0) > 0 ? 22 - record.workDays - (record.absentDays || 0) : 0} 日</td>
-                    <td className="border border-slate-300 p-2.5 text-center print:border-black">{record.workHours} h</td>
-                    <td className="border border-slate-300 p-2.5 text-center print:border-black">{record.workDays * 8} h</td>
-                    <td className="border border-slate-300 p-2.5 text-center font-bold text-orange-600 print:text-black print:border-black">{record.overtimeHours} h</td>
+                    <td className="border border-slate-300 p-2.5 text-center font-bold text-sm print:border-black">{record.workDays} {t('payroll.daysUnit')}</td>
+                    <td className="border border-slate-300 p-2.5 text-center font-bold text-sm text-red-600 print:text-black print:border-black">{record.absentDays || 0} {t('payroll.daysUnit')}</td>
+                    <td className="border border-slate-300 p-2.5 text-center font-bold text-sm print:border-black">{22 - record.workDays - (record.absentDays || 0) > 0 ? 22 - record.workDays - (record.absentDays || 0) : 0} {t('payroll.daysUnit')}</td>
+                    <td className="border border-slate-300 p-2.5 text-center print:border-black">{record.workHours} {t('payroll.hoursUnit')}</td>
+                    <td className="border border-slate-300 p-2.5 text-center print:border-black">{record.workDays * 8} {t('payroll.hoursUnit')}</td>
+                    <td className="border border-slate-300 p-2.5 text-center font-bold text-orange-600 print:text-black print:border-black">{record.overtimeHours} {t('payroll.hoursUnit')}</td>
                   </tr>
                 </tbody>
               </table>
@@ -257,45 +267,45 @@ function PayslipModal({ record, employee, onClose }: { record: PayrollRecord; em
             
             {/* Earnings (支給) */}
             <div>
-              <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【支給】</h3>
+              <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【{t('payroll.earnings')}】</h3>
               <table className="w-full text-xs border-collapse border border-slate-300 print:border-black">
                 <thead>
                   <tr className="bg-slate-50 print:bg-slate-100">
-                    <th className="border border-slate-300 p-2 text-left font-medium print:border-black">支給科目</th>
-                    <th className="border border-slate-300 p-2 text-right font-medium print:border-black">金額</th>
+                    <th className="border border-slate-300 p-2 text-left font-medium print:border-black">{t('payroll.earningSubject')}</th>
+                    <th className="border border-slate-300 p-2 text-right font-medium print:border-black">{t('payroll.colGross')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 print:divide-black">
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">基本給</td><td className="border border-slate-300 p-2.5 text-right font-semibold print:border-black">{formatCurrency(record.baseSalary)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">時間外手当 (残業手当)</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-green-600 print:text-black print:border-black">+{formatCurrency(record.overtimePay)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">通勤手当</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(transAllow)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">住宅手当</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(houseAllow)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">食事手当</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(mealAllow)}</td></tr>
-                  {otherAllow > 0 && <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">その他手当 (賞与等)</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(otherAllow)}</td></tr>}
-                  <tr className="bg-blue-50/50 font-bold print:bg-slate-100"><td className="border border-slate-300 p-3 text-slate-800 print:text-black print:border-black">支給合計額</td><td className="border border-slate-300 p-3 text-right text-blue-700 print:text-black print:border-black">{formatCurrency(record.totalGross)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.baseSalarySubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold print:border-black">{formatCurrency(record.baseSalary)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.overtimeSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-green-600 print:text-black print:border-black">+{formatCurrency(record.overtimePay)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.transportSubject')}</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(transAllow)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.housingSubject')}</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(houseAllow)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.mealSubject')}</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(mealAllow)}</td></tr>
+                  {otherAllow > 0 && <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.otherSubject')}</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(otherAllow)}</td></tr>}
+                  <tr className="bg-blue-50/50 font-bold print:bg-slate-100"><td className="border border-slate-300 p-3 text-slate-800 print:text-black print:border-black">{t('payroll.totalEarnings')}</td><td className="border border-slate-300 p-3 text-right text-blue-700 print:text-black print:border-black">{formatCurrency(record.totalGross)}</td></tr>
                 </tbody>
               </table>
             </div>
 
             {/* Deductions (控除) */}
             <div>
-              <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【控除】</h3>
+              <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【{t('payroll.deductions')}】</h3>
               <table className="w-full text-xs border-collapse border border-slate-300 print:border-black">
                 <thead>
                   <tr className="bg-slate-50 print:bg-slate-100">
-                    <th className="border border-slate-300 p-2 text-left font-medium print:border-black">控除科目</th>
-                    <th className="border border-slate-300 p-2 text-right font-medium print:border-black">金額</th>
+                    <th className="border border-slate-300 p-2 text-left font-medium print:border-black">{t('payroll.deductionSubject')}</th>
+                    <th className="border border-slate-300 p-2 text-right font-medium print:border-black">{t('payroll.colDeduction')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 print:divide-black">
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">健康保険料</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.healthInsurance)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">厚生年金保険料</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.pension)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">雇用保険料</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.employmentInsurance)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">労災保険料</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.workersComp)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">欠勤控除</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.totalDeductions - record.healthInsurance - record.pension - record.employmentInsurance - record.workersComp - record.incomeTax - record.residentTax > 0 ? record.totalDeductions - record.healthInsurance - record.pension - record.employmentInsurance - record.workersComp - record.incomeTax - record.residentTax : 0)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">所得税</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.incomeTax)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">住民税</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.residentTax)}</td></tr>
-                  <tr className="bg-red-50/50 font-bold print:bg-slate-100"><td className="border border-slate-300 p-3 text-slate-800 print:text-black print:border-black">控除合計額</td><td className="border border-slate-300 p-3 text-right text-red-700 print:text-black print:border-black">-{formatCurrency(record.totalDeductions)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.healthInsSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.healthInsurance)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.pensionSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.pension)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.employmentInsSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.employmentInsurance)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.workersCompSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.workersComp)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.absentDeductionSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.totalDeductions - record.healthInsurance - record.pension - record.employmentInsurance - record.workersComp - record.incomeTax - record.residentTax > 0 ? record.totalDeductions - record.healthInsurance - record.pension - record.employmentInsurance - record.workersComp - record.incomeTax - record.residentTax : 0)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.incomeTaxSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.incomeTax)}</td></tr>
+                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.residentTaxSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.residentTax)}</td></tr>
+                  <tr className="bg-red-50/50 font-bold print:bg-slate-100"><td className="border border-slate-300 p-3 text-slate-800 print:text-black print:border-black">{t('payroll.totalDeductions')}</td><td className="border border-slate-300 p-3 text-right text-red-700 print:text-black print:border-black">-{formatCurrency(record.totalDeductions)}</td></tr>
                 </tbody>
               </table>
             </div>
@@ -305,7 +315,7 @@ function PayslipModal({ record, employee, onClose }: { record: PayrollRecord; em
           {/* Net pay summary box */}
           <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 print:bg-white print:border-black print:rounded-none">
             <div>
-              <p className="text-xs text-slate-500 print:text-black font-bold uppercase tracking-wider">差引支給額 (銀行振込額)</p>
+              <p className="text-xs text-slate-500 print:text-black font-bold uppercase tracking-wider">{t('payroll.grossPayMinusDeductions')}</p>
               <p className="text-xs text-slate-400 print:text-black">Gross Pay minus Deductions</p>
             </div>
             <div className="text-right">
@@ -329,6 +339,7 @@ interface PayrollSettings {
 export default function PayrollClient({ employees, initialRecords, payrollSettings, isEmployeeMode = false }: {
   employees: Employee[]; initialRecords: PayrollRecord[]; payrollSettings?: PayrollSettings; isEmployeeMode?: boolean;
 }) {
+  const { t, locale } = useI18n();
   const [records, setRecords] = useState(initialRecords);
   const [viewType, setViewType] = useState<'month' | 'employee'>('month');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(() => employees[0]?.id || '');
@@ -473,13 +484,13 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
               onClick={() => { setViewType('month'); setCurrentPage(1); }} 
               className={`px-5 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all ${viewType === 'month' ? 'bg-white dark:bg-slate-700 shadow text-blue-650 dark:text-blue-400 font-black' : 'text-slate-500 hover:text-slate-800'}`}
             >
-              月別で表示
+              {t('payroll.viewByMonth')}
             </button>
             <button 
               onClick={() => { setViewType('employee'); setCurrentPage(1); }} 
               className={`px-5 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all ${viewType === 'employee' ? 'bg-white dark:bg-slate-700 shadow text-blue-650 dark:text-blue-400 font-black' : 'text-slate-500 hover:text-slate-800'}`}
             >
-              従業員別で表示
+              {t('payroll.viewByEmployee')}
             </button>
           </div>
 
@@ -487,7 +498,7 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
             {viewType === 'month' ? (
               <>
                 <div className="flex gap-3 items-center">
-                  <label className="text-sm font-medium text-slate-600 dark:text-slate-400">期間:</label>
+                  <label className="text-sm font-medium text-slate-600 dark:text-slate-400">{t('payroll.monthRange')}:</label>
                   <input type="month" value={startMonth} onChange={e => { setStartMonth(e.target.value); setCurrentPage(1); }}
                     className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer" />
                   <span className="text-slate-400">〜</span>
@@ -496,14 +507,14 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
                 </div>
                 <button onClick={handleCalculate} disabled={calculating}
                   className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 cursor-pointer">
-                  {calculating ? '計算中...' : '給与自動計算'}
+                  {calculating ? t('payroll.calculating') : t('payroll.calculateBtn')}
                 </button>
               </>
             ) : (
               <div className="flex flex-wrap gap-4 items-center w-full justify-between">
                 <div className="flex flex-wrap gap-4 items-center">
                   <div className="flex gap-3 items-center">
-                    <label className="text-sm font-medium text-slate-600 dark:text-slate-400 shrink-0">従業員コード:</label>
+                    <label className="text-sm font-medium text-slate-600 dark:text-slate-400 shrink-0">{t('payroll.employeeCode')}:</label>
                     <input 
                       type="text" 
                       placeholder="例: NV001" 
@@ -513,15 +524,15 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
                         setEmpCodeInput(val);
                         const matched = employees.find(emp => emp.employeeCode.toLowerCase() === val.trim().toLowerCase());
                         if (matched) {
-                          setSelectedEmployeeId(matched.id);
-                          setCurrentPage(1);
+                           setSelectedEmployeeId(matched.id);
+                           setCurrentPage(1);
                         }
                       }}
                       className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 w-32 font-mono font-bold uppercase"
                     />
                   </div>
                   <div className="flex gap-3 items-center">
-                    <label className="text-sm font-medium text-slate-600 dark:text-slate-400 shrink-0">または氏名選択:</label>
+                    <label className="text-sm font-medium text-slate-650 dark:text-slate-400 shrink-0">{t('payroll.orSelectName')}:</label>
                     <select 
                       value={selectedEmployeeId} 
                       onChange={e => {
@@ -542,7 +553,7 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
                   </div>
                 </div>
                 <div className="flex gap-3 items-center">
-                  <label className="text-sm font-medium text-slate-600 dark:text-slate-400">期間:</label>
+                  <label className="text-sm font-medium text-slate-600 dark:text-slate-400">{t('payroll.monthRange')}:</label>
                   <input type="month" value={startMonth} onChange={e => { setStartMonth(e.target.value); setCurrentPage(1); }}
                     className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer" />
                   <span className="text-slate-400">〜</span>
@@ -564,7 +575,7 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
           
           <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
             <div className="space-y-1">
-              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">従業員氏名</span>
+              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">{t('payroll.employeeName')}</span>
               <p className="font-extrabold text-slate-800 dark:text-slate-200 text-base">
                 {selectedEmployee.lastName} {selectedEmployee.firstName}
               </p>
@@ -573,7 +584,7 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
               </p>
             </div>
             <div className="space-y-1">
-              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">所属 / 役職</span>
+              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">{t('payroll.deptPos')}</span>
               <p className="font-bold text-slate-700 dark:text-slate-350">
                 {selectedEmployee.department}
               </p>
@@ -582,16 +593,16 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
               </p>
             </div>
             <div className="space-y-1">
-              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">契約形態 / 給与形態</span>
+              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">{t('payroll.contractSalaryType')}</span>
               <p className="font-bold text-slate-700 dark:text-slate-350">
                 {selectedEmployee.contractType} <span className="text-xs font-normal">({selectedEmployee.salaryType})</span>
               </p>
               <p className="text-xs text-slate-500 font-mono font-medium">
-                基本給: {formatCurrency(selectedEmployee.salary)} / 月
+                {t('payroll.baseSalaryLabel')}: {formatCurrency(selectedEmployee.salary)} / {locale === 'ja' ? '月' : locale === 'vi' ? 'tháng' : locale === 'en' ? 'mo' : locale === 'zh' ? '月' : 'เดือน'}
               </p>
             </div>
             <div className="space-y-1">
-              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">従業員コード</span>
+              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">{t('payroll.employeeCode')}</span>
               <p className="font-mono font-black text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-lg w-fit text-sm border border-slate-200/40 dark:border-slate-750">
                 {selectedEmployee.employeeCode}
               </p>
@@ -607,12 +618,12 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
       {!isEmployeeMode && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
-            { label: '総支給額', value: formatCurrency(stats.totalGross), color: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: '総控除額', value: formatCurrency(stats.totalDeductions), color: 'text-red-600', bg: 'bg-red-50' },
-            { label: '差引支給', value: formatCurrency(stats.totalNet), color: 'text-green-600', bg: 'bg-green-50' },
-            { label: '残業合計', value: `${stats.totalOT}h`, color: 'text-orange-600', bg: 'bg-orange-50' },
-            { label: '残業代合計', value: formatCurrency(stats.totalOTPay), color: 'text-purple-600', bg: 'bg-purple-50' },
-            { label: '人数', value: `${stats.count}名`, color: 'text-slate-600', bg: 'bg-slate-50' },
+            { label: t('payroll.totalPayout'), value: formatCurrency(stats.totalGross), color: 'text-blue-600', bg: 'bg-blue-50' },
+            { label: t('payroll.taxDeduction'), value: formatCurrency(stats.totalDeductions), color: 'text-red-600', bg: 'bg-red-50' },
+            { label: t('payroll.netPayout'), value: formatCurrency(stats.totalNet), color: 'text-green-600', bg: 'bg-green-50' },
+            { label: t('payroll.overtimeHours'), value: `${stats.totalOT}${t('payroll.hoursUnit')}`, color: 'text-orange-600', bg: 'bg-orange-50' },
+            { label: t('payroll.overtimeSubject'), value: formatCurrency(stats.totalOTPay), color: 'text-purple-600', bg: 'bg-purple-50' },
+            { label: t('payroll.totalEmployees'), value: `${stats.count}${locale === 'ja' ? '名' : locale === 'vi' ? ' người' : locale === 'en' ? ' staff' : locale === 'zh' ? ' 人' : ' คน'}`, color: 'text-slate-600', bg: 'bg-slate-50' },
           ].map(s => (
             <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-200`}>
               <p className="text-xs text-slate-500 mb-1">{s.label}</p>
@@ -624,7 +635,7 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
 
       {isEmployeeMode && (
         <div className="flex gap-3 items-center bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 shadow-sm w-fit mb-4">
-          <label className="text-sm font-medium text-slate-650 dark:text-slate-400">表示期間:</label>
+          <label className="text-sm font-medium text-slate-650 dark:text-slate-400">{t('payroll.monthRange')}:</label>
           <input type="month" value={startMonth} onChange={e => { setStartMonth(e.target.value); setCurrentPage(1); }}
             className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer" />
           <span className="text-slate-400">〜</span>
@@ -636,23 +647,26 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
       {/* Salary Type Distribution */}
       {!isEmployeeMode && (
         <div className="flex gap-3">
-          {Object.entries(stats.byType).map(([type, count]) => (
-            <div key={type} className={`px-4 py-2 rounded-lg ${salaryTypeColor(type)}`}>
-              <span className="text-sm font-medium">{type}: {count}名</span>
-            </div>
-          ))}
+          {Object.entries(stats.byType).map(([type, count]) => {
+            const translatedType = type === '月給' ? t('payroll.typeMonthly') : type === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly');
+            return (
+              <div key={type} className={`px-4 py-2 rounded-lg ${salaryTypeColor(type)}`}>
+                <span className="text-sm font-medium">{translatedType}: {count}{locale === 'ja' ? '名' : locale === 'vi' ? ' người' : locale === 'en' ? ' staff' : locale === 'zh' ? ' 人' : ' คน'}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* Table */}
       <Card title={
         isEmployeeMode 
-          ? '給与明細書履歴' 
+          ? t('payroll.payslipHistory') 
           : viewType === 'employee'
-            ? `${employees.find(e => e.id === selectedEmployeeId)?.lastName} ${employees.find(e => e.id === selectedEmployeeId)?.firstName} さんの給与明細履歴`
+            ? `${employees.find(e => e.id === selectedEmployeeId)?.lastName} ${employees.find(e => e.id === selectedEmployeeId)?.firstName} ${t('payroll.employeePayslipHistory')}`
             : startMonth === endMonth
-              ? `${endMonth.replace('-', '年')}月 給与明細一覧`
-              : `${startMonth.replace('-', '年')}月 〜 ${endMonth.replace('-', '年')}月 給与明細一覧`
+              ? `${getDisplayMonth(endMonth, locale)} ${t('payroll.monthPayslipList')}`
+              : `${getDisplayMonth(startMonth, locale)} 〜 ${getDisplayMonth(endMonth, locale)} ${t('payroll.monthPayslipList')}`
       }>
         {!isEmployeeMode && (
           <div className="flex flex-col sm:flex-row gap-3 mb-5 justify-between items-center">
@@ -661,41 +675,47 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                <input type="text" placeholder="名前で検索..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+                <input type="text" placeholder={t('payroll.searchPlaceholder')} value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
                   className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
             ) : <div />}
             {activeFilterCount > 0 && viewType === 'month' && (
               <button onClick={() => { setColumnFilters({}); setCurrentPage(1); }}
-                className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg border border-red-200">フィルタークリア ({activeFilterCount})</button>
+                className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg border border-red-200">{t('payroll.filterClear')} ({activeFilterCount})</button>
             )}
             <ExportButtons
               data={filtered.map(r => {
                 const emp = employees.find(e => e.id === r.employeeId);
+                const translatedSalaryType = r.salaryType === '月給' ? t('payroll.typeMonthly') : r.salaryType === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly');
+                const getStatusLabel = (s: string) =>
+                  s === 'PAID' ? t('payroll.statusPaid') :
+                  s === 'APPROVED' ? t('payroll.statusApproved') :
+                  s === 'CALCULATED' ? t('payroll.statusCalculated') :
+                  s === 'PENDING' ? t('payroll.statusPending') : s;
                 return {
                   name: emp ? `${emp.lastName} ${emp.firstName}` : '',
-                  month: `${r.month.replace('-', '年')}月`,
-                  salaryType: r.salaryType,
+                  month: getDisplayMonth(r.month, locale),
+                  salaryType: translatedSalaryType,
                   baseSalary: formatCurrency(r.baseSalary), overtimePay: formatCurrency(r.overtimePay),
                   allowances: formatCurrency(r.allowances), totalGross: formatCurrency(r.totalGross),
                   deductions: formatCurrency(r.totalDeductions), netSalary: formatCurrency(r.netSalary),
-                  status: statusLabel(r.status),
+                  status: getStatusLabel(r.status),
                 };
               })}
               columns={viewType === 'employee' ? [
-                { header: '対象月', key: 'month' }, { header: '給与形態', key: 'salaryType' },
-                { header: '基本給', key: 'baseSalary' }, { header: '残業手当', key: 'overtimePay' },
-                { header: '諸手当', key: 'allowances' }, { header: '総支給', key: 'totalGross' },
-                { header: '控除', key: 'deductions' }, { header: '差引支給', key: 'netSalary' },
-                { header: '状態', key: 'status' },
+                { header: t('payroll.processMonth'), key: 'month' }, { header: t('payroll.contractSalaryType'), key: 'salaryType' },
+                { header: t('payroll.baseSalarySubject'), key: 'baseSalary' }, { header: t('payroll.overtimeHours'), key: 'overtimePay' },
+                { header: t('payroll.colAllowance'), key: 'allowances' }, { header: t('payroll.totalEarnings'), key: 'totalGross' },
+                { header: t('payroll.deductions'), key: 'deductions' }, { header: t('payroll.colNet'), key: 'netSalary' },
+                { header: t('payroll.colStatus'), key: 'status' },
               ] : [
-                { header: '氏名', key: 'name' }, { header: '給与形態', key: 'salaryType' },
-                { header: '基本給', key: 'baseSalary' }, { header: '残業手当', key: 'overtimePay' },
-                { header: '諸手当', key: 'allowances' }, { header: '総支給', key: 'totalGross' },
-                { header: '控除', key: 'deductions' }, { header: '差引支給', key: 'netSalary' },
-                { header: '状態', key: 'status' },
+                { header: t('payroll.colName'), key: 'name' }, { header: t('payroll.contractSalaryType'), key: 'salaryType' },
+                { header: t('payroll.baseSalarySubject'), key: 'baseSalary' }, { header: t('payroll.overtimeHours'), key: 'overtimePay' },
+                { header: t('payroll.colAllowance'), key: 'allowances' }, { header: t('payroll.totalEarnings'), key: 'totalGross' },
+                { header: t('payroll.deductions'), key: 'deductions' }, { header: t('payroll.colNet'), key: 'netSalary' },
+                { header: t('payroll.colStatus'), key: 'status' },
               ]}
-              fileName={viewType === 'employee' ? `給与明細_${employees.find(e => e.id === selectedEmployeeId)?.lastName}_${employees.find(e => e.id === selectedEmployeeId)?.firstName}` : (startMonth === endMonth ? `給与明細_${endMonth}` : `給与明細_${startMonth}_to_${endMonth}`)}
+              fileName={viewType === 'employee' ? `${t('payroll.payslipTitle')}_${employees.find(e => e.id === selectedEmployeeId)?.lastName}_${employees.find(e => e.id === selectedEmployeeId)?.firstName}` : (startMonth === endMonth ? `${t('payroll.payslipTitle')}_${endMonth}` : `${t('payroll.payslipTitle')}_${startMonth}_to_${endMonth}`)}
             />
           </div>
         )}
@@ -716,24 +736,24 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 {(isEmployeeMode || viewType === 'employee') ? (
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">対象月</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('payroll.processMonth')}</th>
                 ) : (
-                  <FilterTh label="氏名" filterKey="name" options={nameOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
+                  <FilterTh label={t('payroll.colName')} filterKey="name" options={nameOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
                 )}
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">形態</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">基本給</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">残業</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">手当</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">控除</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">差引支給</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">状態</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">明細</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('payroll.contractSalaryType')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('payroll.baseSalarySubject')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('payroll.overtimeHours')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('payroll.colAllowance')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('payroll.colDeduction')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('payroll.colNet')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('payroll.colStatus')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('payroll.detailBtn')}</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
               {paginated.length === 0 ? (
                 <tr><td colSpan={9} className="px-4 py-12 text-center text-slate-400">
-                  {isEmployeeMode ? '給与明細の記録がありません' : (viewType === 'employee' ? 'この従業員の給与明細記録がありません' : (monthRecords.length === 0 ? '「給与自動計算」ボタンを押して給与を計算してください' : '該当する記録が見つかりません'))}
+                  {isEmployeeMode ? t('payroll.noPayslipRecord') : (viewType === 'employee' ? t('payroll.noEmployeePayslipRecord') : (monthRecords.length === 0 ? t('payroll.clickCalculatePrompt') : t('common.noData')))}
                 </td></tr>
               ) : paginated.map(record => {
                 const emp = employees.find(e => e.id === record.employeeId);
@@ -741,7 +761,7 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
                   <tr key={record.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
                       {(isEmployeeMode || viewType === 'employee') ? (
-                        <span className="font-bold text-slate-800">{record.month.replace('-', '年')}月</span>
+                        <span className="font-bold text-slate-800">{getDisplayMonth(record.month, locale)}</span>
                       ) : (
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs">{emp?.firstNameKana?.charAt(0).toUpperCase()}</div>
@@ -749,7 +769,7 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
                             <span className="text-sm font-medium text-slate-800">{emp?.lastName} {emp?.firstName}</span>
                             {startMonth !== endMonth && (
                               <span className="text-xs text-blue-600 dark:text-blue-400 font-bold ml-1.5">
-                                ({record.month.replace('-', '年')}月)
+                                ({getDisplayMonth(record.month, locale)})
                               </span>
                             )}
                             <p className="text-xs text-slate-400">{emp?.department}</p>
@@ -757,16 +777,21 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3"><span className={`px-2 py-0.5 text-xs rounded ${salaryTypeColor(record.salaryType)}`}>{record.salaryType}</span></td>
+                    <td className="px-4 py-3"><span className={`px-2 py-0.5 text-xs rounded ${salaryTypeColor(record.salaryType)}`}>{record.salaryType === '月給' ? t('payroll.typeMonthly') : record.salaryType === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly')}</span></td>
                     <td className="px-4 py-3 text-sm text-right text-slate-600">{formatCurrency(record.baseSalary)}</td>
                     <td className="px-4 py-3 text-sm text-right text-slate-600">{record.overtimePay > 0 ? formatCurrency(record.overtimePay) : '-'}</td>
                     <td className="px-4 py-3 text-sm text-right text-slate-600">{record.allowances > 0 ? formatCurrency(record.allowances) : '-'}</td>
                     <td className="px-4 py-3 text-sm text-right text-red-600">{formatCurrency(record.totalDeductions)}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-slate-800">{formatCurrency(record.netSalary)}</td>
-                    <td className="px-4 py-3 text-center"><span className={`px-2 py-0.5 text-xs rounded ${statusColor(record.status)}`}>{statusLabel(record.status)}</span></td>
+                    <td className="px-4 py-3 text-center"><span className={`px-2 py-0.5 text-xs rounded ${statusColor(record.status)}`}>{
+                      record.status === 'PAID' ? t('payroll.statusPaid') :
+                      record.status === 'APPROVED' ? t('payroll.statusApproved') :
+                      record.status === 'CALCULATED' ? t('payroll.statusCalculated') :
+                      record.status === 'PENDING' ? t('payroll.statusPending') : record.status
+                    }</span></td>
                     <td className="px-4 py-3 text-center">
                       {emp && <button onClick={() => setSelectedPayslip(record)}
-                        className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors">明細</button>}
+                        className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors">{t('payroll.detailBtn')}</button>}
                     </td>
                   </tr>
                 );
@@ -777,16 +802,22 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
 
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-200">
-            <p className="text-sm text-slate-500">{filtered.length} 件中 {(currentPage - 1) * PAGE_SIZE + 1}〜{Math.min(currentPage * PAGE_SIZE, filtered.length)} 件を表示</p>
+            <p className="text-sm text-slate-500">
+              {locale === 'ja' ? `${filtered.length} 件中 ${(currentPage - 1) * PAGE_SIZE + 1}〜${Math.min(currentPage * PAGE_SIZE, filtered.length)} 件を表示` :
+               locale === 'vi' ? `Hiển thị ${(currentPage - 1) * PAGE_SIZE + 1}〜${Math.min(currentPage * PAGE_SIZE, filtered.length)} trong số ${filtered.length} bản ghi` :
+               locale === 'en' ? `Showing ${(currentPage - 1) * PAGE_SIZE + 1} to ${Math.min(currentPage * PAGE_SIZE, filtered.length)} of ${filtered.length} records` :
+               locale === 'zh' ? `显示第 ${(currentPage - 1) * PAGE_SIZE + 1} 至 ${Math.min(currentPage * PAGE_SIZE, filtered.length)} 条，共 ${filtered.length} 条记录` :
+               `แสดง ${(currentPage - 1) * PAGE_SIZE + 1} ถึง ${Math.min(currentPage * PAGE_SIZE, filtered.length)} จากทั้งหมด ${filtered.length} รายการ`}
+            </p>
             <div className="flex gap-1">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">前へ</button>
+                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">{t('staff.client.prev')}</button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                 <button key={page} onClick={() => setCurrentPage(page)}
                   className={`px-3 py-1.5 text-sm rounded-lg ${page === currentPage ? 'bg-blue-600 text-white' : 'border border-slate-300 hover:bg-slate-50'}`}>{page}</button>
               ))}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">次へ</button>
+                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">{t('staff.client.next')}</button>
             </div>
           </div>
         )}
@@ -802,6 +833,7 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
 }
 
 function PayrollSchedule({ cutoffDay, payday }: { cutoffDay: string; payday: string }) {
+  const { t } = useI18n();
   const info = useMemo(() => {
     const today = new Date();
     const todayDate = today.getDate();
@@ -845,24 +877,24 @@ function PayrollSchedule({ cutoffDay, payday }: { cutoffDay: string; payday: str
     <div className="bg-white rounded-xl border border-slate-200 p-4">
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
-          <p className="text-xs text-slate-500 mb-1">計算期間</p>
+          <p className="text-xs text-slate-500 mb-1">{t('payroll.calcPeriod')}</p>
           <p className="text-sm font-medium text-slate-800">{info.period}</p>
         </div>
         <div className="flex-1">
-          <p className="text-xs text-slate-500 mb-1">締め日</p>
+          <p className="text-xs text-slate-500 mb-1">{t('payroll.cutoffDay')}</p>
           <div className="flex items-center gap-2">
             {info.isCutoffDay && <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />}
             <p className="text-sm font-medium text-slate-800">
-              {info.isCutoffDay ? '本日が締め日です' : `あと${info.daysUntilCutoff}日`}
+              {info.isCutoffDay ? t('payroll.todayIsCutoff') : t('payroll.daysLeft').replace('{days}', String(info.daysUntilCutoff))}
             </p>
           </div>
         </div>
         <div className="flex-1">
-          <p className="text-xs text-slate-500 mb-1">支払日</p>
+          <p className="text-xs text-slate-500 mb-1">{t('payroll.payday')}</p>
           <div className="flex items-center gap-2">
             {info.isPayday && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
             <p className="text-sm font-medium text-slate-800">
-              {info.isPayday ? '本日が支払日です' : info.payDate}
+              {info.isPayday ? t('payroll.todayIsPayday') : info.payDate}
             </p>
           </div>
         </div>
@@ -872,9 +904,9 @@ function PayrollSchedule({ cutoffDay, payday }: { cutoffDay: string; payday: str
           <span className="text-green-600 text-lg">&#128176;</span>
           <div>
             <p className="text-sm font-medium text-green-800">
-              {info.isPayday ? '本日は給与支払日です' : `給与支払日まであと${info.daysUntilPay}日です`}
+              {info.isPayday ? t('payroll.todayIsPaydayAlert') : t('payroll.daysLeftPaydayAlert').replace('{days}', String(info.daysUntilPay))}
             </p>
-            <p className="text-xs text-green-600">「給与自動計算」ボタンで当月分の給与を計算してください</p>
+            <p className="text-xs text-green-600">{t('payroll.paydayAlertDesc')}</p>
           </div>
         </div>
       )}

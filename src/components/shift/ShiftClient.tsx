@@ -1,4 +1,5 @@
 'use client';
+import { useI18n } from '@/lib/i18n';
 
 import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
@@ -17,15 +18,17 @@ interface Shift {
   endTime: string;
 }
 
-const shiftTypes = [
-  { key: 'day', label: '日勤', color: 'bg-blue-100 text-blue-700', time: '09:00-18:00', icon: '☀️' },
-  { key: 'night', label: '夜勤', color: 'bg-indigo-100 text-indigo-700', time: '22:00-07:00', icon: '🌙' },
-  { key: 'early', label: '早番', color: 'bg-orange-100 text-orange-700', time: '06:00-15:00', icon: '🌅' },
-  { key: 'late', label: '遅番', color: 'bg-purple-100 text-purple-700', time: '13:00-22:00', icon: '🌆' },
-  { key: 'off', label: '休み', color: 'bg-slate-100 text-slate-500', time: '-', icon: '🔴' },
-];
+
 
 export default function ShiftClient({ employees, isReadOnly = false }: { employees: Employee[]; isReadOnly?: boolean }) {
+  const { t, locale } = useI18n();
+  const shiftTypes = [
+    { key: 'day', label: t('shift.dayShift'), color: 'bg-blue-100 text-blue-700', time: '09:00-18:00', icon: '☀️' },
+    { key: 'night', label: t('shift.nightShift'), color: 'bg-indigo-100 text-indigo-700', time: '22:00-07:00', icon: '🌙' },
+    { key: 'early', label: t('shift.earlyShift'), color: 'bg-orange-100 text-orange-700', time: '06:00-15:00', icon: '🌅' },
+    { key: 'late', label: t('shift.lateShift'), color: 'bg-purple-100 text-purple-700', time: '13:00-22:00', icon: '🌆' },
+    { key: 'off', label: t('shift.daysOff'), color: 'bg-slate-100 text-slate-500', time: '-', icon: '🔴' },
+  ];
   const [currentMonth, setCurrentMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -95,9 +98,18 @@ export default function ShiftClient({ employees, isReadOnly = false }: { employe
     return { dayCount, nightCount, offCount, total: monthShifts.length };
   }, [shifts, currentMonth]);
 
+  const localeMap: Record<string, string> = {
+    ja: 'ja-JP',
+    en: 'en-US',
+    vi: 'vi-VN',
+    zh: 'zh-CN',
+    th: 'th-TH'
+  };
+
   const getDayOfWeek = (day: number) => {
     const d = new Date(year, month - 1, day);
-    return ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+    const localeCode = localeMap[locale] || 'ja-JP';
+    return new Intl.DateTimeFormat(localeCode, { weekday: 'short' }).format(d);
   };
 
   return (
@@ -105,10 +117,10 @@ export default function ShiftClient({ employees, isReadOnly = false }: { employe
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: '日勤シフト', value: `${stats.dayCount}回`, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: '夜勤シフト', value: `${stats.nightCount}回`, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-          { label: '休み日数', value: `${stats.offCount}日`, color: 'text-slate-600', bg: 'bg-slate-50' },
-          { label: 'シフト合計', value: `${stats.total}件`, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: t('shift.dayShift'), value: `${stats.dayCount}${t('common.timesUnit')}`, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: t('shift.nightShift'), value: `${stats.nightCount}${t('common.timesUnit')}`, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: t('shift.daysOff'), value: `${stats.offCount}${t('common.dayUnit')}`, color: 'text-slate-600', bg: 'bg-slate-50' },
+          { label: t('shift.totalShifts'), value: `${stats.total}${t('common.caseUnit')}`, color: 'text-purple-600', bg: 'bg-purple-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-200`}>
             <p className="text-xs text-slate-500 mb-1">{s.label}</p>
@@ -118,7 +130,7 @@ export default function ShiftClient({ employees, isReadOnly = false }: { employe
       </div>
 
       {/* Shift Type Legend */}
-      <Card title="シフト種別">
+      <Card title={t('shift.legend')}>
         <div className="flex flex-wrap gap-3">
           {shiftTypes.map(st => (
             <div key={st.key} className={`flex items-center gap-2 px-4 py-2 rounded-lg ${st.color}`}>
@@ -133,27 +145,28 @@ export default function ShiftClient({ employees, isReadOnly = false }: { employe
       {/* Month & Filter */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex gap-3 items-center">
-          <label className="text-sm font-medium text-slate-600">月:</label>
+          <label className="text-sm font-medium text-slate-600">{t('shift.month')}:</label>
           <input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm" />
           <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)}
             className="px-3 py-2 border border-slate-300 rounded-lg text-sm">
-            <option value="">全部署</option>
+            <option value="">{t('common.allDepts')}</option>
             {[...new Set(employees.map(e => e.department))].map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
       </div>
 
       {/* Shift Calendar */}
-      <Card title="シフト表">
+      <Card title={t('shift.tableTitle')}>
         <div className="overflow-x-auto">
           <table className="table-fixed border-collapse" style={{ width: `${140 + days.length * 45}px` }}>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 w-[140px] min-w-[140px]">従業員</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase sticky left-0 bg-slate-50 z-10 w-[140px] min-w-[140px]">{t('shift.employee')}</th>
                 {days.map(d => {
+                  const dObj = new Date(year, month - 1, d);
                   const dow = getDayOfWeek(d);
-                  const isWeekend = dow === '日' || dow === '土';
+                  const isWeekend = dObj.getDay() === 0 || dObj.getDay() === 6;
                   return (
                     <th key={d} className={`px-1 py-2 text-center text-xs font-medium w-[45px] min-w-[45px] ${isWeekend ? 'text-red-400' : 'text-slate-500'}`}>
                       <div>{d}</div>
@@ -212,18 +225,18 @@ export default function ShiftClient({ employees, isReadOnly = false }: { employe
       </Card>
 
       {/* Monthly Summary per Employee */}
-      <Card title="従業員別 シフト集計">
+      <Card title={t('shift.summary')}>
         <div className="overflow-x-auto">
           <table className="w-full table-fixed border-collapse" style={{ minWidth: '800px' }}>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase w-[180px] min-w-[180px]">従業員</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">日勤</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">夜勤</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">早番</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">遅番</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">休み</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">出勤日数</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase w-[180px] min-w-[180px]">{t('shift.employee')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">{t('shift.dayShift')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">{t('shift.nightShift')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">{t('shift.earlyShift')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">{t('shift.lateShift')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">{t('shift.daysOff')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase w-[90px] min-w-[90px]">{t('shift.totalShifts')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

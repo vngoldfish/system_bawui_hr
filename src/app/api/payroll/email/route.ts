@@ -35,7 +35,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Security Check: Employees can only send their own payslip
-    if (user.role === 'EMPLOYEE' && record.employeeId !== user.id) {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployeeMode = user.role === 'EMPLOYEE' || viewMode === 'employee';
+    if (isEmployeeMode && record.employeeId !== user.id) {
       return errorResponse('Forbidden', 403);
     }
 

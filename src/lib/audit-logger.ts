@@ -75,7 +75,66 @@ export function logDatabaseChange({
     }
     const logFilePath = path.join(logDir, 'audit.jsonl');
     fs.appendFileSync(logFilePath, safeJsonStringify(logEntry) + '\n', 'utf-8');
+
+    // Run expiration cleanup at most once every 24 hours
+    const lastCleanupFile = path.join(logDir, '.last_cleanup');
+    let shouldCleanup = false;
+    const now = new Date();
+
+    if (!fs.existsSync(lastCleanupFile)) {
+      shouldCleanup = true;
+    } else {
+      try {
+        const lastTime = new Date(fs.readFileSync(lastCleanupFile, 'utf-8').trim());
+        if (now.getTime() - lastTime.getTime() > 24 * 60 * 60 * 1000) {
+          shouldCleanup = true;
+        }
+      } catch (e) {
+        shouldCleanup = true;
+      }
+    }
+
+    if (shouldCleanup) {
+      fs.writeFileSync(lastCleanupFile, now.toISOString(), 'utf-8');
+      cleanupExpiredAuditLogs(logFilePath, 90);
+    }
   } catch (err) {
     console.error('Failed to write audit log:', err);
+  }
+}
+
+function cleanupExpiredAuditLogs(logFilePath: string, retentionDays: number = 90) {
+  try {
+    if (!fs.existsSync(logFilePath)) return;
+
+    const cutoffTime = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+    const fileContent = fs.readFileSync(logFilePath, 'utf-8');
+    const lines = fileContent.split('\n');
+    const keptLines: string[] = [];
+    let deletedCount = 0;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      try {
+        const entry = JSON.parse(trimmed);
+        const entryTime = new Date(entry.timestamp).getTime();
+        if (entryTime >= cutoffTime) {
+          keptLines.push(trimmed);
+        } else {
+          deletedCount++;
+        }
+      } catch (e) {
+        // Discard malformed lines during cleanup
+      }
+    }
+
+    if (deletedCount > 0) {
+      fs.writeFileSync(logFilePath, keptLines.join('\n') + '\n', 'utf-8');
+      console.log(`[AUDIT-LOG] Pruned ${deletedCount} expired log entries older than ${retentionDays} days.`);
+    }
+  } catch (err) {
+    console.error('Failed to run audit log expiration cleanup:', err);
   }
 }

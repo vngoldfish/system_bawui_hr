@@ -8,9 +8,10 @@ import Portal from '@/components/common/Portal';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { generateContractPDF, generateResignationPDF } from '@/lib/documents';
 import type { Employee } from '@/types';
+import { useI18n } from '@/lib/i18n';
 
-function getContractExpiryStatus(endDate: string | null): { level: 'expired' | 'expiring' | 'valid'; daysLeft: number; label: string; colorClasses: string } {
-  if (!endDate) return { level: 'valid', daysLeft: 9999, label: '無期', colorClasses: 'bg-green-50 text-green-700 border-green-200' };
+function getContractExpiryStatus(endDate: string | null): { level: 'expired' | 'expiring' | 'valid'; daysLeft: number; colorClasses: string } {
+  if (!endDate) return { level: 'valid', daysLeft: 9999, colorClasses: 'bg-green-50 text-green-700 border-green-200' };
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const end = new Date(endDate);
@@ -18,34 +19,20 @@ function getContractExpiryStatus(endDate: string | null): { level: 'expired' | '
   const diffMs = end.getTime() - today.getTime();
   const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-  if (daysLeft < 0) return { level: 'expired', daysLeft, label: '契約満了', colorClasses: 'bg-red-50 text-red-700 border-red-200' };
-  if (daysLeft <= 90) return { level: 'expiring', daysLeft, label: `残${daysLeft}日`, colorClasses: 'bg-orange-50 text-orange-700 border-orange-200' };
-  return { level: 'valid', daysLeft, label: '有効', colorClasses: 'bg-green-50 text-green-700 border-green-200' };
+  if (daysLeft < 0) return { level: 'expired', daysLeft, colorClasses: 'bg-red-50 text-red-700 border-red-200' };
+  if (daysLeft <= 90) return { level: 'expiring', daysLeft, colorClasses: 'bg-orange-50 text-orange-700 border-orange-200' };
+  return { level: 'valid', daysLeft, colorClasses: 'bg-green-50 text-green-700 border-green-200' };
 }
-
-const weekdayOptions = [
-  { value: 1, label: '月' },
-  { value: 2, label: '火' },
-  { value: 3, label: '水' },
-  { value: 4, label: '木' },
-  { value: 5, label: '金' },
-  { value: 6, label: '土' },
-  { value: 0, label: '日' },
-];
 
 function getActiveEmployeeContract(emp: any) {
   return emp.employeeContracts?.find((c: any) => c.isActive) || emp.employeeContracts?.[0] || null;
-}
-
-function formatWorkDays(days?: number[]) {
-  const values = Array.isArray(days) ? days : [1, 2, 3, 4, 5];
-  return weekdayOptions.filter(d => values.includes(d.value)).map(d => d.label).join('・') || '-';
 }
 
 function ColumnFilterDropdown({ column, options, selected, onSelect, onClose }: {
   column: string; options?: { value: string; label: string }[]; selected: string[];
   onSelect: (values: string[]) => void; onClose: () => void;
 }) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
@@ -55,7 +42,7 @@ function ColumnFilterDropdown({ column, options, selected, onSelect, onClose }: 
 
   return (
     <div ref={ref} className="absolute top-full left-0 mt-1.5 z-30 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-lg p-2.5 min-w-[170px] animate-fadeIn">
-      <p className="text-[10px] text-slate-400 font-extrabold px-2 mb-1.5 uppercase tracking-wider">{column}で絞り込み</p>
+      <p className="text-[10px] text-slate-400 font-extrabold px-2 mb-1.5 uppercase tracking-wider">{column}</p>
       <div className="space-y-1 max-h-[180px] overflow-y-auto pr-1">
         {options?.map(opt => (
           <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors">
@@ -68,7 +55,7 @@ function ColumnFilterDropdown({ column, options, selected, onSelect, onClose }: 
       </div>
       {selected.length > 0 && (
         <button onClick={() => onSelect([])} className="w-full mt-2 pt-2 px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg border-t border-slate-100 font-bold transition-colors cursor-pointer text-center">
-          フィルター解除
+          {t('common.clear')}
         </button>
       )}
     </div>
@@ -100,13 +87,14 @@ function FilterableTh({
   onSort: (field: string) => void;
   widthClass?: string;
 }) {
+  const { t } = useI18n();
   const hasFilter = (columnFilters[filterKey]?.length ?? 0) > 0;
   const isActive = activeFilter === filterKey;
   const isSorted = sortField === filterKey;
 
   return (
     <th className={`px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider select-none relative text-left ${widthClass || ''}`}
-      onDoubleClick={() => onActiveFilterChange(isActive ? null : filterKey)} title="ダブルクリックでフィルター">
+      onDoubleClick={() => onActiveFilterChange(isActive ? null : filterKey)} title={t('contracts.doubleClickFilter')}>
       <div className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
         <span className="cursor-pointer" onClick={() => onSort(filterKey)}>{label}</span>
         {isSorted && (
@@ -131,6 +119,7 @@ function FilterableTh({
 const PAGE_SIZE = 10;
 
 export default function ContractsClient({ initialEmployees }: { initialEmployees: Employee[] }) {
+  const { t, locale } = useI18n();
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState<string>('all');
@@ -154,6 +143,40 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
     defaultBreakEnd: '13:00',
     holidayWorkCountsAsOvertime: true,
   });
+
+
+  const weekdayNames: Record<string, string[]> = {
+    ja: ['\u65e5', '\u6708', '\u706b', '\u6c34', '\u6728', '\u91d1', '\u571f'],
+    en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    vi: ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'],
+    zh: ['\u65e5', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d'],
+    th: ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.']
+  };
+
+  const getWeekdayLabel = (value: number) => {
+    return weekdayNames[locale]?.[value] || '';
+  };
+
+  const weekdayOptions = [
+    { value: 1, label: getWeekdayLabel(1) },
+    { value: 2, label: getWeekdayLabel(2) },
+    { value: 3, label: getWeekdayLabel(3) },
+    { value: 4, label: getWeekdayLabel(4) },
+    { value: 5, label: getWeekdayLabel(5) },
+    { value: 6, label: getWeekdayLabel(6) },
+    { value: 0, label: getWeekdayLabel(0) },
+  ];
+
+  const formatWorkDaysLocal = (days?: number[]) => {
+    const values = Array.isArray(days) ? days : [1, 2, 3, 4, 5];
+    return weekdayOptions.filter(d => values.includes(d.value)).map(d => d.label).join('\u30fb') || '-';
+  };
+
+  const getExpiryLabel = (status: { level: 'expired' | 'expiring' | 'valid'; daysLeft: number }) => {
+    if (status.level === 'expired') return t('contracts.expiredStats');
+    if (status.level === 'expiring') return t('client.expiryStatusExpiring').replace('{days}', String(status.daysLeft));
+    return t('client.expiryStatusValid');
+  };
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -181,9 +204,9 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
   }, [employees]);
 
   const statusOptions = [
-    { value: 'ACTIVE', label: '在籍中' },
-    { value: 'ON_LEAVE', label: '休職中' },
-    { value: 'INACTIVE', label: '退職' },
+    { value: 'ACTIVE', label: t('client.statusActive') },
+    { value: 'ON_LEAVE', label: t('client.statusLeave') },
+    { value: 'INACTIVE', label: t('client.statusInactive') },
   ];
 
   const activeEmployees = useMemo(() => employees.filter(e => e.status !== 'INACTIVE'), [employees]);
@@ -302,6 +325,12 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
     return result;
   }, [employees, search, columnFilters, sortField, sortDir]);
 
+  const getPaginationText = (start: number, end: number, total: number) => {
+    return t('common.paginationText')
+      .replace('{start}', String(start))
+      .replace('{end}', String(end))
+      .replace('{total}', String(total));
+  };
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
@@ -318,12 +347,12 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.details || err.error || '保存に失敗しました');
+        throw new Error(err.details || err.error || t('client.saveFailed'));
       }
       window.location.reload();
     } catch (err: any) {
       console.error('Save failed:', err);
-      alert(err.message || '保存に失敗しました');
+      alert(err.message || t('client.saveFailed'));
     } finally {
       setLoading(false);
     }
@@ -355,7 +384,7 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
     const payload = {
       employeeId: emp.id,
       contractTypeId: emp.contractTypeId,
-      name: `${emp.lastName} ${emp.firstName} 勤務契約`,
+      name: `${emp.lastName} ${emp.firstName} ${t('contracts.workContract')}`,
       startDate: emp.contractStartDate || emp.hireDate,
       endDate: emp.contractEndDate || null,
       ...contractForm,
@@ -368,7 +397,7 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      alert('勤務契約の保存に失敗しました');
+      alert(t('client.saveFailed'));
       return;
     }
     const saved = await res.json();
@@ -394,14 +423,14 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
       contractStartDate: emp.contractStartDate || '',
       contractEndDate: emp.contractEndDate || '',
       salary: emp.salary || 0,
-      salaryType: emp.salaryType || '月給',
+      salaryType: emp.salaryType || '\u6708\u7d66',
       hourlyRate: emp.hourlyRate || 0,
       dailyRate: emp.dailyRate || 0,
       benefits: emp.benefits || { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 0, housing: 0, meal: 0 },
-      workLocation: '本社',
+      workLocation: '\u672c\u793e',
       workingHours: schedule
-        ? `${formatWorkDays(schedule.workDays)} ${schedule.defaultCheckIn}～${schedule.defaultCheckOut}（休憩 ${schedule.defaultBreakStart}～${schedule.defaultBreakEnd}）`
-        : '08:00～17:00（休憩 12:00～13:00）',
+        ? `${formatWorkDaysLocal(schedule.workDays)} ${schedule.defaultCheckIn}～${schedule.defaultCheckOut}（${t('contracts.breakLabel')} ${schedule.defaultBreakStart}～${schedule.defaultBreakEnd}）`
+        : `08:00～17:00（${t('contracts.breakLabel')} 12:00～13:00）`,
     });
   };
 
@@ -445,8 +474,8 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-850">雇用契約期限アラート ({alerts.length}件)</h3>
-              <p className="text-xs text-rose-600 font-bold mt-0.5">有期契約の満了日が近くなっている従業員がいます</p>
+              <h3 className="text-sm font-bold text-slate-850">{t('contracts.alertTitle').replace('{count}', String(alerts.length))}</h3>
+              <p className="text-xs text-rose-600 font-bold mt-0.5">{t('contracts.alertDesc')}</p>
             </div>
           </div>
           
@@ -467,15 +496,15 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                       <span className="text-xs text-slate-450 font-semibold ml-2">({emp.contractType.name})</span>
                     </p>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      {emp.department?.name || '-'} | 期間: {formatDate(emp.contractStartDate)} ～ {formatDate(emp.contractEndDate)}
+                      {emp.department?.name || '-'} | {t('form.contractPeriod')}: {formatDate(emp.contractStartDate)} ～ {formatDate(emp.contractEndDate)}
                     </p>
                   </div>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
                   <span className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border ${status.colorClasses}`}>
-                    {status.level === 'expired' ? '契約満了' : status.label}
+                    {getExpiryLabel(status)}
                   </span>
-                  <button onClick={() => openEdit(emp)} className="px-2.5 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer">更新</button>
+                  <button onClick={() => openEdit(emp)} className="px-2.5 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer">{t('client.updateBtn')}</button>
                 </div>
               </div>
             ))}
@@ -486,10 +515,10 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
       {/* Stats - Redesigned to look premium */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: '在籍者数', value: stats.total, color: 'text-slate-800', bg: 'bg-white border-slate-200/60 shadow-sm' },
-          { label: '契約満了', value: stats.expired, color: 'text-red-650 font-black', bg: 'bg-red-50/40 border-red-100 shadow-[0_4px_20px_-4px_rgba(239,68,68,0.06)]' },
-          { label: '間もなく満了', value: stats.expiring, color: 'text-orange-600 font-black', bg: 'bg-orange-50/40 border-orange-100 shadow-[0_4px_20px_-4px_rgba(245,158,11,0.06)]' },
-          { label: '無期契約', value: stats.indefinite, color: 'text-green-600 font-black', bg: 'bg-green-50/40 border-green-100 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.06)]' },
+          { label: t('contracts.totalStats'), value: stats.total, color: 'text-slate-800', bg: 'bg-white border-slate-200/60 shadow-sm' },
+          { label: t('contracts.expiredStats'), value: stats.expired, color: 'text-red-650 font-black', bg: 'bg-red-50/40 border-red-100 shadow-[0_4px_20px_-4px_rgba(239,68,68,0.06)]' },
+          { label: t('contracts.expiringStats'), value: stats.expiring, color: 'text-orange-600 font-black', bg: 'bg-orange-50/40 border-orange-100 shadow-[0_4px_20px_-4px_rgba(245,158,11,0.06)]' },
+          { label: t('contracts.indefiniteStats'), value: stats.indefinite, color: 'text-green-600 font-black', bg: 'bg-green-50/40 border-green-100 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.06)]' },
         ].map((s, idx) => (
           <div key={idx} className={`${s.bg} border rounded-2xl p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.06)] flex justify-between items-start relative overflow-hidden group`}>
             <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-transparent to-transparent group-hover:from-blue-500 group-hover:to-indigo-600 transition-all duration-300" />
@@ -497,14 +526,14 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{s.label}</span>
               <div className="flex items-baseline gap-1.5">
                 <span className={`text-3xl font-extrabold ${s.color} tracking-tight`}>{s.value}</span>
-                <span className="text-xs text-slate-400 font-bold">名</span>
+                <span className="text-xs text-slate-400 font-bold">{t('common.personUnit')}</span>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      <Card title="契約一覧">
+      <Card title={t('contracts.cardTitle')}>
         {/* Search & Export */}
         <div className="flex flex-col lg:flex-row gap-3 mb-6 bg-slate-50/50 p-4 border border-slate-200/60 rounded-2xl">
           <div className="flex flex-col sm:flex-row gap-2.5 flex-1">
@@ -514,12 +543,12 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                 onChange={e => { setSearchField(e.target.value); setCurrentPage(1); }}
                 className="pl-3 pr-8 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer select-none appearance-none shadow-xs w-full sm:w-[140px]"
               >
-                <option value="all">🔍 全項目</option>
-                <option value="name">氏名</option>
-                <option value="email">メール</option>
-                <option value="department">部署</option>
-                <option value="position">役職</option>
-                <option value="contractType">雇用形態</option>
+                <option value="all">{t('client.searchAll')}</option>
+                <option value="name">{t('client.colName')}</option>
+                <option value="email">{t('form.email')}</option>
+                <option value="department">{t('client.colDept')}</option>
+                <option value="position">{t('client.colPos')}</option>
+                <option value="contractType">{t('form.contractType')}</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
                 <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
@@ -531,7 +560,7 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
               </svg>
               <input
                 type="text"
-                placeholder={searchField === 'all' ? '氏名、メール、部署、雇用形態などから検索...' : `選択した項目から検索...`}
+                placeholder={searchField === 'all' ? t('contracts.searchPrompt') : t('client.searchFieldPromptSelected')}
                 value={search}
                 onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
                 className="w-full pl-9 pr-4 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs shadow-xs bg-white outline-none"
@@ -541,17 +570,17 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
           <div className="flex flex-wrap sm:flex-nowrap gap-2.5 items-center">
             <select value={columnFilters.department?.[0] || ''} onChange={e => handleColumnFilter('department', e.target.value ? [e.target.value] : [])}
               className="px-3 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs outline-none">
-              <option value="">🏢 全部署</option>
+              <option value="">{t('client.allDepts')}</option>
               {departments.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
             </select>
             <select value={columnFilters.status?.[0] || ''} onChange={e => handleColumnFilter('status', e.target.value ? [e.target.value] : [])}
               className="px-3 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs outline-none">
-              <option value="">🟢 全ての状態</option>
+              <option value="">{t('client.allStatuses')}</option>
               {statusOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
             <select value={columnFilters.contractType?.[0] || ''} onChange={e => handleColumnFilter('contractType', e.target.value ? [e.target.value] : [])}
               className="px-3 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs outline-none">
-              <option value="">📋 全ての雇用形態</option>
+              <option value="">{t('contracts.allContractTypes')}</option>
               {contractTypes.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
             <ExportButtons
@@ -560,24 +589,24 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                 kana: `${e.lastNameKana} ${e.firstNameKana}`,
                 department: e.department?.name || '',
                 position: e.position?.name || '',
-                status: e.status === 'ACTIVE' ? '在籍中' : e.status === 'ON_LEAVE' ? '休職中' : '退職',
+                status: e.status === 'ACTIVE' ? t('client.statusActive') : e.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive'),
                 contractType: e.contractType?.name || '',
                 contractStart: e.contractStartDate ? formatDate(e.contractStartDate) : '-',
-                contractEnd: e.contractEndDate ? formatDate(e.contractEndDate) : '無期',
+                contractEnd: e.contractEndDate ? formatDate(e.contractEndDate) : t('contracts.indefiniteLabel'),
                 salary: formatCurrency(e.salary),
               }))}
               columns={[
-                { header: '名前', key: 'name' }, { header: 'フリガナ', key: 'kana' },
-                { header: '部署', key: 'department' }, { header: '役職', key: 'position' },
-                { header: '状態', key: 'status' }, { header: '雇用形態', key: 'contractType' },
-                { header: '契約開始', key: 'contractStart' }, { header: '契約終了', key: 'contractEnd' },
-                { header: '給与', key: 'salary' },
+                { header: t('client.colName'), key: 'name' }, { header: t('form.lastNameKana'), key: 'kana' },
+                { header: t('client.colDept'), key: 'department' }, { header: t('client.colPos'), key: 'position' },
+                { header: t('common.status'), key: 'status' }, { header: t('form.contractType'), key: 'contractType' },
+                { header: t('form.contractStart'), key: 'contractStart' }, { header: t('form.contractPeriod'), key: 'contractEnd' },
+                { header: t('form.salaryTitle'), key: 'salary' },
               ]}
-              fileName="契約一覧"
+              fileName={t('contracts.cardTitle')}
             />
             {activeFilterCount > 0 && (
               <button onClick={() => { setColumnFilters({}); setSearch(''); setCurrentPage(1); }} className="px-3.5 py-2 text-xs text-red-650 hover:bg-red-50 rounded-xl border border-red-200 font-bold transition-all cursor-pointer h-9">
-                解除 ({activeFilterCount})
+                {t('common.clear')} ({activeFilterCount})
               </button>
             )}
           </div>
@@ -615,7 +644,7 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                 </th>
                 <th className="px-5 py-3.5 select-none text-left w-[180px] min-w-[180px]">
                   <div className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer" onClick={() => handleSort('name')}>
-                    <span>名前・フリガナ</span>
+                    <span>{t('contracts.nameAndKana')}</span>
                     {sortField === 'name' ? (
                       sortDir === 'asc' ? (
                         <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
@@ -627,10 +656,10 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                     )}
                   </div>
                 </th>
-                <FilterableTh label="部署" filterKey="department" activeFilter={activeFilter} filterOptions={departments} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[130px] min-w-[130px]" />
+                <FilterableTh label={t('client.colDept')} filterKey="department" activeFilter={activeFilter} filterOptions={departments} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[130px] min-w-[130px]" />
                 <th className="px-5 py-3.5 select-none text-left w-[110px] min-w-[110px]">
                   <div className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer" onClick={() => handleSort('position')}>
-                    <span>役職</span>
+                    <span>{t('client.colPos')}</span>
                     {sortField === 'position' ? (
                       sortDir === 'asc' ? (
                         <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
@@ -642,12 +671,12 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                     )}
                   </div>
                 </th>
-                <FilterableTh label="状態" filterKey="status" activeFilter={activeFilter} filterOptions={statusOptions} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[90px] min-w-[90px]" />
-                <FilterableTh label="雇用形態" filterKey="contractType" activeFilter={activeFilter} filterOptions={contractTypes} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[115px] min-w-[115px]" />
-                <th className="px-5 py-3.5 w-[220px] min-w-[220px]">勤務日・所定時間</th>
+                <FilterableTh label={t('common.status')} filterKey="status" activeFilter={activeFilter} filterOptions={statusOptions} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[90px] min-w-[90px]" />
+                <FilterableTh label={t('form.contractType')} filterKey="contractType" activeFilter={activeFilter} filterOptions={contractTypes} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[115px] min-w-[115px]" />
+                <th className="px-5 py-3.5 w-[220px] min-w-[220px]">{t('contracts.colCheckTime')}</th>
                 <th className="px-5 py-3.5 select-none text-left w-[190px] min-w-[190px]">
                   <div className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer" onClick={() => handleSort('contractEndDate')}>
-                    <span>契約期間</span>
+                    <span>{t('form.contractPeriod')}</span>
                     {sortField === 'contractEndDate' ? (
                       sortDir === 'asc' ? (
                         <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
@@ -659,13 +688,13 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                     )}
                   </div>
                 </th>
-                <th className="px-5 py-3.5 w-[100px] min-w-[100px]">期限状態</th>
-                <th className="px-5 py-3.5 text-right w-[140px] min-w-[140px]">操作</th>
+                <th className="px-5 py-3.5 w-[100px] min-w-[100px]">{t('contracts.colExpiryState')}</th>
+                <th className="px-5 py-3.5 text-right w-[140px] min-w-[140px]">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginated.length === 0 ? (
-                <tr><td colSpan={10} className="px-6 py-16 text-center text-slate-400 bg-slate-50/20">該当する従業員が見つかりません</td></tr>
+                <tr><td colSpan={10} className="px-6 py-16 text-center text-slate-400 bg-slate-50/20">{t('client.noEmployeesFound')}</td></tr>
               ) : paginated.map((emp, idx) => {
                 const expiry = emp.contractEndDate ? getContractExpiryStatus(emp.contractEndDate) : null;
                 const schedule = getActiveEmployeeContract(emp);
@@ -693,20 +722,20 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                     <td className="px-5 py-4 text-slate-650 font-semibold text-xs w-[110px] min-w-[110px] truncate">{emp.position.name}</td>
                     <td className="px-5 py-4 w-[90px] min-w-[90px]">
                       <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-lg border ${statusColor(emp.status)} block text-center`}>
-                        {emp.status === 'ACTIVE' ? '在籍中' : emp.status === 'ON_LEAVE' ? '休職中' : '退職'}
+                        {emp.status === 'ACTIVE' ? t('client.statusActive') : emp.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive')}
                       </span>
                     </td>
                     <td className="px-5 py-4 text-slate-800 text-xs font-extrabold w-[115px] min-w-[115px] truncate">{emp.contractType?.name || '-'}</td>
                     <td className="px-5 py-4 text-xs w-[220px] min-w-[220px]">
                       <div className="flex flex-col gap-1.5 min-w-[150px]">
                         <span className="font-black text-slate-750 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 w-fit">
-                          {formatWorkDays(schedule?.workDays)} / {schedule?.standardHoursPerDay || 8}h
+                          {formatWorkDaysLocal(schedule?.workDays)} / {schedule?.standardHoursPerDay || 8}h
                         </span>
                         <span className="text-[10px] text-slate-500 font-mono font-bold">
-                          {schedule?.defaultCheckIn || '08:00'}〜{schedule?.defaultCheckOut || '17:00'} / 休憩 {schedule?.defaultBreakStart || '12:00'}〜{schedule?.defaultBreakEnd || '13:00'}
+                          {schedule?.defaultCheckIn || '08:00'}〜{schedule?.defaultCheckOut || '17:00'} / {t('contracts.breakLabel')} {schedule?.defaultBreakStart || '12:00'}〜{schedule?.defaultBreakEnd || '13:00'}
                         </span>
                         <span className={`text-[9px] font-black w-fit px-2 py-0.5 rounded-lg border ${schedule?.holidayWorkCountsAsOvertime ?? true ? 'bg-rose-50 text-rose-650 border-rose-150' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                          祝日勤務: {(schedule?.holidayWorkCountsAsOvertime ?? true) ? '残業扱い' : '通常扱い'}
+                          {t('contracts.holidayWorkLabel')}: {(schedule?.holidayWorkCountsAsOvertime ?? true) ? t('contracts.holidayOt') : t('contracts.holidayNormal')}
                         </span>
                       </div>
                     </td>
@@ -715,34 +744,34 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                         <div className="flex items-center gap-1">
                           <span>{formatDate(emp.contractStartDate)}</span>
                           <span className="text-slate-350">～</span>
-                          <span>{emp.contractEndDate ? formatDate(emp.contractEndDate) : '無期'}</span>
+                          <span>{emp.contractEndDate ? formatDate(emp.contractEndDate) : t('contracts.indefiniteLabel')}</span>
                         </div>
                       ) : '-'}
                     </td>
                     <td className="px-5 py-4 w-[100px] min-w-[100px]">
                       {expiry ? (
                         <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-lg border ${expiry.colorClasses} block text-center`}>
-                          {expiry.level === 'expired' ? '契約満了' : expiry.label}
+                          {getExpiryLabel(expiry)}
                         </span>
-                      ) : <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-lg border bg-green-50 text-green-700 text-center border-green-200 block">無期</span>}
+                      ) : <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-lg border bg-green-50 text-green-700 text-center border-green-200 block">{t('contracts.indefiniteLabel')}</span>}
                     </td>
                     <td className="px-5 py-4 text-right w-[140px] min-w-[140px]">
                       {emp.status !== 'INACTIVE' ? (
                         <div className="flex justify-end gap-1.5">
-                          <button onClick={() => openEdit(emp)} className="p-2 text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-150 rounded-xl transition-all cursor-pointer" title="編集・更新">
+                          <button onClick={() => openEdit(emp)} className="p-2 text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-150 rounded-xl transition-all cursor-pointer" title={t('common.edit')}>
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                           </button>
-                          <button onClick={() => openContractScheduleEdit(emp)} className="p-2 text-violet-600 hover:bg-violet-50 border border-transparent hover:border-violet-150 rounded-xl transition-all cursor-pointer" title="勤務日・休日ルール設定">
+                          <button onClick={() => openContractScheduleEdit(emp)} className="p-2 text-violet-600 hover:bg-violet-50 border border-transparent hover:border-violet-150 rounded-xl transition-all cursor-pointer" title={t('contracts.editContractTitle')}>
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                           </button>
-                          <button onClick={() => handleGenerateContract(emp)} className="p-2 text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-150 rounded-xl transition-all cursor-pointer" title="契約書ダウンロード">
+                          <button onClick={() => handleGenerateContract(emp)} className="p-2 text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-150 rounded-xl transition-all cursor-pointer" title={t('nav.documents')}>
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                           </button>
-                          <button onClick={() => { setResignTarget(emp); setResignReason(''); }} className="p-2 text-red-650 hover:bg-red-50 border border-transparent hover:border-red-150 rounded-xl transition-all cursor-pointer" title="退職処理">
+                          <button onClick={() => { setResignTarget(emp); setResignReason(''); }} className="p-2 text-red-650 hover:bg-red-50 border border-transparent hover:border-red-150 rounded-xl transition-all cursor-pointer" title={t('contracts.resignTitle')}>
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                           </button>
                         </div>
-                      ) : <span className="text-xs text-slate-400 font-bold bg-slate-50 border px-2 py-0.5 rounded-lg">退職済み</span>}
+                      ) : <span className="text-xs text-slate-400 font-bold bg-slate-50 border px-2 py-0.5 rounded-lg">{t('form.statusInactive')}</span>}
                     </td>
                   </tr>
                 );
@@ -753,13 +782,13 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
 
         {/* Pagination */}
         <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-200/80">
-          <p className="text-xs text-slate-550 font-bold">{filtered.length} 件中 {(currentPage - 1) * PAGE_SIZE + 1}〜{Math.min(currentPage * PAGE_SIZE, filtered.length)} 件を表示</p>
+          <p className="text-xs text-slate-550 font-bold">{getPaginationText((currentPage - 1) * PAGE_SIZE + 1, Math.min(currentPage * PAGE_SIZE, filtered.length), filtered.length)}</p>
           <div className="flex gap-1.5">
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3.5 py-2 text-xs font-bold border border-slate-250 bg-white hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">前へ</button>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3.5 py-2 text-xs font-bold border border-slate-250 bg-white hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">{t('client.prev')}</button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
               <button key={page} onClick={() => setCurrentPage(page)} className={`px-3 py-2 text-xs font-black rounded-xl cursor-pointer transition-all ${page === currentPage ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-250 bg-white hover:bg-slate-50 text-slate-650'}`}>{page}</button>
             ))}
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3.5 py-2 text-xs font-bold border border-slate-250 bg-white hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">次へ</button>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3.5 py-2 text-xs font-bold border border-slate-250 bg-white hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">{t('client.next')}</button>
           </div>
         </div>
       </Card>
@@ -774,15 +803,15 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn" onClick={() => setContractEditTarget(null)} />
             <div className="relative bg-white rounded-3xl border border-slate-100 shadow-2xl w-full max-w-2xl mx-auto p-6.5 animate-fadeIn">
               <div className="mb-5 pb-4 border-b border-slate-100">
-                <h2 className="text-lg font-black text-slate-850">勤務契約・休日ルール設定</h2>
+                <h2 className="text-lg font-black text-slate-850">{t('contracts.editContractTitle')}</h2>
                 <p className="text-xs text-slate-500 font-bold mt-1">
-                  {contractEditTarget.lastName} {contractEditTarget.firstName} の勤務曜日 and 赤日/休日出勤の残業判定を設定します。
+                  {contractEditTarget.lastName} {contractEditTarget.firstName}{t('contracts.editContractDesc')}
                 </p>
               </div>
 
               <div className="space-y-5">
                 <div>
-                  <label className="block text-xs font-black text-slate-500 mb-2 uppercase">契約勤務曜日</label>
+                  <label className="block text-xs font-black text-slate-500 mb-2 uppercase">{t('contracts.workdayLabel')}</label>
                   <div className="flex flex-wrap gap-2">
                     {weekdayOptions.map(day => {
                       const checked = contractForm.workDays.includes(day.value);
@@ -805,40 +834,40 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div>
-                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">所定時間/日</label>
+                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">{t('contracts.hoursPerDayLabel')}</label>
                     <input type="number" min="0" max="24" step="0.5" value={contractForm.standardHoursPerDay} onChange={e => setContractForm(prev => ({ ...prev, standardHoursPerDay: Number(e.target.value) }))} className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">出勤</label>
+                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">{t('contracts.checkinLabel')}</label>
                     <input type="time" value={contractForm.defaultCheckIn} onChange={e => setContractForm(prev => ({ ...prev, defaultCheckIn: e.target.value }))} className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">退勤</label>
+                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">{t('contracts.checkoutLabel')}</label>
                     <input type="time" value={contractForm.defaultCheckOut} onChange={e => setContractForm(prev => ({ ...prev, defaultCheckOut: e.target.value }))} className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">休憩開始</label>
+                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">{t('contracts.breakstartLabel')}</label>
                     <input type="time" value={contractForm.defaultBreakStart} onChange={e => setContractForm(prev => ({ ...prev, defaultBreakStart: e.target.value }))} className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">休憩終了</label>
+                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">{t('contracts.breakendLabel')}</label>
                     <input type="time" value={contractForm.defaultBreakEnd} onChange={e => setContractForm(prev => ({ ...prev, defaultBreakEnd: e.target.value }))} className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" />
                   </div>
                 </div>
 
                 <label className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-rose-150 bg-rose-50/50 cursor-pointer">
                   <div>
-                    <p className="text-sm font-black text-rose-800">赤日・祝日に働いた時間を残業扱いにする</p>
-                    <p className="text-xs text-rose-600 font-semibold mt-0.5">オンの場合、祝日/赤日の実労働時間は全て残業時間として集計されます。</p>
+                    <p className="text-sm font-black text-rose-800">{t('contracts.holidayOtSwitch')}</p>
+                    <p className="text-xs text-rose-600 font-semibold mt-0.5">{t('contracts.holidayOtDesc')}</p>
                   </div>
                   <input type="checkbox" checked={contractForm.holidayWorkCountsAsOvertime} onChange={e => setContractForm(prev => ({ ...prev, holidayWorkCountsAsOvertime: e.target.checked }))} className="w-5 h-5 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer" />
                 </label>
               </div>
 
               <div className="flex justify-end gap-2.5 mt-6 pt-4 border-t border-slate-100">
-                <button onClick={() => setContractEditTarget(null)} className="px-4 py-2.5 border border-slate-250 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer">キャンセル</button>
+                <button onClick={() => setContractEditTarget(null)} className="px-4 py-2.5 border border-slate-250 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer">{t('form.cancel')}</button>
                 <button onClick={handleSaveContractSchedule} className="px-5 py-2.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700 text-xs font-black shadow-sm cursor-pointer">
-                  勤務契約を保存
+                  {t('contracts.saveBtn')}
                 </button>
               </div>
             </div>
@@ -852,26 +881,26 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn" onClick={() => setResignTarget(null)} />
             <div className="relative bg-white rounded-3xl border border-slate-100 shadow-2xl w-full max-w-md mx-auto p-6.5 animate-fadeIn">
-              <h2 className="text-lg font-black text-slate-800 mb-2">退職処理の実行</h2>
+              <h2 className="text-lg font-black text-slate-800 mb-2">{t('contracts.resignTitle')}</h2>
               <p className="text-sm text-slate-600 font-semibold mb-4">
-                <span className="font-extrabold text-slate-800">{resignTarget.lastName} {resignTarget.firstName}</span> を退職処理しますか？
+                <span className="font-extrabold text-slate-800">{resignTarget.lastName} {resignTarget.firstName}</span>{t('contracts.resignPrompt')}
               </p>
-              <p className="text-[11px] text-slate-450 font-bold mb-4">※退職証明書（PDF）が自動生成されダウンロードされます。</p>
+              <p className="text-[11px] text-slate-450 font-bold mb-4">{t('contracts.resignPdfDesc')}</p>
               <div className="mb-5">
-                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">退職事由を選択してください</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">{t('contracts.resignReasonLabel')}</label>
                 <select value={resignReason} onChange={e => setResignReason(e.target.value)} className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer font-semibold">
-                  <option value="">選択してください...</option>
-                  <option value="自己都合退職">自己都合退職</option>
-                  <option value="会社都合退職">会社都合退職</option>
-                  <option value="契約満了">契約満了</option>
-                  <option value="定年退職">定年退職</option>
-                  <option value="その他">その他</option>
+                  <option value="">{t('common.select')}</option>
+                  <option value="\u81ea\u5df1\u90fd\u5408\u9000\u8077">{t('contracts.resignReasonPersonal')}</option>
+                  <option value="\u4f1a\u793a\u90fd\u5408\u9000\u8077">{t('contracts.resignReasonCompany')}</option>
+                  <option value="\u5951\u7d04\u6e80\u4e86">{t('contracts.resignReasonExpiry')}</option>
+                  <option value="\u5b9a\u5e74\u9000\u8077">{t('contracts.resignReasonRetired')}</option>
+                  <option value="\u305d\u306e\u4ed6">{t('contracts.resignReasonOther')}</option>
                 </select>
               </div>
               <div className="flex justify-end gap-2.5 border-t border-slate-100 pt-4">
-                <button onClick={() => setResignTarget(null)} className="px-4 py-2.5 border border-slate-250 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer">キャンセル</button>
+                <button onClick={() => setResignTarget(null)} className="px-4 py-2.5 border border-slate-250 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer">{t('form.cancel')}</button>
                 <button onClick={handleResign} disabled={!resignReason} className="px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 text-xs font-black shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-                  退職処理 & 証明書発行
+                  {t('contracts.resignSubmit')}
                 </button>
               </div>
             </div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Card from '@/components/common/Card';
 import ManagementModal from '@/components/common/ManagementModal';
 import { formatCurrency } from '@/lib/utils';
+import { useI18n } from '@/lib/i18n';
 
 interface Department {
   id: string;
@@ -40,10 +41,10 @@ interface DeptStats {
 }
 
 const getDeptIcon = (name: string) => {
-  if (name.includes('営業')) return '📈';
-  if (name.includes('開発') || name.includes('技術') || name.includes('システム')) return '💻';
-  if (name.includes('人事') || name.includes('労務')) return '🤝';
-  if (name.includes('経理') || name.includes('財務') || name.includes('総務')) return '📊';
+  if (name.includes('\u55b6\u696d')) return '📈';
+  if (name.includes('\u958b\u767a') || name.includes('\u6280\u8853') || name.includes('\u30b7\u30b9\u30c6\u30e0')) return '💻';
+  if (name.includes('\u4eba\u4e8b') || name.includes('\u52b4\u52d9')) return '🤝';
+  if (name.includes('\u7d4c\u7406') || name.includes('\u8ca1\u52d9') || name.includes('\u7dcf\u52d9')) return '📊';
   return '🏢';
 };
 
@@ -52,6 +53,7 @@ export default function DepartmentsClient({
 }: {
   initialDepartments?: Department[];
 }) {
+  const { t, locale } = useI18n();
   const [departments, setDepartments] = useState<Department[]>(initialDepartments);
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -142,9 +144,8 @@ export default function DepartmentsClient({
             else if (rec.status === 'ABSENT') absent++;
           });
 
-          const [, monthNum] = month.split('-');
           return {
-            month: `${parseInt(monthNum)}月`,
+            month: month, // Keep original month YYYY-MM
             present,
             late,
             absent,
@@ -159,6 +160,41 @@ export default function DepartmentsClient({
       setMonthlyStats([]);
     }
   };
+
+  // Auto-select first department after initial load
+  useEffect(() => {
+    if (departments.length > 0 && !selectedDept) {
+      const firstDept = departments[0];
+      setSelectedDept(firstDept);
+      fetchEmployeesByDept(firstDept.id);
+    }
+  }, [departments]);
+
+  // Pagination state for departments
+  const DEPT_PAGE_SIZE = 12;
+  const [deptPage, setDeptPage] = useState(1);
+  const totalDeptPages = Math.ceil(departments.length / DEPT_PAGE_SIZE);
+  const paginatedDepartments = useMemo(
+    () => departments.slice((deptPage - 1) * DEPT_PAGE_SIZE, deptPage * DEPT_PAGE_SIZE),
+    [departments, deptPage]
+  );
+
+  // Pagination state for employees table
+  const EMP_PAGE_SIZE = 10;
+  const [empPage, setEmpPage] = useState(1);
+  const totalEmpPages = Math.ceil(filteredEmployees.length / EMP_PAGE_SIZE);
+  const paginatedEmployees = useMemo(
+    () => filteredEmployees.slice((empPage - 1) * EMP_PAGE_SIZE, empPage * EMP_PAGE_SIZE),
+    [filteredEmployees, empPage]
+  );
+
+  // Reset pagination when data changes
+  useEffect(() => {
+    setDeptPage(1);
+  }, [departments]);
+  useEffect(() => {
+    setEmpPage(1);
+  }, [filteredEmployees]);
 
   // Filter and sort employees list
   useEffect(() => {
@@ -192,6 +228,15 @@ export default function DepartmentsClient({
     setFilteredEmployees(result);
   }, [employees, searchTerm, statusFilter, sortBy]);
 
+  const getMonthLabel = (monthStr: string) => {
+    try {
+      const [year, month] = monthStr.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+      return date.toLocaleDateString(locale, { month: 'short' });
+    } catch (e) {
+      return monthStr;
+    }
+  };
   const handleSelectDept = (dept: Department) => {
     if (selectedDept?.id === dept.id) {
       setSelectedDept(null);
@@ -228,16 +273,16 @@ export default function DepartmentsClient({
       {/* Header Stat Board - Redesigned to look extremely premium */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-md p-5 rounded-2xl border border-slate-200/80 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
         <div>
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Departments Overview</h2>
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t('nav.departments')}</h2>
           <p className="text-xl font-black text-slate-800 mt-1">
-            全 {departments.length} 部署 <span className="text-slate-350 font-normal mx-2">|</span> 稼働人員 {totalEmployees} 名
+            {t('departments.activeStaff').replace('{depts}', String(departments.length)).replace('{staff}', String(totalEmployees))}
           </p>
         </div>
         <button
           onClick={() => setManageOpen(true)}
           className="px-4.5 py-2.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-sm self-start sm:self-center cursor-pointer hover:shadow-md"
         >
-          ⚙️ 部署マスター管理
+          {t('departments.manageBtn')}
         </button>
       </div>
 
@@ -245,7 +290,7 @@ export default function DepartmentsClient({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {departments.length === 0 && (
           <div className="col-span-full text-center py-16 text-slate-450 bg-slate-50/50 border border-dashed rounded-2xl">
-            部署が登録されていません。「部署マスター管理」から追加してください。
+            {t('departments.noDeptRegistered')}
           </div>
         )}
         {departments.map((dept) => {
@@ -271,7 +316,7 @@ export default function DepartmentsClient({
                 </div>
                 <div className="text-right ml-2 bg-slate-50 border border-slate-200/80 px-3 py-1 rounded-xl">
                   <p className="text-sm font-black text-blue-600 tracking-tight">{dept._count?.employees || 0}</p>
-                  <p className="text-[9px] text-slate-450 font-bold -mt-0.5">名</p>
+                  <p className="text-[9px] text-slate-450 font-bold -mt-0.5">{t('common.personUnit').trim()}</p>
                 </div>
               </div>
               {dept.description && (
@@ -290,7 +335,7 @@ export default function DepartmentsClient({
           <div className="flex items-center justify-between border-t border-slate-200/80 pt-6">
             <h2 className="text-base font-black text-slate-800 flex items-center gap-2">
               <span className="text-xl">{getDeptIcon(selectedDept.name)}</span>
-              <span>{selectedDept.name} — 詳細ダッシュボード</span>
+              <span>{selectedDept.name}{t('departments.detailDashboard')}</span>
             </h2>
             <button
               onClick={() => {
@@ -304,7 +349,7 @@ export default function DepartmentsClient({
               }}
               className="text-xs text-slate-400 hover:text-slate-650 font-bold border border-slate-200 rounded-lg px-2 py-1 bg-white hover:bg-slate-50 transition-colors cursor-pointer"
             >
-              閉じる ✕
+              {t('departments.closeBtn')}
             </button>
           </div>
 
@@ -312,11 +357,11 @@ export default function DepartmentsClient({
           {deptStats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: '人件費総額 (月給合計)', value: formatCurrency(deptStats.totalSalary), color: 'text-slate-800', bg: 'bg-white border-slate-200/60 shadow-sm' },
-                { label: '平均基本給 (在籍者平均)', value: formatCurrency(deptStats.avgSalary), color: 'text-blue-600', bg: 'bg-white border-slate-200/60 shadow-sm' },
-                { label: '在籍比率 (在籍/休職/退職)', value: `${deptStats.activeCount} / ${deptStats.onLeaveCount} / ${deptStats.inactiveCount}`, color: 'text-slate-800', bg: 'bg-white border-slate-200/60 shadow-sm' },
+                { label: t('departments.totalPayroll'), value: formatCurrency(deptStats.totalSalary), color: 'text-slate-800', bg: 'bg-white border-slate-200/60 shadow-sm' },
+                { label: t('departments.averageSalary'), value: formatCurrency(deptStats.avgSalary), color: 'text-blue-600', bg: 'bg-white border-slate-200/60 shadow-sm' },
+                { label: t('departments.ratioLabel'), value: `${deptStats.activeCount} / ${deptStats.onLeaveCount} / ${deptStats.inactiveCount}`, color: 'text-slate-800', bg: 'bg-white border-slate-200/60 shadow-sm' },
                 {
-                  label: '出勤率 (直近月)',
+                  label: t('departments.attendanceRate'),
                   value: monthlyStats.length > 0 && monthlyStats[monthlyStats.length - 1].total > 0
                     ? `${Math.round((monthlyStats[monthlyStats.length - 1].present / (monthlyStats[monthlyStats.length - 1].total)) * 100)}%`
                     : '-',
@@ -336,8 +381,8 @@ export default function DepartmentsClient({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Clustered Column Chart - Redesigned with proper SVG rounded gradients */}
             <div className="lg:col-span-2">
-              <Card title="過去3ヶ月の勤怠実績 (出勤・遅刻・欠勤内訳)" className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
-                <p className="text-xs text-slate-400 -mt-2 mb-6">部署メンバーの総打刻記録データ（月次推移）</p>
+              <Card title={t('departments.attendanceHistoryTitle')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+                <p className="text-xs text-slate-400 -mt-2 mb-6">{t('departments.attendanceHistoryDesc')}</p>
                 {monthlyStats.length > 0 ? (
                   <div className="relative h-64 w-full">
                     <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
@@ -362,7 +407,7 @@ export default function DepartmentsClient({
                         return (
                           <g key={idx}>
                             <line x1="45" y1={y} x2="480" y2={y} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 3" />
-                            <text x="22" y={y + 3} fill="#94a3b8" fontSize="9" fontWeight="bold" textAnchor="middle">{val}回</text>
+                            <text x="22" y={y + 3} fill="#94a3b8" fontSize="9" fontWeight="bold" textAnchor="middle">{val}{t('common.timesUnit').trim()}</text>
                           </g>
                         );
                       })}
@@ -381,7 +426,7 @@ export default function DepartmentsClient({
                             <g className="group cursor-pointer">
                               <rect x={xStart - 12} y={160 - hPresent - 22} width="40" height="18" rx="5" fill="#1e293b" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                               <text x={xStart + 8} y={160 - hPresent - 10} fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                出勤: {stat.present}回
+                                {t('departments.presentCount').replace('{count}', String(stat.present))}
                               </text>
                               <rect
                                 x={xStart}
@@ -398,7 +443,7 @@ export default function DepartmentsClient({
                             <g className="group cursor-pointer">
                               <rect x={xStart + 8} y={160 - hLate - 22} width="40" height="18" rx="5" fill="#1e293b" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                               <text x={xStart + 28} y={160 - hLate - 10} fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                遅刻: {stat.late}回
+                                {t('departments.lateCount').replace('{count}', String(stat.late))}
                               </text>
                               <rect
                                 x={xStart + 20}
@@ -415,7 +460,7 @@ export default function DepartmentsClient({
                             <g className="group cursor-pointer">
                               <rect x={xStart + 28} y={160 - hAbsent - 22} width="40" height="18" rx="5" fill="#1e293b" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                               <text x={xStart + 48} y={160 - hAbsent - 10} fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                欠勤: {stat.absent}回
+                                {t('departments.absentCount').replace('{count}', String(stat.absent))}
                               </text>
                               <rect
                                 x={xStart + 40}
@@ -429,29 +474,29 @@ export default function DepartmentsClient({
                             </g>
 
                             {/* Month Label */}
-                            <text x={xStart + 28} y="182" fill="#64748b" fontSize="10" fontWeight="bold" textAnchor="middle">{stat.month}</text>
+                            <text x={xStart + 28} y="182" fill="#64748b" fontSize="10" fontWeight="bold" textAnchor="middle">{getMonthLabel(stat.month)}</text>
                           </g>
                         );
                       })}
                     </svg>
                   </div>
                 ) : (
-                  <div className="text-center py-16 text-slate-400">勤怠実績データが存在しません</div>
+                  <div className="text-center py-16 text-slate-400">{t('departments.noAttendanceData')}</div>
                 )}
 
                 {/* Legends Footer */}
                 <div className="flex gap-4 justify-center border-t border-slate-100 pt-4 text-xs font-semibold">
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
-                    <span className="text-slate-650">出勤</span>
+                    <span className="text-slate-650">{t('status.present')}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
-                    <span className="text-slate-650">遅刻</span>
+                    <span className="text-slate-650">{t('status.late')}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
-                    <span className="text-slate-650">欠勤</span>
+                    <span className="text-slate-650">{t('status.absent')}</span>
                   </div>
                 </div>
               </Card>
@@ -459,23 +504,23 @@ export default function DepartmentsClient({
 
             {/* Department Breakdown / Labor Cost Details */}
             <div className="lg:col-span-1">
-              <Card title="就業状態割合 & 給与目安" className="bg-white border border-slate-200/60 shadow-sm h-full rounded-2xl">
-                <p className="text-xs text-slate-400 -mt-2 mb-4">雇用状況と報酬内訳</p>
+              <Card title={t('departments.ratioTitle')} className="bg-white border border-slate-200/60 shadow-sm h-full rounded-2xl">
+                <p className="text-xs text-slate-400 -mt-2 mb-4">{t('departments.ratioDesc')}</p>
                 {deptStats ? (
                   <div className="space-y-5">
                     {/* Status Progress Tracks */}
                     <div className="space-y-3">
-                      <h4 className="text-xs font-bold text-slate-455 uppercase tracking-wider">就業状態割合</h4>
+                      <h4 className="text-xs font-bold text-slate-455 uppercase tracking-wider">{t('departments.ratioHeader')}</h4>
                       {[
-                        { label: '在籍中', count: deptStats.activeCount, color: 'bg-emerald-550', total: employees.length },
-                        { label: '休職中', count: deptStats.onLeaveCount, color: 'bg-amber-550', total: employees.length },
-                        { label: '退職済み', count: deptStats.inactiveCount, color: 'bg-slate-350', total: employees.length },
+                        { label: t('client.statusActive'), count: deptStats.activeCount, color: 'bg-emerald-550', total: employees.length },
+                        { label: t('client.statusLeave'), count: deptStats.onLeaveCount, color: 'bg-amber-550', total: employees.length },
+                        { label: t('client.statusInactive'), count: deptStats.inactiveCount, color: 'bg-slate-350', total: employees.length },
                       ].map((item, idx) => {
                         const pct = item.total > 0 ? Math.round((item.count / item.total) * 100) : 0;
                         return (
                           <div key={idx} className="space-y-1">
                             <div className="flex justify-between text-xs font-bold text-slate-700">
-                              <span>{item.label} ({item.count}名)</span>
+                              <span>{item.label} ({item.count}{t('common.personUnit')})</span>
                               <span>{pct}%</span>
                             </div>
                             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -487,18 +532,18 @@ export default function DepartmentsClient({
                     </div>
 
                     <div className="border-t border-slate-100 pt-4 space-y-2">
-                      <h4 className="text-xs font-bold text-slate-455 uppercase tracking-wider">人件費目安（基本給）</h4>
+                      <h4 className="text-xs font-bold text-slate-455 uppercase tracking-wider">{t('departments.payrollEstimateHeader')}</h4>
                       <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl shadow-sm">
                         <p className="text-[10px] text-slate-400 font-extrabold uppercase">Department Payroll Base</p>
                         <p className="text-xl font-black text-slate-800 tracking-tight mt-0.5">{formatCurrency(deptStats.totalSalary)}</p>
                         <p className="text-xs text-slate-500 font-semibold mt-2.5 border-t border-slate-200/60 pt-2">
-                          一人当たり平均: <span className="font-extrabold text-slate-700">{formatCurrency(deptStats.avgSalary)}</span>
+                          {t('departments.averageEstimate')}<span className="font-extrabold text-slate-700">{formatCurrency(deptStats.avgSalary)}</span>
                         </p>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-400 py-6 text-center">統計データがありません</p>
+                  <p className="text-sm text-slate-400 py-6 text-center">{t('departments.noStatsData')}</p>
                 )}
               </Card>
             </div>
@@ -506,7 +551,7 @@ export default function DepartmentsClient({
 
           {/* Members Table Card - Spacious, premium layout */}
           <Card
-            title={`${selectedDept.name} 所属メンバー一覧`}
+            title={t('departments.membersListTitle').replace('{dept}', selectedDept.name)}
             className="bg-white border border-slate-200/60 shadow-sm rounded-2xl"
             action={
               <button
@@ -521,7 +566,7 @@ export default function DepartmentsClient({
                 }}
                 className="text-xs text-slate-400 hover:text-slate-650 font-bold border border-slate-250 bg-white rounded-lg px-2.5 py-1 hover:bg-slate-50 cursor-pointer"
               >
-                閉じる
+                {t('common.cancel')}
               </button>
             }
           >
@@ -533,7 +578,7 @@ export default function DepartmentsClient({
                 </svg>
                 <input
                   type="text"
-                  placeholder="氏名・従業員コードで検索..."
+                  placeholder={t('departments.searchPrompt')}
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
@@ -544,19 +589,19 @@ export default function DepartmentsClient({
                 onChange={e => setStatusFilter(e.target.value)}
                 className="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
               >
-                <option value="ALL">全ての就業状態</option>
-                <option value="ACTIVE">在籍中</option>
-                <option value="ON_LEAVE">休職中</option>
-                <option value="INACTIVE">退職</option>
+                <option value="ALL">{t('departments.allStatuses')}</option>
+                <option value="ACTIVE">{t('client.statusActive')}</option>
+                <option value="ON_LEAVE">{t('client.statusLeave')}</option>
+                <option value="INACTIVE">{t('client.statusInactive')}</option>
               </select>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as any)}
                 className="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
               >
-                <option value="name">氏名順</option>
-                <option value="salary">給与額順</option>
-                <option value="position">役職順</option>
+                <option value="name">{t('departments.sortName')}</option>
+                <option value="salary">{t('departments.sortSalary')}</option>
+                <option value="position">{t('departments.sortPosition')}</option>
               </select>
             </div>
 
@@ -566,7 +611,7 @@ export default function DepartmentsClient({
               </div>
             ) : filteredEmployees.length === 0 ? (
               <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed">
-                条件に合致するメンバーは見つかりませんでした。
+                {t('departments.noMembersFound')}
               </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-slate-200/60">
@@ -580,11 +625,11 @@ export default function DepartmentsClient({
                   </colgroup>
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="px-4 py-3">社員コード</th>
-                      <th className="px-4 py-3">氏名</th>
-                      <th className="px-4 py-3">役職</th>
-                      <th className="px-4 py-3">ステータス</th>
-                      <th className="px-4 py-3 text-right">基本給 (月給)</th>
+                      <th className="px-4 py-3">{t('departments.colCode')}</th>
+                      <th className="px-4 py-3">{t('departments.colName')}</th>
+                      <th className="px-4 py-3">{t('departments.colPos')}</th>
+                      <th className="px-4 py-3">{t('departments.colStatus')}</th>
+                      <th className="px-4 py-3 text-right">{t('departments.colSalary')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
@@ -601,10 +646,10 @@ export default function DepartmentsClient({
                               emp.status === 'ON_LEAVE' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                               'bg-slate-100 text-slate-500 border border-slate-200'
                             }`}>
-                              {emp.status === 'ACTIVE' ? '在籍中' : emp.status === 'ON_LEAVE' ? '休職中' : '退職'}
+                              {emp.status === 'ACTIVE' ? t('client.statusActive') : emp.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive')}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right font-mono font-black text-slate-700">{emp.salary.toLocaleString()}円</td>
+                          <td className="px-4 py-3 text-right font-mono font-black text-slate-700">{formatCurrency(emp.salary)}</td>
                         </tr>
                       );
                     })}
@@ -620,7 +665,7 @@ export default function DepartmentsClient({
       <ManagementModal
         isOpen={manageOpen}
         onClose={() => { setManageOpen(false); fetchDepartments(); }}
-        title="部署"
+        title={t('form.dept')}
         apiPath="/api/departments"
       />
     </div>

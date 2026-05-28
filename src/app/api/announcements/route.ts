@@ -11,7 +11,9 @@ export async function GET(request: NextRequest) {
       return errorResponse('認証されていません。', 401);
     }
 
-    if (user.role === 'EMPLOYEE') {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const isEmployeeMode = user.role === 'EMPLOYEE' || viewMode === 'employee';
+    if (isEmployeeMode) {
       // Get employee's department and position
       const emp = await prisma.employee.findUnique({
         where: { id: user.id },
@@ -72,8 +74,9 @@ export async function POST(request: NextRequest) {
       return errorResponse('認証されていません。', 401);
     }
 
-    // Only Admin / HR can create announcements
-    if (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER') {
+    // Only Admin / HR can create announcements (in admin mode)
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    if (viewMode === 'employee' || (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER')) {
       return errorResponse('この操作を行う権限がありません。', 403);
     }
 

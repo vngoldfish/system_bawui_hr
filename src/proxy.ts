@@ -31,10 +31,13 @@ export function proxy(request: NextRequest) {
   // 3. Parse user session and verify permissions
   try {
     const user = JSON.parse(decodeURIComponent(cookie.value));
-    console.log(`[PROXY] User: ${user.email}, Role: ${user.role}, Permissions: ${user.permissions?.join(', ')}`);
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    const effectiveRole = user.role === 'EMPLOYEE' || viewMode === 'employee' ? 'EMPLOYEE' : user.role;
+
+    console.log(`[PROXY] User: ${user.email}, Role: ${user.role}, Effective Role: ${effectiveRole}`);
     
-    // SUPER_ADMIN bypassed (has access to all routes)
-    if (user.role === 'SUPER_ADMIN') {
+    // SUPER_ADMIN bypassed ONLY if not in employee mode
+    if (user.role === 'SUPER_ADMIN' && viewMode !== 'employee') {
       console.log(`[PROXY] SUPER_ADMIN bypass granted`);
       return NextResponse.next();
     }
@@ -54,12 +57,23 @@ export function proxy(request: NextRequest) {
       }
     }
 
-    const permissions = (user.permissions || []) as string[];
+    let permissions = (user.permissions || []) as string[];
+
+    if (effectiveRole === 'EMPLOYEE') {
+      permissions = ['attendance:view', 'leave:view', 'leave:create'];
+    }
+
+    if (effectiveRole === 'SUPER_ADMIN' || effectiveRole === 'HR_MANAGER') {
+      if (!permissions.includes('audit_logs:view')) {
+        permissions.push('audit_logs:view');
+      }
+    }
 
     // 4. Enforce route guarding maps
     const guards: Record<string, string> = {
       '/roles': 'settings:view',
       '/company': 'settings:view',
+      '/audit-logs': 'audit_logs:view',
       '/salary-table': 'payroll:view',
       '/payment-methods': 'payroll:view',
       '/benefits': 'payroll:view',
@@ -76,6 +90,7 @@ export function proxy(request: NextRequest) {
       // Administrative API guards
       '/api/roles': 'settings:view',
       '/api/permissions': 'settings:view',
+      '/api/audit-logs': 'audit_logs:view',
       '/api/holidays': 'settings:view',
       '/api/contract-types': 'employees:view',
       '/api/departments': 'employees:view',

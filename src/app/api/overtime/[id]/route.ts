@@ -16,7 +16,8 @@ export async function PUT(
     }
 
     // Reject employees since only supervisor/admin can approve/reject
-    if (user.role === 'EMPLOYEE') {
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    if (user.role === 'EMPLOYEE' || viewMode === 'employee') {
       return errorResponse('Forbidden', 403);
     }
 

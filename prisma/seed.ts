@@ -315,7 +315,13 @@ async function main() {
     const { dependents, education, certifications, ...data } = emp;
 
     const defaultPassword = emp.employeeCode + (emp.birthDate ? emp.birthDate.replace(/-/g, '') : '123456');
-    const role = emp.employeeCode === 'NV008' ? 'SUPER_ADMIN' : emp.employeeCode === 'NV003' ? 'HR_MANAGER' : 'EMPLOYEE';
+    const role = emp.employeeCode === 'NV008'
+      ? 'SUPER_ADMIN'
+      : emp.employeeCode === 'NV003'
+      ? 'HR_MANAGER'
+      : (emp.employeeCode === 'NV002' || emp.employeeCode === 'NV009' || emp.employeeCode === 'NV013')
+      ? 'DEPARTMENT_MANAGER'
+      : 'EMPLOYEE';
 
     const employee = await prisma.employee.create({
       data: {
@@ -506,7 +512,7 @@ async function main() {
         }
         
         // PRESENT or LATE
-        let checkInTime = new Date(date);
+        const checkInTime = new Date(date);
         if (status === 'PRESENT') {
           const min = 30 + Math.floor(Math.random() * 30);
           checkInTime.setHours(8, min, 0, 0);
@@ -520,7 +526,7 @@ async function main() {
           }
         }
         
-        let checkOutTime = new Date(date);
+        const checkOutTime = new Date(date);
         const isOvertime = Math.random() > 0.7;
         let overtimeHours = 0;
         
@@ -642,8 +648,8 @@ async function main() {
       const absentDays = attendance.filter(a => a.status === 'ABSENT').length;
       const totalOvertimeHours = attendance.reduce((sum, a) => sum + a.overtimeHours, 0);
       
-      let hourlyRate = emp.hourlyRate > 0 ? emp.hourlyRate : (emp.salary / 160);
-      let dailyRate = emp.dailyRate > 0 ? emp.dailyRate : (emp.salary / 20);
+      const hourlyRate = emp.hourlyRate > 0 ? emp.hourlyRate : (emp.salary / 160);
+      const dailyRate = emp.dailyRate > 0 ? emp.dailyRate : (emp.salary / 20);
       
       let baseSalary = emp.salary;
       if (emp.salaryType === '日給') {

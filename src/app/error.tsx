@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { useI18n } from '@/lib/i18n';
 
 export default function GlobalError({
   error,
@@ -10,6 +11,8 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useI18n();
+
   useEffect(() => {
     console.error('Unhandled Global Error:', error);
   }, [error]);
@@ -28,9 +31,9 @@ export default function GlobalError({
           </svg>
         </div>
 
-        <h1 className="text-xl font-black text-slate-850 tracking-tight mb-2">システムエラーが発生しました</h1>
+        <h1 className="text-xl font-black text-slate-850 tracking-tight mb-2">{t('errorBoundary.title')}</h1>
         <p className="text-sm text-slate-500 font-semibold mb-6">
-          予期しないエラーが検知されました。ページをリロードするか、時間をおいて再度お試しください。
+          {t('errorBoundary.description')}
         </p>
 
         {/* Detailed error box */}
@@ -47,13 +50,13 @@ export default function GlobalError({
             onClick={() => reset()}
             className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-sm transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
           >
-            もう一度試す
+            {t('errorBoundary.retry')}
           </button>
           <Link
             href="/dashboard"
             className="w-full sm:w-auto px-6 py-2.5 border border-slate-250 hover:bg-slate-50 text-slate-650 rounded-xl text-xs font-bold transition-all text-center"
           >
-            ダッシュボードへ戻る
+            {t('errorBoundary.backDashboard')}
           </Link>
         </div>
       </div>
