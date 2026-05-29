@@ -429,6 +429,7 @@ async function main() {
   const getPastMonths = (count: number) => {
     const list: { year: number; month: number }[] = [];
     const d = new Date();
+    d.setDate(1); // Avoid month rollover issues when current day is 29/30/31
     for (let i = 0; i < count; i++) {
       list.push({
         year: d.getFullYear(),
