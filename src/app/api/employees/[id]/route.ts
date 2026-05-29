@@ -6,6 +6,9 @@ import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
 import { Prisma } from '@prisma/client';
 import { hashPassword } from '@/lib/crypto';
+import { v2 as cloudinary } from 'cloudinary';
+import fs from 'fs';
+import path from 'path';
 
 const employeeInclude = {
   department: true,
@@ -15,6 +18,7 @@ const employeeInclude = {
   education: true,
   certifications: true,
   residenceCardHistory: true,
+  shitens: true,
 } satisfies Prisma.EmployeeInclude;
 
 // GET single employee
@@ -76,7 +80,7 @@ export async function PUT(
       return errorResponse('従業員が見つかりません', 404);
     }
 
-    const { dependents, education, certifications, contractTypeId, ...employeeData } = data;
+    const { dependents, education, certifications, shitenIds, contractTypeId, ...employeeData } = data;
 
     // Build update data with date conversions
     const updateData: Prisma.EmployeeUpdateInput = {};
@@ -93,6 +97,12 @@ export async function PUT(
     if (employeeData.hireDate !== undefined) updateData.hireDate = new Date(employeeData.hireDate);
     if (employeeData.salary !== undefined) updateData.salary = employeeData.salary;
     if (employeeData.status !== undefined) updateData.status = employeeData.status;
+    if (employeeData.residenceCardImage !== undefined) updateData.residenceCardImage = employeeData.residenceCardImage;
+    if (shitenIds !== undefined) {
+      updateData.shitens = {
+        set: shitenIds.map((sid: string) => ({ id: sid })),
+      };
+    }
     if (employeeData.nationality !== undefined) updateData.nationality = employeeData.nationality;
     if (employeeData.residenceStatus !== undefined) updateData.residenceStatus = employeeData.residenceStatus;
     if (employeeData.residenceCardNumber !== undefined) updateData.residenceCardNumber = employeeData.residenceCardNumber;
@@ -120,7 +130,60 @@ export async function PUT(
       return newVal !== undefined && (newVal || '') !== (oldVal || '');
     });
 
+    let historicalImage = existing.residenceCardImage;
+
     if (residenceChanged && (existing.residenceStatus || existing.residenceCardNumber)) {
+      // If there is an existing card image, rename it from valid to expired
+      if (existing.residenceCardImage) {
+        try {
+          const isCloud = existing.residenceCardImage.includes('cloudinary.com');
+          if (isCloud) {
+            const isCloudinaryConfigured = !!(
+              process.env.CLOUDINARY_CLOUD_NAME &&
+              process.env.CLOUDINARY_API_KEY &&
+              process.env.CLOUDINARY_API_SECRET
+            );
+            if (isCloudinaryConfigured) {
+              const urlParts = existing.residenceCardImage.split('/');
+              const uploadIndex = urlParts.indexOf('upload');
+              if (uploadIndex !== -1) {
+                const pathParts = urlParts.slice(uploadIndex + 2);
+                const fullPublicId = pathParts.join('/').split('.')[0];
+                
+                if (fullPublicId.includes('_valid_')) {
+                  const newPublicId = fullPublicId.replace('_valid_', '_expired_');
+                  
+                  cloudinary.config({
+                    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+                    api_key: process.env.CLOUDINARY_API_KEY,
+                    api_secret: process.env.CLOUDINARY_API_SECRET,
+                  });
+                  
+                  const renameResult = await cloudinary.uploader.rename(fullPublicId, newPublicId);
+                  historicalImage = renameResult.secure_url;
+                  console.log(`[CLOUDINARY] Renamed ${fullPublicId} to ${newPublicId}`);
+                }
+              }
+            }
+          } else {
+            // Local file rename
+            if (existing.residenceCardImage.includes('_valid_')) {
+              const localPath = path.join(process.cwd(), 'public', existing.residenceCardImage);
+              const newUrl = existing.residenceCardImage.replace('_valid_', '_expired_');
+              const newLocalPath = path.join(process.cwd(), 'public', newUrl);
+              
+              if (fs.existsSync(localPath)) {
+                fs.renameSync(localPath, newLocalPath);
+                historicalImage = newUrl;
+                console.log(`[LOCAL] Renamed file from ${localPath} to ${newLocalPath}`);
+              }
+            }
+          }
+        } catch (renameErr) {
+          console.error('[RENAME ERROR] Failed to rename old card image:', renameErr);
+        }
+      }
+
       await prisma.residenceCardHistory.create({
         data: {
           employeeId: id,
@@ -129,6 +192,7 @@ export async function PUT(
           residenceCardIssueDate: existing.residenceCardIssueDate,
           residenceExpiry: existing.residenceExpiry,
           workRestriction: existing.workRestriction,
+          residenceCardImage: historicalImage,
         },
       });
     }

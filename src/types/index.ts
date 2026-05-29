@@ -102,6 +102,18 @@ export interface ResidenceCardHistory {
   residenceCardIssueDate: string;
   residenceExpiry: string;
   workRestriction: string;
+  residenceCardImage: string | null;
+  updatedAt: string;
+}
+
+// Shiten (Branch)
+export interface Shiten {
+  id: string;
+  name: string;
+  nameKana: string | null;
+  address: string | null;
+  phone: string | null;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -130,6 +142,7 @@ export interface Employee {
   residenceCardIssueDate: string | null;
   residenceExpiry: string | null;
   workRestriction: string | null;
+  residenceCardImage: string | null;
   contractTypeId: string;
   contractType: ContractType;
   contractStartDate: string | null;
@@ -144,6 +157,7 @@ export interface Employee {
   education: Education[];
   certifications: Certification[];
   residenceCardHistory: ResidenceCardHistory[];
+  shitens: Shiten[];
   createdAt: string;
   updatedAt: string;
 }

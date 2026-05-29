@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "cloudinary": "^2.10.0",
     "clsx": "^2.1.1",
     "html2canvas-pro": "^2.0.2",
     "jspdf": "^4.2.1",

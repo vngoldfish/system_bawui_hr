@@ -52,6 +52,14 @@ interface Employee {
   };
   dependents: number;
   dependentList: Dependent[];
+  shitenIds?: string[];
+}
+
+interface DashboardShiten {
+  id: string;
+  name: string;
+  nameKana: string | null;
+  employeeIds: string[];
 }
 
 interface AttendanceRecord {
@@ -114,12 +122,14 @@ export default function DashboardClient({
   employees,
   attendance,
   leaves,
+  shitens = [],
   isEmployeeMode = false,
   currentUser,
 }: {
   employees: Employee[];
   attendance: AttendanceRecord[];
   leaves: LeaveRequest[];
+  shitens?: DashboardShiten[];
   isEmployeeMode?: boolean;
   currentUser?: {
     firstName: string;
@@ -291,7 +301,7 @@ export default function DashboardClient({
   }, []);
 
   // Compute all statistics in useMemo
-  const stats = useMemo(() => {
+  const baseStatsCalc = useMemo(() => {
     const activeEmployees = employees.filter(e => e.status === 'ACTIVE');
     const onLeaveEmployees = employees.filter(e => e.status === 'ON_LEAVE');
 
@@ -446,6 +456,35 @@ export default function DashboardClient({
       totalContractForce: activeContractEmployees.length,
     };
   }, [employees, attendance, leaves, todayStr]);
+
+  const stats = useMemo(() => {
+    const baseStats = baseStatsCalc;
+    const shitenStats = shitens.map(s => {
+      const shitenEmps = employees.filter(emp => emp.shitenIds?.includes(s.id));
+      const workingToday = shitenEmps.filter(emp => {
+        const rc = baseStats.rollCallList.find(rcEmp => rcEmp.id === emp.id);
+        return rc && (rc.rollStatus === 'PRESENT' || rc.rollStatus === 'LATE');
+      });
+      const notWorking = shitenEmps.filter(emp => {
+        const rc = baseStats.rollCallList.find(rcEmp => rcEmp.id === emp.id);
+        return !rc || (rc.rollStatus !== 'PRESENT' && rc.rollStatus !== 'LATE');
+      });
+      const rate = shitenEmps.length > 0 ? Math.round((workingToday.length / shitenEmps.length) * 100) : 0;
+      return {
+        ...s,
+        totalEmployees: shitenEmps.length,
+        workingTodayCount: workingToday.length,
+        workingTodayEmployees: workingToday.map(e => `${e.lastName} ${e.firstName}`),
+        notWorkingEmployees: notWorking.map(e => `${e.lastName} ${e.firstName}`),
+        rate,
+      };
+    });
+
+    return {
+      ...baseStats,
+      shitenStats,
+    };
+  }, [employees, shitens, baseStatsCalc]);
 
   // Pagination for roll‑call list (after stats)
   const PAGE_SIZE = 10;
@@ -883,7 +922,7 @@ export default function DashboardClient({
             }`}
           >
             <span className="block text-sm tracking-wide">{tab.label}</span>
-            <span className="block text-[10px] opacity-80 font-normal mt-0.5">{tab.desc}</span>
+            <span className="hidden md:block text-[10px] opacity-80 font-normal mt-0.5">{tab.desc}</span>
           </button>
         ))}
       </div>
@@ -948,7 +987,7 @@ export default function DashboardClient({
                   </div>
 
                   {/* Legends */}
-                  <div className="w-full mt-6 grid grid-cols-2 gap-2">
+                  <div className="w-full mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2">
                     {[
                       { label: t('status.present'), count: stats.presentCount, color: 'bg-emerald-500', text: 'text-emerald-700' },
                       { label: t('status.late'), count: stats.lateCount, color: 'bg-orange-500', text: 'text-orange-700' },
@@ -973,7 +1012,7 @@ export default function DashboardClient({
                 title={t('dashboard.attendanceChartTitle')}
                 className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl"
                 action={
-                  <div className="flex gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                  <div className="flex gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60 overflow-x-auto max-w-full no-scrollbar flex-nowrap shrink-0">
                     {[
                       { id: 'all', label: t('dashboard.all') },
                       { id: 'present', label: t('status.present') },
@@ -985,7 +1024,7 @@ export default function DashboardClient({
                       <button
                         key={btn.id}
                         onClick={() => setAttendanceFilter(btn.id as any)}
-                        className={`px-3 py-1 text-xs rounded-lg font-bold transition-all cursor-pointer ${
+                        className={`px-3 py-1 text-xs rounded-lg font-bold transition-all cursor-pointer whitespace-nowrap ${
                           attendanceFilter === btn.id
                             ? 'bg-white text-blue-600 shadow-sm'
                             : 'text-slate-600 hover:text-blue-600'
@@ -1071,6 +1110,98 @@ export default function DashboardClient({
               </Card>
             </div>
           </div>
+
+          {/* Branch Attendance (Shiten Statistics & Chart) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+             {/* Horizontal Bar Chart for Branches */}
+             <div className="lg:col-span-1">
+               <Card title={`🏢 ${t('shitens.title')} (Branch Operations)`} className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl p-6">
+                 <p className="text-xs text-slate-400 -mt-2 mb-6">本日稼働率</p>
+                 <div className="space-y-4">
+                   {stats.shitenStats.length === 0 ? (
+                     <p className="text-center py-12 text-slate-400 text-xs font-semibold">{t('shitens.noShiten')}</p>
+                   ) : (
+                     stats.shitenStats.map((shiten) => (
+                       <div key={shiten.id} className="space-y-1.5 p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+                         <div className="flex justify-between items-center text-xs">
+                           <span className="font-extrabold text-slate-800">{shiten.name}</span>
+                           <span className="font-bold text-slate-500">{shiten.workingTodayCount} / {shiten.totalEmployees} 名</span>
+                         </div>
+                         <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
+                           <div 
+                             className="bg-indigo-650 h-full rounded-full transition-all duration-300"
+                             style={{ width: `${shiten.rate}%` }}
+                           />
+                         </div>
+                         <div className="flex justify-between text-[10px] text-slate-400 font-bold">
+                           <span>稼働率: {shiten.rate}%</span>
+                         </div>
+                       </div>
+                     ))
+                   )}
+                 </div>
+               </Card>
+             </div>
+
+             {/* Detailed Branch Staff Working Today */}
+             <div className="lg:col-span-2">
+               <Card title="👥 支店別本日の稼働メンバー (Today's Branch Team)" className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl p-6">
+                 <p className="text-xs text-slate-400 -mt-2 mb-4">本日各支店で稼働中および非稼働のメンバー一覧</p>
+                 <div className="space-y-4 overflow-y-auto max-h-[380px] pr-2">
+                   {stats.shitenStats.length === 0 ? (
+                     <div className="text-center py-12 text-slate-400 text-sm">
+                       {t('shitens.noShiten')}
+                     </div>
+                   ) : (
+                     stats.shitenStats.map((shiten) => (
+                       <div key={shiten.id} className="p-4 bg-slate-50/30 border border-slate-200/80 rounded-2xl space-y-3">
+                         <div className="flex justify-between items-center border-b border-slate-150 pb-2">
+                           <h4 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
+                             📍 {shiten.name}
+                           </h4>
+                           <span className="text-xxs px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 font-extrabold">
+                             本日稼働: {shiten.workingTodayCount} 名
+                           </span>
+                         </div>
+
+                         {/* Working Today list */}
+                         <div className="space-y-1.5">
+                           <p className="text-[11px] font-bold text-slate-400">🟢 勤務中 ({shiten.workingTodayCount})</p>
+                           {shiten.workingTodayEmployees.length === 0 ? (
+                             <p className="text-xxs text-slate-400 italic">勤務中のメンバーはいません</p>
+                           ) : (
+                             <div className="flex flex-wrap gap-1.5">
+                               {shiten.workingTodayEmployees.map(name => (
+                                 <span key={name} className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 border border-emerald-100 text-[10px] text-emerald-700 font-bold">
+                                   {name}
+                                 </span>
+                               ))}
+                             </div>
+                           )}
+                         </div>
+
+                         {/* Not Working Today list */}
+                         <div className="space-y-1.5">
+                           <p className="text-[11px] font-bold text-slate-400">⚪ 未稼働/公休/休暇 ({shiten.notWorkingEmployees.length})</p>
+                           {shiten.notWorkingEmployees.length === 0 ? (
+                             <p className="text-xxs text-slate-400 italic">未稼働/公休のメンバーはいません</p>
+                           ) : (
+                             <div className="flex flex-wrap gap-1.5">
+                               {shiten.notWorkingEmployees.map(name => (
+                                 <span key={name} className="inline-flex items-center px-2 py-0.5 rounded border border-slate-200 bg-white text-[10px] text-slate-550 font-bold">
+                                   {name}
+                                 </span>
+                               ))}
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     ))
+                   )}
+                 </div>
+               </Card>
+             </div>
+           </div>
 
           {/* Redesigned 7-day Attendance Rate Trend - Line/Area Chart */}
           <Card title={t('dashboard.attendanceHistoryTitle')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
@@ -1310,7 +1441,7 @@ export default function DashboardClient({
                       </p>
                     </div>
                     
-                    <span className={`px-2.5 py-1 text-xs rounded-lg font-bold border ${emp.expiry!.colorClass}`}>
+                    <span className={`px-2.5 py-1 text-xs rounded-lg font-bold border ${emp.expiry!.colorClass} shrink-0 whitespace-nowrap`}>
                       {emp.expiry!.label}
                     </span>
                   </div>
@@ -1377,7 +1508,7 @@ export default function DashboardClient({
                       </p>
                     </div>
                     
-                    <span className={`px-2.5 py-1 text-xs rounded-lg font-bold border ${emp.expiry!.colorClass}`}>
+                    <span className={`px-2.5 py-1 text-xs rounded-lg font-bold border ${emp.expiry!.colorClass} shrink-0 whitespace-nowrap`}>
                       {emp.expiry!.label}
                     </span>
                   </div>

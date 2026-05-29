@@ -79,6 +79,7 @@ export function proxy(request: NextRequest) {
       '/benefits': 'payroll:view',
       '/employees': 'employees:view',
       '/departments': 'employees:view',
+      '/shitens': 'employees:view',
       '/contracts': 'employees:view',
       '/recruitment': 'employees:view',
       '/residence-cards': 'residence_card:view',
@@ -86,6 +87,7 @@ export function proxy(request: NextRequest) {
       '/shift': 'attendance:view',
       '/leave': 'leave:view',
       '/reports': 'reports:view',
+      '/uploads': 'employees:view',
 
       // Administrative API guards
       '/api/roles': 'settings:view',
@@ -94,9 +96,11 @@ export function proxy(request: NextRequest) {
       '/api/holidays': 'settings:view',
       '/api/contract-types': 'employees:view',
       '/api/departments': 'employees:view',
+      '/api/shitens': 'employees:view',
       '/api/positions': 'employees:view',
       '/api/employee-contracts': 'employees:view',
       '/api/employees': 'employees:view',
+      '/api/upload': 'employees:view',
       '/api/payroll': 'payroll:view',
       '/api/overtime': 'attendance:view',
     };

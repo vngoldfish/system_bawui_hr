@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { Employee, Dependent, Education, Certification, ResidenceCardHistory, Department, Position, ContractType } from '@/types';
+import type { Employee, Dependent, Education, Certification, ResidenceCardHistory, Department, Position, ContractType, Shiten } from '@/types';
 import ManagementModal from '@/components/common/ManagementModal';
 import Portal from '@/components/common/Portal';
 import { useI18n } from '@/lib/i18n';
@@ -28,6 +28,7 @@ interface EmployeeFormData {
   residenceCardIssueDate: string;
   residenceExpiry: string;
   workRestriction: string;
+  residenceCardImage: string;
   contractTypeId: string;
   contractStartDate: string;
   contractEndDate: string;
@@ -48,12 +49,13 @@ interface EmployeeFormData {
   education: Education[];
   certifications: Certification[];
   residenceCardHistory: ResidenceCardHistory[];
+  shitenIds: string[];
 }
 
 interface EmployeeFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Omit<Employee, 'id'>, id?: string) => void;
+  onSave: (data: Omit<Employee, 'id'> & { shitenIds?: string[] }, id?: string) => void;
   employee?: Employee | null;
 }
 
@@ -72,17 +74,18 @@ const emptyForm: EmployeeFormData = {
   avatar: '',
   salary: '',
   status: 'ACTIVE',
-  nationality: '\u65e5\u672c',
+  nationality: '日本',
   residenceStatus: '',
   residenceCardNumber: '',
   residenceCardIssueDate: '',
   residenceExpiry: '',
   workRestriction: '',
+  residenceCardImage: '',
   contractTypeId: '',
   contractStartDate: new Date().toISOString().split('T')[0],
   contractEndDate: '',
   contractEndDateType: 'none',
-  salaryType: '\u6708\u7d66',
+  salaryType: '月給',
   hourlyRate: '',
   dailyRate: '',
   benefits: { healthInsurance: false, pension: false, employmentInsurance: false, workersComp: false, transportation: '', housing: '', meal: '' },
@@ -90,6 +93,7 @@ const emptyForm: EmployeeFormData = {
   education: [],
   certifications: [],
   residenceCardHistory: [],
+  shitenIds: [],
 };
 
 const emptyDependent: Dependent = { name: '', relationship: '', birthDate: '', gender: '', cohabitation: '\u540c\u5c45' };
@@ -106,17 +110,21 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [contractTypes, setContractTypes] = useState<ContractType[]>([]);
+  const [shitens, setShitens] = useState<Shiten[]>([]);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingCard, setIsUploadingCard] = useState(false);
   const [manageDeptOpen, setManageDeptOpen] = useState(false);
   const [managePosOpen, setManagePosOpen] = useState(false);
   const [manageContractOpen, setManageContractOpen] = useState(false);
 
-  const isForeign = formData.nationality !== '\u65e5\u672c';
+  const isForeign = formData.nationality !== '日本';
 
   useEffect(() => {
     if (isOpen) {
       fetchDepartments();
       fetchPositions();
       fetchContractTypes();
+      fetchShitens();
     }
   }, [isOpen]);
 
@@ -183,6 +191,8 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
           expiryDate: toDateInputValue(c.expiryDate),
         })),
         residenceCardHistory: employee.residenceCardHistory || [],
+        residenceCardImage: toInputValue(employee.residenceCardImage),
+        shitenIds: (employee.shitens || []).map(s => s.id),
       });
       setAutoGenerateCode(false);
     } else {
@@ -207,6 +217,12 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
     const res = await fetch('/api/contract-types');
     const data = await res.json();
     setContractTypes(data);
+  };
+
+  const fetchShitens = async () => {
+    const res = await fetch('/api/shitens');
+    const data = await res.json();
+    setShitens(data);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -279,14 +295,50 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
     }));
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadFile = async (file: File, type: 'avatar' | 'residence-card'): Promise<string | null> => {
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('type', type);
+      fd.append('employeeCode', formData.employeeCode || 'temp');
+      fd.append('status', 'valid');
+      
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: fd
+      });
+      if (!res.ok) {
+        throw new Error('Upload failed');
+      }
+      const json = await res.json();
+      return json.url;
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Upload failed');
+      return null;
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setFormData(prev => ({ ...prev, avatar: reader.result as string }));
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingAvatar(true);
+    const url = await uploadFile(file, 'avatar');
+    setIsUploadingAvatar(false);
+    if (url) {
+      setFormData(prev => ({ ...prev, avatar: url }));
+    }
+  };
+
+  const handleCardImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingCard(true);
+    const url = await uploadFile(file, 'residence-card');
+    setIsUploadingCard(false);
+    if (url) {
+      setFormData(prev => ({ ...prev, residenceCardImage: url }));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -333,6 +385,8 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
         education: formData.education,
         certifications: formData.certifications,
         residenceCardHistory: formData.residenceCardHistory as any,
+        residenceCardImage: isForeign ? (formData.residenceCardImage || null) : null,
+        shitenIds: formData.shitenIds,
         createdAt: '',
         updatedAt: '',
       } as any,
@@ -360,7 +414,11 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
             {/* アバター */}
             <section className="flex items-center gap-6">
               <div className="relative">
-                {formData.avatar ? (
+                {isUploadingAvatar ? (
+                  <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center border-2 border-slate-200">
+                    <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : formData.avatar ? (
                   <img src={formData.avatar} alt="avatar" className="w-20 h-20 rounded-full object-cover border-2 border-slate-200" />
                 ) : (
                   <div className="w-20 h-20 rounded-full bg-slate-200 flex items-center justify-center text-2xl font-bold text-slate-500">
@@ -372,7 +430,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                  <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" disabled={isUploadingAvatar} />
                 </label>
               </div>
               <div className="flex-1">
@@ -432,6 +490,37 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                     <option value="INACTIVE">{t('form.statusInactive')}</option>
                   </select>
                 </div>
+              </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">{t('shitens.labelShitens')}</label>
+                {shitens.length === 0 ? (
+                  <p className="text-xs text-slate-400">{t('shitens.noShiten')}</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    {shitens.map(s => {
+                      const isChecked = formData.shitenIds.includes(s.id);
+                      return (
+                        <label key={s.id} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700 hover:text-slate-900">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setFormData(prev => ({
+                                ...prev,
+                                shitenIds: checked 
+                                  ? [...prev.shitenIds, s.id]
+                                  : prev.shitenIds.filter(id => id !== s.id)
+                              }));
+                            }}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span>{locale === 'ja' ? (s.nameKana ? `${s.name} (${s.nameKana})` : s.name) : s.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </section>
 
@@ -496,7 +585,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
               </div>
               <div className="mt-4">
                 <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">{t('form.socialInsurance')}</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={formData.benefits.healthInsurance} onChange={e => handleBenefitsChange('healthInsurance', e.target.checked)} className="rounded border-slate-300 text-blue-600" />
                     <span className="text-sm text-slate-700">{t('form.healthIns')}</span>
@@ -548,6 +637,35 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                     <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.issueDate')}</label><input type="date" name="residenceCardIssueDate" value={formData.residenceCardIssueDate} onChange={handleChange} className={inputCls} required={isForeign} /></div>
                     <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.expiryDate')}</label><input type="date" name="residenceExpiry" value={formData.residenceExpiry} onChange={handleChange} className={inputCls} required={isForeign} /></div>
                     <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.restriction')}</label><input type="text" name="workRestriction" value={formData.workRestriction} onChange={handleChange} placeholder={t('form.restrictionNone')} className={inputCls} /></div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">{t('residenceCards.colCardImage')}</label>
+                      <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                        {formData.residenceCardImage ? (
+                          <div className="relative w-24 h-16 rounded border border-slate-200 overflow-hidden bg-white">
+                            <img src={formData.residenceCardImage} alt="residence card" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setFormData(prev => ({ ...prev, residenceCardImage: '' }))}
+                              className="absolute top-0 right-0 bg-red-600 text-white rounded-bl p-1 hover:bg-red-700 flex items-center justify-center w-5 h-5"
+                              title={t('common.delete')}
+                            >
+                              &times;
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="w-24 h-16 rounded bg-slate-200 flex items-center justify-center text-xs text-slate-400">
+                            {t('residenceCards.noCardImage')}
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <label className="inline-flex items-center px-3 py-1.5 border border-slate-300 shadow-sm text-xs font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 cursor-pointer">
+                            {isUploadingCard ? 'Uploading...' : t('residenceCards.uploadCardImage')}
+                            <input type="file" accept="image/*" onChange={handleCardImageChange} className="hidden" disabled={isUploadingCard} />
+                          </label>
+                          <p className="text-[10px] text-slate-400 mt-1">JPEG, PNG up to 5MB</p>
+                        </div>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>

@@ -115,6 +115,7 @@ export default async function DashboardPage() {
           employees={formattedEmployee as any} 
           attendance={formattedAttendance} 
           leaves={formattedLeaves} 
+          shitens={[]}
           isEmployeeMode={true}
           currentUser={user}
         />
@@ -122,8 +123,7 @@ export default async function DashboardPage() {
     );
   }
 
-  // Admin / HR gets all data
-  const { employees, attendance, leaves } = await dashboardService.getDashboardData();
+  const { employees, attendance, leaves, shitens } = await dashboardService.getDashboardData();
 
   return (
     <DashboardLayout title="ダッシュボード" subtitle="人事管理システムの概要">
@@ -131,6 +131,7 @@ export default async function DashboardPage() {
         employees={employees as any} 
         attendance={attendance} 
         leaves={leaves} 
+        shitens={shitens}
         isEmployeeMode={false}
         currentUser={user}
       />

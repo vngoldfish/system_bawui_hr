@@ -53,6 +53,7 @@ export const createEmployeeSchema = z.object({
   residenceCardIssueDate: z.string().optional().nullable(),
   residenceExpiry: z.string().optional().nullable(),
   workRestriction: z.string().optional().nullable(),
+  residenceCardImage: z.string().optional().nullable(),
   contractTypeId: z.string().min(1, '雇用形態は必須です'),
   contractStartDate: z.string().optional().nullable(),
   contractEndDate: z.string().optional().nullable(),
@@ -64,6 +65,7 @@ export const createEmployeeSchema = z.object({
   dependents: z.array(dependentSchema).optional().default([]),
   education: z.array(educationSchema).optional().default([]),
   certifications: z.array(certificationSchema).optional().default([]),
+  shitenIds: z.array(z.string()).optional().default([]),
   role: z.string().optional().default('EMPLOYEE'),
   password: z.string().optional(),
 });
@@ -72,10 +74,11 @@ export const updateEmployeeSchema = createEmployeeSchema.partial();
 
 export const employeeQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(1000).default(20),
   search: z.string().optional().default(''),
   departmentId: z.string().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'ON_LEAVE']).optional(),
+  shitenId: z.string().optional(),
 });
 
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;

@@ -15,6 +15,7 @@ const employeeInclude = {
   education: true,
   certifications: true,
   residenceCardHistory: true,
+  shitens: true,
 } satisfies Prisma.EmployeeInclude;
 
 // GET all employees with pagination, search, filter
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = createEmployeeSchema.parse(body);
 
-    const { dependents, education, certifications, employeeCode: inputCode, contractTypeId, departmentId, positionId, ...employeeData } = data;
+    const { dependents, education, certifications, shitenIds, employeeCode: inputCode, contractTypeId, departmentId, positionId, ...employeeData } = data;
 
     // Auto-generate employeeCode if not provided
     let employeeCode = inputCode?.trim() || '';
@@ -130,6 +131,11 @@ export async function POST(request: NextRequest) {
         department: { connect: { id: departmentId } },
         position: { connect: { id: positionId } },
         contractType: { connect: { id: contractTypeId } },
+        ...(shitenIds && shitenIds.length > 0 && {
+          shitens: {
+            connect: shitenIds.map((sid: string) => ({ id: sid })),
+          },
+        }),
         hireDate: new Date(employeeData.hireDate),
         birthDate: employeeData.birthDate ? new Date(employeeData.birthDate) : null,
         residenceCardIssueDate: employeeData.residenceCardIssueDate ? new Date(employeeData.residenceCardIssueDate) : null,

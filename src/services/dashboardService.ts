@@ -14,6 +14,7 @@ export const dashboardService = {
         position: true,
         contractType: true,
         dependents: true,
+        shitens: true,
       },
     });
 
@@ -75,6 +76,7 @@ export const dashboardService = {
         gender: d.gender || '',
         cohabitation: d.cohabitation,
       })),
+      shitenIds: emp.shitens.map(s => s.id),
     }));
 
     // Map attendance records to Client Component expected interface
@@ -102,6 +104,23 @@ export const dashboardService = {
       status: l.status,
     }));
 
-    return { employees, attendance, leaves };
+    // Fetch all branches
+    const dbShitens = await prisma.shiten.findMany({
+      include: {
+        employees: {
+          select: { id: true }
+        }
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const shitens = dbShitens.map(s => ({
+      id: s.id,
+      name: s.name,
+      nameKana: s.nameKana || null,
+      employeeIds: s.employees.map(e => e.id),
+    }));
+
+    return { employees, attendance, leaves, shitens };
   }
 };

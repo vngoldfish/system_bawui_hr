@@ -102,14 +102,14 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
               </svg>
             </button>
           )}
-          <div>
-            <h1 className="text-lg md:text-2xl font-bold tracking-tight text-slate-800">{title}</h1>
+          <div className="min-w-0 flex-grow sm:flex-grow-0">
+            <h1 className="text-base md:text-2xl font-bold tracking-tight text-slate-800 truncate" title={title}>{title}</h1>
             {subtitle && (
-              <p className="text-[10px] md:text-xs font-semibold text-slate-400 mt-0.5 md:mt-1">{subtitle}</p>
+              <p className="text-[9px] md:text-xs font-semibold text-slate-400 mt-0.5 md:mt-1 truncate" title={subtitle}>{subtitle}</p>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-4 md:gap-6">
+        <div className="flex items-center gap-2 sm:gap-4 md:gap-6">
           {isMounted && today && (
             <div className="text-right hidden sm:block">
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('common.todayDate')}</p>
@@ -121,14 +121,21 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
             <button
               onClick={handleToggleMode}
               className={cn(
-                "px-3 py-1.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow border shrink-0 flex items-center gap-1.5",
+                "px-2.5 py-1.5 md:px-3 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow border shrink-0 flex items-center gap-1.5",
                 viewMode === 'employee'
                   ? "bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-450 border-amber-250 dark:border-amber-900 hover:bg-amber-100/60"
                   : "bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-450 border-indigo-250 dark:border-indigo-900 hover:bg-indigo-100/60"
               )}
               title={viewMode === 'employee' ? 'Chuyển sang chế độ quản trị' : 'Chuyển sang chế độ thường'}
             >
-              <span>{viewMode === 'employee' ? '👤 ' + (headerModeTranslations[locale]?.employeeView || headerModeTranslations.en.employeeView) : '🔑 ' + (headerModeTranslations[locale]?.managerView || headerModeTranslations.en.managerView)}</span>
+              <span className="flex items-center gap-1">
+                <span>{viewMode === 'employee' ? '👤' : '🔑'}</span>
+                <span className="hidden sm:inline">
+                  {viewMode === 'employee' 
+                    ? (headerModeTranslations[locale]?.employeeView || headerModeTranslations.en.employeeView) 
+                    : (headerModeTranslations[locale]?.managerView || headerModeTranslations.en.managerView)}
+                </span>
+              </span>
             </button>
           )}
           

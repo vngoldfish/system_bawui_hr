@@ -10,6 +10,7 @@ const employeeIncludeFull = {
   education: true,
   certifications: true,
   residenceCardHistory: true,
+  shitens: true,
   employeeContracts: {
     include: { contractType: true },
     orderBy: { startDate: 'desc' as const },
@@ -33,6 +34,7 @@ const visaEmployeeInclude = {
   position: true,
   contractType: true,
   residenceCardHistory: true,
+  shitens: true,
 };
 
 export function serializeEmployee(emp: any): Employee {
@@ -96,6 +98,11 @@ export function serializeEmployee(emp: any): Employee {
       residenceCardIssueDate: h.residenceCardIssueDate?.toISOString() ?? null,
       residenceExpiry: h.residenceExpiry?.toISOString() ?? null,
       updatedAt: h.updatedAt.toISOString(),
+    })) || [],
+    shitens: emp.shitens?.map((s: any) => ({
+      ...s,
+      createdAt: s.createdAt.toISOString(),
+      updatedAt: s.updatedAt.toISOString(),
     })) || [],
   };
 }

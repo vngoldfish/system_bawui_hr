@@ -129,6 +129,7 @@ model Employee {
   residenceCardIssueDate DateTime?
   residenceExpiry        DateTime?
   workRestriction        String?
+  residenceCardImage     String?
 
   // Contract
   contractTypeId      String
@@ -226,6 +227,7 @@ model ResidenceCardHistory {
   residenceCardIssueDate DateTime?
   residenceExpiry        DateTime?
   workRestriction        String?
+  residenceCardImage     String?
   updatedAt              DateTime  @default(now())
 
   @@map("residence_card_history")

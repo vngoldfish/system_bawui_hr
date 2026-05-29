@@ -6,6 +6,7 @@ import EmployeeFormModal from '@/components/employees/EmployeeFormModal';
 import { formatDate } from '@/lib/utils';
 import type { Employee } from '@/types';
 import { useI18n } from '@/lib/i18n';
+import Portal from '@/components/common/Portal';
 
 type ExpiryLevel = 'expired' | 'expiring' | 'valid';
 
@@ -120,6 +121,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedHistoryEmployee, setSelectedHistoryEmployee] = useState<Employee | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   // Filter foreign employees only
   const foreignEmployees = useMemo(() => {
@@ -332,7 +334,20 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
                           {emp.residenceStatus ? getVisaStatusLabel(emp.residenceStatus, t) : '-'}
                         </span>
                       </td>
-                      <td className="px-5 py-4 font-mono text-xs font-semibold text-slate-500 w-[150px] min-w-[150px] truncate">{emp.residenceCardNumber || '-'}</td>
+                      <td className="px-5 py-4 w-[150px] min-w-[150px] truncate">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-semibold text-slate-500 truncate">{emp.residenceCardNumber || '-'}</span>
+                          {emp.residenceCardImage && (
+                            <button
+                              onClick={() => setPreviewImageUrl(emp.residenceCardImage)}
+                              className="p-0.5 border border-slate-200 rounded hover:border-blue-400 bg-slate-50 transition-all cursor-pointer shrink-0"
+                              title={t('residenceCards.previewCardImage')}
+                            >
+                              <img src={emp.residenceCardImage} alt="card" className="w-6 h-4 object-cover rounded-xs" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-5 py-4 text-slate-655 font-bold text-xs w-[110px] min-w-[110px] truncate">{emp.residenceExpiry ? formatDate(emp.residenceExpiry) : '-'}</td>
                       <td className="px-5 py-4 w-[170px] min-w-[170px]">
                         {expiryStatus && (
@@ -459,6 +474,18 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
                               </strong>
                             </p>
                           </div>
+                          {h.residenceCardImage && (
+                            <div className="mt-3 pt-2 border-t border-slate-100">
+                              <p className="text-[10px] text-slate-400 font-bold mb-1">{t('residenceCards.colCardImage')}:</p>
+                              <button
+                                onClick={() => setPreviewImageUrl(h.residenceCardImage)}
+                                className="p-0.5 border border-slate-200 rounded-lg hover:border-blue-400 bg-white transition-all max-w-[120px] block cursor-pointer"
+                                title={t('residenceCards.previewCardImage')}
+                              >
+                                <img src={h.residenceCardImage} alt="expired card" className="w-24 h-16 object-cover rounded" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -477,6 +504,27 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
             </div>
           </div>
         </div>
+      )}
+      {previewImageUrl && (
+        <Portal>
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all"
+            onClick={() => setPreviewImageUrl(null)}
+          >
+            <div 
+              className="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden p-2 shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setPreviewImageUrl(null)}
+                className="absolute top-4 right-4 bg-black/50 hover:bg-black/75 text-white rounded-full w-8 h-8 flex items-center justify-center text-xl font-bold cursor-pointer z-10 transition-colors"
+              >
+                &times;
+              </button>
+              <img src={previewImageUrl} alt="Residence Card Preview" className="w-full h-auto rounded-lg max-h-[80vh] object-contain mx-auto" />
+            </div>
+          </div>
+        </Portal>
       )}
     </div>
   );
