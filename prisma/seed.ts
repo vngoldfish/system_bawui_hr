@@ -1,10 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../src/lib/crypto';
+import { seedReal } from './seed-real-fn';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Seeding database...');
+  if (process.env.NODE_ENV === 'production' || process.env.SEED_REAL === 'true') {
+    await seedReal(prisma);
+    return;
+  }
+
+  console.log('Seeding database with mock data...');
 
   // Clean existing data
   await prisma.residenceCardHistory.deleteMany();

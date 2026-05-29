@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed:real": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed-real.ts"
+    "seed:real": "ts-node prisma/seed-real.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -25,7 +25,7 @@
     "zod": "^4.4.3"
   },
   "prisma": {
-    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
