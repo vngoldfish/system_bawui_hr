@@ -87,8 +87,9 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
     }
   };
 
+
   return (
-    <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex-shrink-0">
+    <header className="bg-white/85 backdrop-blur-md border-b border-slate-200/50 px-4 md:px-6 py-3.5 flex-shrink-0 sticky top-0 z-30 shadow-[0_1px_3px_rgba(15,23,42,0.02)]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {onMenuClick && (
@@ -103,17 +104,17 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
             </button>
           )}
           <div className="min-w-0 flex-grow sm:flex-grow-0">
-            <h1 className="text-base md:text-2xl font-bold tracking-tight text-slate-800 truncate" title={title}>{title}</h1>
+            <h1 className="text-base md:text-xl font-extrabold tracking-tight text-slate-900 truncate" title={title}>{title}</h1>
             {subtitle && (
-              <p className="text-[9px] md:text-xs font-semibold text-slate-400 mt-0.5 md:mt-1 truncate" title={subtitle}>{subtitle}</p>
+              <p className="text-[9px] md:text-xs font-bold text-slate-400 mt-0.5 truncate" title={subtitle}>{subtitle}</p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-4 md:gap-6">
           {isMounted && today && (
-            <div className="text-right hidden sm:block">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('common.todayDate')}</p>
-              <p className="text-sm font-bold text-slate-700">{today}</p>
+            <div className="text-right hidden sm:block bg-slate-50 border border-slate-150/60 rounded-xl px-3 py-1">
+              <p className="text-[8px] text-slate-400 font-extrabold uppercase tracking-wider">{t('common.todayDate')}</p>
+              <p className="text-xs font-extrabold text-slate-700 font-mono mt-0.5">{today}</p>
             </div>
           )}
 
@@ -121,10 +122,10 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
             <button
               onClick={handleToggleMode}
               className={cn(
-                "px-2.5 py-1.5 md:px-3 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow border shrink-0 flex items-center gap-1.5",
+                "px-2.5 py-1.5 md:px-3 md:py-2 rounded-xl text-[10px] md:text-xs font-extrabold uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-sm border shrink-0 flex items-center gap-1.5 hover:scale-[1.02]",
                 viewMode === 'employee'
-                  ? "bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-450 border-amber-250 dark:border-amber-900 hover:bg-amber-100/60"
-                  : "bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-450 border-indigo-250 dark:border-indigo-900 hover:bg-indigo-100/60"
+                  ? "bg-amber-50 text-amber-700 border-amber-250 hover:bg-amber-100/60"
+                  : "bg-indigo-50 text-indigo-700 border-indigo-250 hover:bg-indigo-100/60"
               )}
               title={viewMode === 'employee' ? 'Chuyển sang chế độ quản trị' : 'Chuyển sang chế độ thường'}
             >
@@ -144,14 +145,14 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
               {/* Clickable user profile info trigger */}
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center gap-2.5 md:gap-3 pl-3 md:pl-4 border-l border-slate-200 cursor-pointer outline-none hover:opacity-85 text-left active:scale-98 transition-all select-none"
+                className="flex items-center gap-2.5 md:gap-3 pl-3 md:pl-4 border-l border-slate-200/80 cursor-pointer outline-none hover:opacity-85 text-left active:scale-98 transition-all select-none"
               >
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-black shadow-sm shrink-0 ${user.avatar || 'bg-gradient-to-tr from-blue-500 to-indigo-600'}`}>
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-black shadow-sm shrink-0 bg-gradient-to-tr from-indigo-500 via-purple-500 to-blue-500`}>
                   {(user.firstName?.charAt(0) || '').toUpperCase()}
                 </div>
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-black text-slate-800 leading-tight">{user.lastName} {user.firstName}</p>
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-blue-50 text-blue-700 border border-blue-100 mt-0.5 leading-none">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mt-0.5 leading-none">
                     {user.role}
                   </span>
                 </div>
@@ -170,16 +171,16 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
 
               {/* Dropdown Menu */}
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2.5 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl shadow-xl py-2 z-40 animate-fadeIn">
-                  <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800/80 mb-1.5">
+                <div className="absolute right-0 mt-2.5 w-52 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-40 animate-fadeIn">
+                  <div className="px-4 py-2 border-b border-slate-100 mb-1.5">
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('nav.myAccount')}</p>
-                    <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate mt-0.5">{user.lastName} {user.firstName}</p>
+                    <p className="text-xs font-black text-slate-800 truncate mt-0.5">{user.lastName} {user.firstName}</p>
                   </div>
                   
                   <Link
                     href="/profile?tab=basic"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                    className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-slate-650 hover:bg-slate-50 transition-colors"
                   >
                     <span className="text-sm">👤</span>
                     <span>{t('profile.tabBasic')}</span>
@@ -189,7 +190,7 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
                     <Link
                       href="/profile?tab=visa"
                       onClick={() => setIsDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                      className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-slate-650 hover:bg-slate-50 transition-colors"
                     >
                       <span className="text-sm">🛂</span>
                       <span>{t('profile.tabVisa')}</span>
@@ -199,7 +200,7 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
                   <Link
                     href="/profile?tab=password"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                    className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-slate-650 hover:bg-slate-50 transition-colors"
                   >
                     <span className="text-sm">🔑</span>
                     <span>{t('profile.tabPassword')}</span>
@@ -208,19 +209,19 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
                   <Link
                     href="/profile?tab=settings"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                    className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-slate-650 hover:bg-slate-50 transition-colors"
                   >
                     <span className="text-sm">⚙️</span>
                     <span>{t('profile.tabSettings')}</span>
                   </Link>
 
-                  <div className="border-t border-slate-100 dark:border-slate-800/80 mt-1.5 pt-1">
+                  <div className="border-t border-slate-100 mt-1.5 pt-1">
                     <button
                       onClick={() => {
                         setIsDropdownOpen(false);
                         handleLogout();
                       }}
-                      className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-rose-600 dark:text-rose-450 hover:bg-rose-50/70 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
+                      className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-55 transition-colors cursor-pointer"
                     >
                       <span className="text-sm">🚪</span>
                       <span>{t('nav.logout')}</span>

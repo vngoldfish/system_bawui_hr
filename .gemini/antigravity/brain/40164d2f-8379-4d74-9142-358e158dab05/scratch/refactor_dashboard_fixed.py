@@ -1,330 +1,20 @@
-'use client';
-import { useI18n } from '@/lib/i18n';
+import os
 
-import { useMemo, useState, useEffect } from 'react';
-import Card from '@/components/common/Card';
-import Link from 'next/link';
-import { formatCurrency, formatDate, cn } from '@/lib/utils';
-import { getLoggedUser, LoggedUser } from '@/lib/auth-client';
-import Portal from '@/components/common/Portal';
+file_path = r"c:\Users\TUSAN\Desktop\CONG TY LONG\bawuiweb\src\components\dashboard\DashboardClient.tsx"
 
-interface Dependent {
-  name: string;
-  relationship: string;
-  birthDate: string;
-  gender: string;
-  cohabitation: string;
-}
+with open(file_path, "r", encoding="utf-8") as f:
+    content = f.read()
 
-interface Employee {
-  id: string;
-  firstName: string;
-  lastName: string;
-  firstNameKana: string;
-  lastNameKana: string;
-  email: string;
-  phone: string;
-  department: string;
-  position: string;
-  hireDate: string;
-  salary: number;
-  status: string;
-  nationality: string;
-  residenceStatus: string;
-  residenceCardNumber: string;
-  residenceCardIssueDate: string;
-  residenceExpiry: string;
-  workRestriction: string;
-  contractType: string;
-  contractStartDate: string;
-  contractEndDate: string;
-  salaryType: string;
-  hourlyRate: number;
-  dailyRate: number;
-  benefits: {
-    healthInsurance: boolean;
-    pension: boolean;
-    employmentInsurance: boolean;
-    workersComp: boolean;
-    transportation: number;
-    housing: number;
-    meal: number;
-  };
-  dependents: number;
-  dependentList: Dependent[];
-  shitenIds?: string[];
-}
+start_idx = content.find("export default function DashboardClient")
+if start_idx == -1:
+    print("Error: Could not find export default function DashboardClient")
+    exit(1)
 
-interface DashboardShiten {
-  id: string;
-  name: string;
-  nameKana: string | null;
-  employeeIds: string[];
-}
+# Keep the imports and interfaces before DashboardClient intact
+header_content = content[:start_idx]
 
-interface AttendanceRecord {
-  id: string;
-  employeeId: string;
-  date: string;
-  checkIn: string;
-  checkOut: string;
-  overtimeHours: number;
-  status: string;
-  note: string;
-}
-
-interface LeaveRequest {
-  id: string;
-  employeeId: string;
-  type: string;
-  startDate: string;
-  endDate: string;
-  days: number;
-  reason: string;
-  status: string;
-}
-
-// Check expiry status (Urgency Level)
-function getExpiryStatus(dateStr: string | null, t?: any) {
-  if (!dateStr) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const d = new Date(dateStr);
-  d.setHours(0, 0, 0, 0);
-  const daysLeft = Math.ceil((d.getTime() - today.getTime()) / 86400000);
-
-  const getLabel = (level: string) => {
-    if (!t) {
-      if (level === 'expired') return `Expired (${Math.abs(daysLeft)} days ago)`;
-      if (level === 'urgent') return `Urgent (${daysLeft} days left)`;
-      if (level === 'warning') return `Warning (${daysLeft} days left)`;
-      return `Safe (${daysLeft} days left)`;
-    }
-    if (level === 'expired') return t('dashboard.expiryStatusExpired').replace('{days}', String(Math.abs(daysLeft)));
-    if (level === 'urgent') return t('dashboard.expiryStatusUrgent').replace('{days}', String(daysLeft));
-    if (level === 'warning') return t('dashboard.expiryStatusWarning').replace('{days}', String(daysLeft));
-    return t('dashboard.expiryStatusSafe').replace('{days}', String(daysLeft));
-  };
-
-  if (daysLeft < 0) {
-    return { level: 'expired', daysLeft, label: getLabel('expired'), colorClass: 'text-red-700 bg-red-50 border-red-200', pct: 0 };
-  }
-  if (daysLeft <= 30) {
-    return { level: 'urgent', daysLeft, label: getLabel('urgent'), colorClass: 'text-orange-700 bg-orange-50 border-orange-200', pct: Math.max(0, (daysLeft / 30) * 100) };
-  }
-  if (daysLeft <= 90) {
-    return { level: 'warning', daysLeft, label: getLabel('warning'), colorClass: 'text-amber-700 bg-amber-50 border-amber-200', pct: Math.max(0, (daysLeft / 90) * 100) };
-  }
-  return { level: 'safe', daysLeft, label: getLabel('safe'), colorClass: 'text-green-700 bg-green-50 border-green-200', pct: 100 };
-}
-
-interface DashboardWidget {
-  id: string;
-  visible: boolean;
-  gridSpan: string;
-  nameKey: string;
-}
-
-interface DashboardSection {
-  id: string;
-  visible: boolean;
-  nameKey: string;
-  emoji: string;
-  widgets: DashboardWidget[];
-}
-
-const DEFAULT_SECTIONS: DashboardSection[] = [
-  {
-    id: 'kpiSummary',
-    visible: true,
-    nameKey: 'kpiSummary',
-    emoji: '📊',
-    widgets: []
-  },
-  {
-    id: 'attendance',
-    visible: true,
-    nameKey: 'attendance',
-    emoji: '📅',
-    widgets: [
-      { id: 'donutChart', visible: true, gridSpan: 'lg:col-span-1', nameKey: 'donutChart' },
-      { id: 'rollCallTable', visible: true, gridSpan: 'lg:col-span-2', nameKey: 'rollCallTable' },
-      { id: 'shitenStats', visible: true, gridSpan: 'lg:col-span-1', nameKey: 'shitenStats' },
-      { id: 'shitenStaff', visible: true, gridSpan: 'lg:col-span-2', nameKey: 'shitenStaff' },
-      { id: 'pendingLeaves', visible: true, gridSpan: 'lg:col-span-3', nameKey: 'pendingLeaves' },
-      { id: 'attendanceTrend', visible: true, gridSpan: 'lg:col-span-3', nameKey: 'attendanceTrend' }
-    ]
-  },
-  {
-    id: 'overtime',
-    visible: true,
-    nameKey: 'overtime',
-    emoji: '🕐',
-    widgets: [
-      { id: 'overtimeTrend', visible: true, gridSpan: 'lg:col-span-2', nameKey: 'overtimeTrend' },
-      { id: 'overtimeWarning', visible: true, gridSpan: 'lg:col-span-1', nameKey: 'overtimeWarning' }
-    ]
-  },
-  {
-    id: 'compliance',
-    visible: true,
-    nameKey: 'compliance',
-    emoji: '🛂',
-    widgets: [
-      { id: 'visaExpiry', visible: true, gridSpan: 'lg:col-span-1', nameKey: 'visaExpiry' },
-      { id: 'contractExpiry', visible: true, gridSpan: 'lg:col-span-1', nameKey: 'contractExpiry' },
-      { id: 'nationalityStats', visible: true, gridSpan: 'lg:col-span-2', nameKey: 'nationalityStats' }
-    ]
-  },
-  {
-    id: 'orgStats',
-    visible: true,
-    nameKey: 'orgStats',
-    emoji: '🏢',
-    widgets: [
-      { id: 'deptDistribution', visible: true, gridSpan: 'lg:col-span-2', nameKey: 'deptDistribution' },
-      { id: 'recentHires', visible: true, gridSpan: 'lg:col-span-1', nameKey: 'recentHires' }
-    ]
-  },
-  {
-    id: 'quickLinks',
-    visible: true,
-    nameKey: 'quickLinks',
-    emoji: '🔗',
-    widgets: []
-  }
-];
-
-const sectionNames: Record<string, Record<string, string>> = {
-  ja: {
-    kpiSummary: 'KPI 統計サマリー',
-    attendance: '勤怠・稼働状況',
-    overtime: '稼働時間・時間外労働',
-    compliance: 'ビザ & 契約管理',
-    orgStats: '組織構造・人事データ',
-    quickLinks: 'クイックリンク',
-  },
-  en: {
-    kpiSummary: 'KPI Summary Stats',
-    attendance: 'Attendance & Operations',
-    overtime: 'Work Hours & Overtime',
-    compliance: 'Visa & Contract Management',
-    orgStats: 'Organization Statistics',
-    quickLinks: 'Quick Links',
-  },
-  vi: {
-    kpiSummary: 'Thống kê tổng hợp (KPI)',
-    attendance: 'Điểm danh & Hoạt động',
-    overtime: 'Giờ làm & Tăng ca',
-    compliance: 'Visa & Hợp đồng',
-    orgStats: 'Cơ cấu & Số liệu nhân sự',
-    quickLinks: 'Liên kết thao tác nhanh',
-  },
-  zh: {
-    kpiSummary: 'KPI 统计摘要',
-    attendance: '考勤与运营状况',
-    overtime: '工作时间与加班管理',
-    compliance: '签证与合同管理',
-    orgStats: '组织架构数据',
-    quickLinks: '快速链接',
-  },
-  th: {
-    kpiSummary: 'แถบสรุปข้อมูล KPI',
-    attendance: 'การลงเวลาและการปฏิบัติงานรายสาขา',
-    overtime: 'ชั่วโมงทำงานและการทำงานล่วงเวลาสะสม',
-    compliance: 'การควบคุมวีซ่าและสัญญาจ้างงาน',
-    orgStats: 'ข้อมูลโครงสร้างองค์กร',
-    quickLinks: 'ลิงก์การเข้าถึงด่วน',
-  }
-};
-
-const widgetNames: Record<string, Record<string, string>> = {
-  ja: {
-    donutChart: '本日出勤率 (ドーナツチャート)',
-    rollCallTable: '本日出欠一覧 (点呼テーブル)',
-    shitenStats: '支店別稼働率統計 (バーチャート)',
-    shitenStaff: '支店別本日の稼働メンバー一覧',
-    attendanceTrend: '出勤率履歴 (7日間トレンド)',
-    pendingLeaves: '休暇申請承認待ち一覧',
-    overtimeTrend: '時間外労働推移 (バーチャート)',
-    overtimeWarning: '過重労働アラート一覧',
-    visaExpiry: '在留資格期限監視',
-    contractExpiry: '雇用契約期限監視',
-    nationalityStats: '国籍別外国人従業員統計',
-    deptDistribution: '部署別人員配置統計',
-    recentHires: '最近30日間の新規入社従業員',
-  },
-  en: {
-    donutChart: 'Today Attendance Rate (Donut Chart)',
-    rollCallTable: 'Today Attendance List (Roll Call Table)',
-    shitenStats: 'Branch Attendance Rate (Bar Chart)',
-    shitenStaff: 'Today Branch Operational Staff',
-    attendanceTrend: 'Attendance Rate History (7-Day Trend)',
-    pendingLeaves: 'Pending Leave Approvals List',
-    overtimeTrend: 'Overtime Trend (Bar Chart)',
-    overtimeWarning: 'Overwork Warning Alert List',
-    visaExpiry: 'Residence Visa Expiry Monitor',
-    contractExpiry: 'Employment Contract Expiry Monitor',
-    nationalityStats: 'Nationality Statistics (Foreigners)',
-    deptDistribution: 'Department Personnel Distribution',
-    recentHires: 'New Employees (Last 30 Days)',
-  },
-  vi: {
-    donutChart: 'Tỷ lệ đi làm hôm nay (Biểu đồ tròn)',
-    rollCallTable: 'Danh sách điểm danh hôm nay (Bảng điểm danh)',
-    shitenStats: 'Tỷ lệ hoạt động chi nhánh (Biểu đồ thanh)',
-    shitenStaff: 'Thành viên làm việc tại chi nhánh hôm nay',
-    attendanceTrend: 'Lịch sử tỷ lệ đi làm (Xu hướng 7 ngày)',
-    pendingLeaves: 'Danh sách nghỉ phép chờ duyệt',
-    overtimeTrend: 'Xu hướng làm thêm giờ (Biểu đồ cột)',
-    overtimeWarning: 'Danh sách cảnh báo làm việc quá giờ',
-    visaExpiry: 'Theo dõi thời hạn thẻ cư trú / Visa',
-    contractExpiry: 'Theo dõi thời hạn hợp đồng lao động',
-    nationalityStats: 'Thống kê quốc tịch nhân viên nước ngoài',
-    deptDistribution: 'Phân bổ nhân sự theo phòng ban',
-    recentHires: 'Nhân viên mới nhận việc (30 ngày qua)',
-  },
-  zh: {
-    donutChart: '今日出勤率 (环形图)',
-    rollCallTable: '今日出勤列表 (点名表)',
-    shitenStats: '分店出勤率 (柱状图)',
-    shitenStaff: '今日分店在岗成员列表',
-    attendanceTrend: '出勤率历史 (7天趋势)',
-    pendingLeaves: '待审批请假申请列表',
-    overtimeTrend: '加班趋势 (柱状图)',
-    overtimeWarning: '加班警报列表',
-    visaExpiry: '签证过期监控',
-    contractExpiry: '合同过期监控',
-    nationalityStats: '外国员工国籍分布',
-    deptDistribution: '部门人员分布统计',
-    recentHires: '最近30日新进员工',
-  },
-  th: {
-    donutChart: 'อัตราเข้างานวันนี้ (แผนภูมิโดนัท)',
-    rollCallTable: 'รายการเข้างานวันนี้ (ตารางเรียกชื่อ)',
-    shitenStats: 'อัตราการทำงานรายสาขา (แผนภูมิแท่ง)',
-    shitenStaff: 'สมาชิกปฏิบัติงานรายสาขาวันนี้',
-    attendanceTrend: 'ประวัติอัตราเข้างาน (แนวโน้ม 7 วัน)',
-    pendingLeaves: 'รายการใบลาที่รอการอนุมัติ',
-    overtimeTrend: 'แนวโน้มการทำงานล่วงเวลา (แผนภูมิแท่ง)',
-    overtimeWarning: 'รายการแจ้งเตือนการทำงานล่วงเวลาสะสม',
-    visaExpiry: 'ระบบตรวจวัดการหมดอายุของวีซ่า',
-    contractExpiry: 'ระบบตรวจวัดการหมดอายุของสัญญาจ้าง',
-    nationalityStats: 'สถิติสัญชาติของพนักงานต่างชาติ',
-    deptDistribution: 'สัดส่วนพนักงานแยกตามแผนก',
-    recentHires: 'พนักงานใหม่ (ในรอบ 30 วัน)',
-  }
-};
-
-const settingsBtnTextMap: Record<string, string> = {
-  ja: 'ダッシュボードカスタマイズ',
-  en: 'Customize Dashboard',
-  vi: 'Cấu hình giao diện Dashboard',
-  zh: '自定义仪表板',
-  th: 'ปรับแต่งแดชบอร์ด'
-};
-
-export default function DashboardClient({
+# Define the new DashboardClient component code
+new_body = """export default function DashboardClient({
   employees,
   attendance,
   leaves: initialLeaves,
@@ -747,47 +437,41 @@ export default function DashboardClient({
 
   // Individual helper rendering functions for widgets and blocks
   const renderKPIOverview = () => (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 animate-fadeIn">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
       {[
-        { label: t('dashboard.statsTotalEmp'), value: stats.totalEmp, icon: '👤', color: 'text-slate-800', border: 'border-slate-200/50', isWarning: false },
-        { label: t('dashboard.statsAttendanceRate'), value: `${stats.attendanceRate}%`, icon: '📈', color: 'text-emerald-600', border: 'border-emerald-200/40 bg-emerald-50/10', isWarning: false },
-        { label: t('dashboard.statsOnLeave'), value: `${stats.onLeaveCount}${t('common.personUnit')}`, icon: '🏖️', color: 'text-blue-600', border: 'border-blue-200/40 bg-blue-50/10', isWarning: false },
+        { label: t('dashboard.statsTotalEmp'), value: stats.totalEmp, color: 'text-slate-800', bg: 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:border-blue-300', isWarning: false },
+        { label: t('dashboard.statsAttendanceRate'), value: `${stats.attendanceRate}%`, color: 'text-emerald-600 font-extrabold', bg: 'bg-emerald-50/40 border-emerald-100/80 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.1)] hover:border-emerald-300', isWarning: false },
+        { label: t('dashboard.statsOnLeave'), value: `${stats.onLeaveCount}${t('common.personUnit')}`, color: 'text-blue-600', bg: 'bg-blue-50/40 border-blue-100/80 shadow-[0_4px_20px_-4px_rgba(59,130,246,0.1)] hover:border-blue-300', isWarning: false },
         { 
           label: t('dashboard.statsOvertimeAlerts'), 
           value: `${stats.monthlyOTLimitAlerts.length}${t('common.personUnit')}`, 
-          icon: '⏰',
-          color: stats.monthlyOTLimitAlerts.length > 0 ? 'text-red-600 font-extrabold animate-pulse' : 'text-slate-500', 
-          border: stats.monthlyOTLimitAlerts.length > 0 ? 'border-red-200 bg-red-50/30 shadow-[0_4px_20px_rgba(239,68,68,0.05)]' : 'border-slate-200/50',
-          isWarning: stats.monthlyOTLimitAlerts.length > 0
+          color: stats.monthlyOTLimitAlerts.length > 0 ? 'text-red-600 animate-pulse font-extrabold' : 'text-slate-500', 
+          bg: stats.monthlyOTLimitAlerts.length > 0 ? 'bg-red-50/50 border-red-200 shadow-[0_4px_20px_-4px_rgba(239,68,68,0.15)] hover:border-red-400' : 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]',
+          isWarning: true
         },
         { 
           label: t('dashboard.statsVisaAlerts'), 
           value: `${stats.visaAlerts.length}${t('common.personUnit')}`, 
-          icon: '🛂',
           color: stats.visaAlerts.length > 0 ? 'text-rose-600 font-extrabold' : 'text-slate-500', 
-          border: stats.visaAlerts.length > 0 ? 'border-rose-200 bg-rose-50/30 shadow-[0_4px_20px_rgba(244,63,94,0.05)]' : 'border-slate-200/50',
-          isWarning: stats.visaAlerts.length > 0
+          bg: stats.visaAlerts.length > 0 ? 'bg-rose-50/50 border-rose-200 shadow-[0_4px_20px_-4px_rgba(244,63,94,0.15)] hover:border-rose-400' : 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]',
+          isWarning: true
         },
         { 
           label: t('dashboard.statsContractAlerts'), 
           value: `${stats.contractAlerts.length}${t('common.personUnit')}`, 
-          icon: '📋',
           color: stats.contractAlerts.length > 0 ? 'text-amber-600 font-extrabold' : 'text-slate-500', 
-          border: stats.contractAlerts.length > 0 ? 'border-amber-200 bg-amber-50/30 shadow-[0_4px_20px_rgba(245,158,11,0.05)]' : 'border-slate-200/50',
-          isWarning: stats.contractAlerts.length > 0
+          bg: stats.contractAlerts.length > 0 ? 'bg-amber-50/50 border-amber-200 shadow-[0_4px_20px_-4px_rgba(245,158,11,0.15)] hover:border-amber-400' : 'bg-white/80 border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]',
+          isWarning: true
         },
       ].map((s, idx) => (
-        <div key={idx} className={cn("bg-white rounded-3xl shadow-premium border p-4.5 transition-all duration-300 hover:shadow-premium-hover hover:-translate-y-0.5 relative overflow-hidden", s.border)}>
-          <div className="flex justify-between items-start">
-            <p className="text-xxs text-slate-400 font-bold uppercase tracking-wider">{s.label}</p>
-            <span className="text-sm opacity-80">{s.icon}</span>
-          </div>
-          <div className="flex items-baseline justify-between mt-2.5">
-            <p className={cn("text-xl sm:text-2xl font-black tracking-tight", s.color)}>{s.value}</p>
-            {s.isWarning && (
-              <span className="flex h-2 w-2 relative">
+        <div key={idx} className={`${s.bg} backdrop-blur-md rounded-2xl p-4 border transition-all duration-300 hover:-translate-y-1 hover:shadow-md cursor-default`}>
+          <p className="text-xs text-slate-500 font-semibold mb-1">{s.label}</p>
+          <div className="flex items-baseline justify-between mt-1">
+            <p className={`text-2xl font-black tracking-tight ${s.color}`}>{s.value}</p>
+            {s.isWarning && parseInt(s.value.toString()) > 0 && (
+              <span className="flex h-2.5 w-2.5 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
               </span>
             )}
           </div>
@@ -797,7 +481,7 @@ export default function DashboardClient({
   );
 
   const renderDonutChart = () => (
-    <Card title={`📊 ${t('dashboard.attendanceRate')} (${t('dashboard.all')})`} className="h-full">
+    <Card title={`📊 ${t('dashboard.attendanceRate')} (${t('dashboard.all')})`} className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl">
       <p className="text-xs text-slate-400 -mt-2 mb-4">{t('dashboard.asOf').replace('{date}', formatDate(todayStr))}</p>
       <div className="flex flex-col items-center justify-center p-2">
         <div className="relative w-44 h-44">
@@ -853,10 +537,10 @@ export default function DashboardClient({
             { label: t('status.present'), count: stats.presentCount, color: 'bg-emerald-500' },
             { label: t('status.late'), count: stats.lateCount, color: 'bg-orange-500' },
             { label: t('status.absent'), count: stats.absentCount, color: 'bg-red-500' },
-            { label: t('status.leave'), count: stats.onLeaveCount, color: 'bg-blue-500' },
+            { label: t('status.leave'), count: stats.onLeaveCount, color: 'bg-blue-50' || 'bg-blue-500' },
             { label: t('attendance.unregistered'), count: stats.unregisteredCount, color: 'bg-slate-400' },
           ].map(legend => {
-            const dotColor = legend.color;
+            const dotColor = legend.color.startsWith('bg-blue-50') ? 'bg-blue-500' : legend.color;
             return (
               <div key={legend.label} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/60 transition-colors">
                 <span className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
@@ -873,7 +557,7 @@ export default function DashboardClient({
   const renderRollCallTable = () => (
     <Card
       title={t('dashboard.attendanceChartTitle')}
-      className="h-full"
+      className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl"
       action={
         <div className="flex gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60 overflow-x-auto max-w-full no-scrollbar flex-nowrap shrink-0">
           {[
@@ -973,7 +657,7 @@ export default function DashboardClient({
   );
 
   const renderShitenStats = () => (
-    <Card title={`🏢 ${t('shitens.title')} (Branch Operations)`} className="h-full p-6">
+    <Card title={`🏢 ${t('shitens.title')} (Branch Operations)`} className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl p-6">
       <p className="text-xs text-slate-400 -mt-2 mb-6">本日稼働率</p>
       <div className="space-y-4">
         {stats.shitenStats.length === 0 ? (
@@ -1002,7 +686,7 @@ export default function DashboardClient({
   );
 
   const renderShitenStaff = () => (
-    <Card title="👥 支店別本日の稼働メンバー (Today's Branch Team)" className="h-full p-6">
+    <Card title="👥 支店別本日の稼働メンバー (Today's Branch Team)" className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl p-6">
       <p className="text-xs text-slate-400 -mt-2 mb-4">本日各支店で稼働中および非稼働のメンバー一覧</p>
       <div className="space-y-4 overflow-y-auto max-h-[380px] pr-2">
         {stats.shitenStats.length === 0 ? (
@@ -1056,7 +740,7 @@ export default function DashboardClient({
   );
 
   const renderAttendanceTrend = () => (
-    <Card title={t('dashboard.attendanceHistoryTitle')} className="">
+    <Card title={t('dashboard.attendanceHistoryTitle')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
       <p className="text-xs text-slate-400 -mt-2 mb-6">{t('dashboard.attendanceHistoryDesc')}</p>
       <div className="p-2">
         <div className="relative w-full">
@@ -1155,7 +839,7 @@ export default function DashboardClient({
     return (
       <Card 
         title={locale === 'vi' ? `🏖️ Đơn nghỉ phép chờ duyệt (${pendingList.length})` : locale === 'ja' ? `🏖️ 承認待ちの休暇申請 (${pendingList.length}件)` : `🏖️ Pending Leaves (${pendingList.length})`}
-        className="h-full p-6"
+        className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl p-6"
         action={
           <Link href="/leave" className="text-xs text-blue-600 hover:text-blue-800 font-bold">
             {locale === 'vi' ? 'Quản lý nghỉ phép →' : locale === 'ja' ? '休暇管理ページへ →' : 'Manage Leave →'}
@@ -1216,7 +900,7 @@ export default function DashboardClient({
   };
 
   const renderOvertimeTrend = () => (
-    <Card title={t('dashboard.overtimeTrendTitle')} className="">
+    <Card title={t('dashboard.overtimeTrendTitle')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
       <p className="text-xs text-slate-400 -mt-2 mb-4">{t('dashboard.overtimeTrendDesc')}</p>
       <div className="p-2">
         <div className="relative w-full">
@@ -1272,7 +956,7 @@ export default function DashboardClient({
   const renderOvertimeWarning = () => (
     <Card
       title={t('dashboard.overtimeWarningTitle')}
-      className=""
+      className="bg-white border border-slate-200/60 shadow-sm rounded-2xl"
     >
       <p className="text-xs text-slate-400 -mt-2 mb-4">{t('dashboard.overtimeWarningDesc')}</p>
       <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
@@ -1324,7 +1008,7 @@ export default function DashboardClient({
   const renderVisaExpiry = () => (
     <Card
       title={t('dashboard.visaExpiryMonitorTitle').replace('{count}', String(stats.visaAlerts.length))}
-      className=""
+      className="bg-white border border-slate-200/60 shadow-sm rounded-2xl"
       action={
         <Link href="/residence-cards" className="text-xs text-blue-600 hover:text-blue-800 font-bold">
           {t('dashboard.viewDetails')}
@@ -1388,7 +1072,7 @@ export default function DashboardClient({
   const renderContractExpiry = () => (
     <Card
       title={t('dashboard.contractExpiryMonitorTitle').replace('{count}', String(stats.contractAlerts.length))}
-      className=""
+      className="bg-white border border-slate-200/60 shadow-sm rounded-2xl"
       action={
         <Link href="/contracts" className="text-xs text-blue-600 hover:text-blue-800 font-bold">
           {t('dashboard.contractPageLink')}
@@ -1462,7 +1146,7 @@ export default function DashboardClient({
     return (
       <Card 
         title={locale === 'vi' ? `🌐 Cơ cấu quốc tịch ngoại kiều` : locale === 'ja' ? `🌐 国籍別外国人従業員統計` : `🌐 Foreign Nationalities Breakdown`}
-        className="h-full p-6"
+        className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl p-6"
       >
         <p className="text-xs text-slate-400 -mt-2 mb-4">
           {locale === 'vi' ? `Tổng số lao động nước ngoài: ${foreignEmps.length} người` : locale === 'ja' ? `外国人従業員総数: ${foreignEmps.length} 名` : `Total foreign workforce: ${foreignEmps.length} employees`}
@@ -1514,7 +1198,7 @@ export default function DashboardClient({
     return (
       <Card 
         title={locale === 'vi' ? `🏢 Phân bổ nhân sự theo phòng ban` : locale === 'ja' ? `🏢 部署別人員配置統計` : `🏢 Department Distribution`}
-        className="h-full p-6"
+        className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl p-6"
         action={
           <Link href="/departments" className="text-xs text-blue-600 hover:text-blue-800 font-bold">
             {locale === 'vi' ? 'Quản lý phòng ban →' : locale === 'ja' ? '部署管理ページへ →' : 'Manage Departments →'}
@@ -1563,7 +1247,7 @@ export default function DashboardClient({
     return (
       <Card 
         title={locale === 'vi' ? `🎉 Nhân sự mới nhận việc (30 ngày qua)` : locale === 'ja' ? `🎉 最近の新入社員 (直近30日間)` : `🎉 Recent New Hires (Last 35 Days)`}
-        className="h-full p-6"
+        className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl p-6"
       >
         <p className="text-xs text-slate-400 -mt-2 mb-4">
           {locale === 'vi' ? `Có ${recentList.length} nhân viên mới gia nhập` : locale === 'ja' ? `新たに ${recentList.length} 名が入社しました` : `${recentList.length} new employees joined recently`}
@@ -1600,7 +1284,7 @@ export default function DashboardClient({
   };
 
   const renderQuickLinks = () => (
-    <Card title={t('dashboard.quickLinks')} className="">
+    <Card title={t('dashboard.quickLinks')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
         {[
           { href: '/employees', label: t('nav.employees'), icon: '👥', color: 'text-blue-600 bg-blue-50/60 border-blue-100 hover:border-blue-300' },
@@ -1698,7 +1382,7 @@ export default function DashboardClient({
         {/* Punch In / Out Card */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
-            <Card title="⏱️ タイムカード (Punch Clock)" className="h-full">
+            <Card title="⏱️ タイムカード (Punch Clock)" className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl">
               <div className="flex flex-col items-center justify-center py-6 text-center">
                 <div className="text-4.5xl font-black text-slate-800 font-mono tracking-wider mb-2">
                   {currentTime || '--:--:--'}
@@ -1759,7 +1443,7 @@ export default function DashboardClient({
 
           {/* Company Announcements */}
           <div className="lg:col-span-2">
-            <Card title={`📢 ${t('dashboard.announcements')}`} className="h-full">
+            <Card title={`📢 ${t('dashboard.announcements')}`} className="h-full bg-white border border-slate-200/60 shadow-sm rounded-2xl">
               <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
                 {announcementsLoading ? (
                   <p className="text-xs text-slate-400 font-bold py-6 text-center">{t('dashboard.loading')}</p>
@@ -2014,3 +1698,13 @@ export default function DashboardClient({
     </div>
   );
 }
+"""
+
+# Re-assemble content
+new_content = header_content + new_body
+
+# Write the new content to DashboardClient.tsx
+with open(file_path, "w", encoding="utf-8") as f:
+    f.write(new_content)
+
+print("DashboardClient.tsx refactored to uniform fixed concurrent grid successfully.")

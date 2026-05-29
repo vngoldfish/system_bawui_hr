@@ -194,7 +194,7 @@ export default function DocumentsClient({ employees }: { employees: Employee[] }
       )}
 
       {/* Document Types Overview */}
-      <Card title={t('documents.cardTypes')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl animate-fadeIn">
+      <Card title={t('documents.cardTypes')} className="animate-fadeIn">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4.5">
           {docTypes.map(tItem => (
             <div key={tItem.value} className="bg-slate-50/50 border border-slate-200/60 rounded-2xl p-4.5 text-center hover:bg-slate-100/55 hover:shadow-sm transition-all duration-300 cursor-pointer"
@@ -208,7 +208,7 @@ export default function DocumentsClient({ employees }: { employees: Employee[] }
       </Card>
 
       {/* Records Table */}
-      <Card title={t('documents.cardHistory')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+      <Card title={t('documents.cardHistory')} className="">
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

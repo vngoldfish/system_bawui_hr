@@ -148,7 +148,7 @@ export default function TemplatesClient({ initialTemplates }: { initialTemplates
       )}
 
       {/* Intro Card */}
-      <Card className="bg-white border border-slate-200/60 shadow-sm rounded-2xl p-6">
+      <Card className="p-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">{getText('title', t)}</h3>
@@ -173,7 +173,7 @@ export default function TemplatesClient({ initialTemplates }: { initialTemplates
           const keyLabel = getTemplateKeyLabel(tItem.key, t);
 
           return (
-            <Card key={tItem.id} title={keyLabel} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+            <Card key={tItem.id} title={keyLabel} className="">
               {isEditing ? (
                 <div className="space-y-4 pt-2">
                   <div>

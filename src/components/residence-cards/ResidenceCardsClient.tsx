@@ -241,7 +241,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
       </div>
 
       {/* Filters - Redesigned to look premium */}
-      <Card className="bg-white border border-slate-200/60 shadow-sm rounded-2xl p-4">
+      <Card className="p-4">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -276,7 +276,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
       </Card>
 
       {/* Table - Spacious, elegant details */}
-      <Card className="bg-white border border-slate-200/60 shadow-sm rounded-2xl overflow-hidden">
+      <Card className="overflow-hidden">
         {filteredEmployees.length === 0 ? (
           <div className="py-16 text-center text-slate-400 bg-slate-50/20">
             {t('residenceCards.noEmployees')}

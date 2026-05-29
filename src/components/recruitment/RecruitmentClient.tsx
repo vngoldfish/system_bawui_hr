@@ -197,7 +197,7 @@ export default function RecruitmentClient() {
       {/* Job Postings Grid Card */}
       <Card
         title={t('recruitment.cardPositions')}
-        className="bg-white border border-slate-200/60 shadow-sm rounded-2xl animate-fadeIn"
+        className="animate-fadeIn"
         action={
           <button onClick={() => setShowAddPosting(true)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow-md cursor-pointer">
@@ -298,7 +298,7 @@ export default function RecruitmentClient() {
       )}
 
       {/* Applicants List Table */}
-      <Card title={t('recruitment.cardApplicants')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+      <Card title={t('recruitment.cardApplicants')} className="">
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -394,7 +394,7 @@ export default function RecruitmentClient() {
       </Card>
 
       {/* Selection Pipeline Flowchart */}
-      <Card title={t('recruitment.cardPipeline')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+      <Card title={t('recruitment.cardPipeline')} className="">
         <p className="text-xs text-slate-400 -mt-2 mb-6">{t('recruitment.pipelineSubtitle')}</p>
         <div className="flex flex-col md:flex-row items-center justify-between p-4 bg-slate-50/50 rounded-2xl border gap-4">
           {statusSteps.filter(s => s.key !== 'rejected').map((s, idx, arr) => {

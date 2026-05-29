@@ -446,7 +446,7 @@ export default function NotificationsClient({
 
       {/* Admin specific Unified Search Filter */}
       {(role === 'SUPER_ADMIN' || role === 'HR_MANAGER') && (
-        <Card className="bg-white border border-slate-200/60 shadow-sm rounded-2xl p-4.5">
+        <Card className="p-4.5">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="w-full sm:w-1/4">
               <select
@@ -489,7 +489,7 @@ export default function NotificationsClient({
       )}
 
       {/* Notifications List */}
-      <Card title={t('notifications.cardTitle')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+      <Card title={t('notifications.cardTitle')} className="">
         <div className="space-y-4">
           {paginatedNotifications.length === 0 ? (
             <div className="text-center py-16 bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl">

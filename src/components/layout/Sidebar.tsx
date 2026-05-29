@@ -209,87 +209,113 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
 
   return (
     <aside className={cn(
-      "relative bg-slate-800 text-white flex-shrink-0 flex flex-col overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out",
+      "relative bg-slate-950 text-white flex-shrink-0 flex flex-col overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out border-r border-slate-850/50",
       sideWidthClass,
       className
     )}>
-      <div className={cn("p-4 flex-shrink-0", isCollapsed ? "px-2" : "px-4")}>
-        <div className="mb-6 flex flex-col items-center relative">
-          {/* Close button for mobile views */}
-          {onCloseMobile && (
-            <button
-              onClick={onCloseMobile}
-              className="absolute right-0 top-0 p-1.5 rounded-lg bg-slate-700 hover:bg-slate-650 text-slate-350 hover:text-white md:hidden cursor-pointer"
-              title={t('common.close')}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
+      <div className={cn("p-4 flex-shrink-0 flex flex-col h-full justify-between", isCollapsed ? "px-2" : "px-4")}>
+        <div>
+          <div className="mb-6 flex flex-col items-center relative">
+            {/* Close button for mobile views */}
+            {onCloseMobile && (
+              <button
+                onClick={onCloseMobile}
+                className="absolute right-0 top-0 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/50 text-slate-400 hover:text-white md:hidden cursor-pointer"
+                title={t('common.close')}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
 
-          {isMounted && isCollapsed ? (
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white text-[11px] font-black font-sans shadow-md border border-blue-500 animate-fadeIn" title={companyName}>
-              {companyName ? companyName.replace(/\u682a\u5f0f\u4f1a\u793a|\u6709\u9650\u4f1a\u793a/g, '').slice(0, 2) : 'HR'}
-            </div>
-          ) : (
-            <div className="animate-fadeIn w-full text-center px-1">
-              <h1 className="text-sm font-black tracking-tight whitespace-nowrap overflow-hidden text-ellipsis pr-6" title={companyName}>
-                {companyName}
-              </h1>
-              <p className="text-[10px] text-slate-400 mt-1 whitespace-nowrap">{t('common.hrSystem')}</p>
-            </div>
-          )}
-        </div>
+            {isMounted && isCollapsed ? (
+              <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-blue-600 rounded-2xl flex items-center justify-center text-white text-[11px] font-black font-sans shadow-lg border border-indigo-400/20 animate-fadeIn" title={companyName}>
+                {companyName ? companyName.replace(/\u682a\u5f0f\u4f1a\u793a|\u6709\u9650\u4f1a\u793a/g, '').slice(0, 2) : 'HR'}
+              </div>
+            ) : (
+              <div className="animate-fadeIn w-full text-center px-1">
+                <h1 className="text-sm font-black tracking-wider whitespace-nowrap overflow-hidden text-ellipsis pr-6 text-slate-100" title={companyName}>
+                  {companyName}
+                </h1>
+                <p className="text-[10px] text-slate-500 mt-1 whitespace-nowrap uppercase tracking-widest font-bold">{t('common.hrSystem')}</p>
+              </div>
+            )}
+          </div>
 
-        <nav className="space-y-1.5">
-          {!isMounted ? (
-            <div className="space-y-3 animate-pulse px-2 py-4">
-              <div className="h-4 bg-slate-700 rounded-md w-3/4"></div>
-              <div className="h-8 bg-slate-700 rounded-xl w-full"></div>
-              <div className="h-8 bg-slate-700 rounded-xl w-full"></div>
-              <div className="h-4 bg-slate-700 rounded-md w-1/2 mt-6"></div>
-              <div className="h-8 bg-slate-700 rounded-xl w-full"></div>
-              <div className="h-8 bg-slate-700 rounded-xl w-full"></div>
-            </div>
-          ) : (
-            filteredSections.map((section) => {
-              const isOpen = openSections.includes(section.label);
-              const hasActive = section.items.some(i => pathname.startsWith(i.href));
-              
-              return (
-                <div key={section.label} className="relative group">
-                  <button
-                    onClick={() => !(isMounted && isCollapsed) && toggleSection(section.label)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-bold outline-none cursor-pointer",
-                      hasActive 
-                        ? "bg-slate-700 text-white border-l-4 border-blue-500 pl-2" 
-                        : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
-                    )}
-                    title={isMounted && isCollapsed ? t(section.label) : undefined}
-                  >
-                    <span className="text-base flex-shrink-0">{section.icon}</span>
-                    {!(isMounted && isCollapsed) && (
-                      <>
-                        <span className="flex-1 text-left whitespace-nowrap animate-fadeIn">{t(section.label)}</span>
-                        <svg
-                          className={cn("w-4 h-4 transition-transform duration-200 shrink-0", isOpen && "rotate-180")}
-                          fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </>
-                    )}
-                  </button>
+          <nav className="space-y-1.5">
+            {!isMounted ? (
+              <div className="space-y-3 animate-pulse px-2 py-4">
+                <div className="h-4 bg-slate-850 rounded-md w-3/4"></div>
+                <div className="h-8 bg-slate-850 rounded-xl w-full"></div>
+                <div className="h-8 bg-slate-850 rounded-xl w-full"></div>
+                <div className="h-4 bg-slate-850 rounded-md w-1/2 mt-6"></div>
+                <div className="h-8 bg-slate-850 rounded-xl w-full"></div>
+                <div className="h-8 bg-slate-850 rounded-xl w-full"></div>
+              </div>
+            ) : (
+              filteredSections.map((section) => {
+                const isOpen = openSections.includes(section.label);
+                const hasActive = section.items.some(i => pathname.startsWith(i.href));
+                
+                return (
+                  <div key={section.label} className="relative group">
+                    <button
+                      onClick={() => !(isMounted && isCollapsed) && toggleSection(section.label)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-xs font-bold outline-none cursor-pointer",
+                        hasActive 
+                          ? "bg-slate-900 text-white border-l-4 border-indigo-500 pl-2.5 font-extrabold shadow-inner" 
+                          : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
+                      )}
+                      title={isMounted && isCollapsed ? t(section.label) : undefined}
+                    >
+                      <span className="text-sm flex-shrink-0">{section.icon}</span>
+                      {!(isMounted && isCollapsed) && (
+                        <>
+                          <span className="flex-1 text-left whitespace-nowrap animate-fadeIn">{t(section.label)}</span>
+                          <svg
+                            className={cn("w-3.5 h-3.5 transition-transform duration-200 shrink-0 text-slate-500", isOpen && "rotate-180")}
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </>
+                      )}
+                    </button>
 
-                  {/* Collapsed Hover Tooltip Dropdown */}
-                  {isMounted && isCollapsed && (
-                    <div className="absolute left-14 top-0 hidden group-hover:block z-50 bg-slate-900 border border-slate-700 text-white rounded-2xl shadow-2xl p-3.5 min-w-[180px] animate-fadeIn transition-all">
-                      <div className="font-black text-xs border-b border-slate-800 pb-2 mb-2 text-slate-400">
-                        {t(section.label)}
+                    {/* Collapsed Hover Tooltip Dropdown */}
+                    {isMounted && isCollapsed && (
+                      <div className="absolute left-14 top-0 hidden group-hover:block z-50 bg-slate-950/95 backdrop-blur-md border border-slate-850 text-white rounded-2xl shadow-2xl p-3.5 min-w-[190px] animate-fadeIn transition-all">
+                        <div className="font-black text-xs border-b border-slate-900 pb-2 mb-2 text-slate-500 uppercase tracking-wider">
+                          {t(section.label)}
+                        </div>
+                        <div className="space-y-1">
+                          {section.items.map((item) => {
+                            const isActive = pathname === item.href;
+                            return (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                className={cn(
+                                  "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all",
+                                  isActive 
+                                    ? "bg-indigo-600 text-white shadow-md" 
+                                    : "text-slate-400 hover:bg-slate-900 hover:text-slate-100"
+                                )}
+                              >
+                                <span className="text-sm shrink-0">{item.icon}</span>
+                                <span className="whitespace-nowrap">{t(item.label)}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="space-y-1">
+                    )}
+
+                    {/* Expanded submenu */}
+                    {isOpen && !(isMounted && isCollapsed) && (
+                      <div className="ml-3.5 mt-1.5 space-y-1.5 border-l border-slate-850 pl-4 animate-fadeIn">
                         {section.items.map((item) => {
                           const isActive = pathname === item.href;
                           return (
@@ -297,10 +323,10 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
                               key={item.href}
                               href={item.href}
                               className={cn(
-                                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all",
-                                isActive 
-                                  ? "bg-blue-600 text-white" 
-                                  : "text-slate-350 hover:bg-slate-800 hover:text-white"
+                                "flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all text-xs font-bold",
+                                isActive
+                                  ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md font-extrabold"
+                                  : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
                               )}
                             >
                               <span className="text-sm shrink-0">{item.icon}</span>
@@ -309,60 +335,36 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
                           );
                         })}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </nav>
+        </div>
 
-                  {/* Expanded submenu */}
-                  {isOpen && !(isMounted && isCollapsed) && (
-                    <div className="ml-3 mt-1.5 space-y-1 border-l-2 border-slate-700 pl-3.5 animate-fadeIn">
-                      {section.items.map((item) => {
-                        const isActive = pathname === item.href;
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className={cn(
-                              "flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-xs font-bold",
-                              isActive
-                                ? "bg-blue-600 text-white shadow-sm font-black"
-                                : "text-slate-350 hover:bg-slate-750 hover:text-white"
-                            )}
-                          >
-                            <span className="text-sm shrink-0">{item.icon}</span>
-                            <span className="whitespace-nowrap">{t(item.label)}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })
+        {/* Collapse Arrow Button & Copyright */}
+        <div className="mt-auto pt-4 border-t border-slate-900 flex flex-col items-center gap-3">
+          <button
+            onClick={toggleCollapse}
+            className="w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-white flex items-center justify-center transition-all shadow border border-slate-850 cursor-pointer active:scale-95 shrink-0"
+            title={isCollapsed ? t('common.expandMenu') : t('common.collapseMenu')}
+          >
+            <span className="text-xs font-bold leading-none">
+              {isMounted && isCollapsed ? '▶' : '◀'}
+            </span>
+          </button>
+          {!(isMounted && isCollapsed) ? (
+            <div className="text-[9px] text-slate-500 text-center font-bold uppercase tracking-wider animate-fadeIn">
+              © 2026 HR System
+              <span className="block mt-0.5 text-slate-650 font-medium">Developed by Team Bawui Dev</span>
+            </div>
+          ) : (
+            <div className="text-[8px] text-slate-600 text-center font-bold font-mono tracking-tighter" title="Developed by Team Bawui Dev">
+              BAWUI
+            </div>
           )}
-        </nav>
-      </div>
-
-      {/* Collapse Arrow Button & Copyright */}
-      <div className="mt-auto p-4 border-t border-slate-700 flex flex-col items-center gap-3">
-        <button
-          onClick={toggleCollapse}
-          className="w-8 h-8 rounded-full bg-slate-700 hover:bg-slate-650 text-white flex items-center justify-center transition-all shadow border border-slate-600 hover:border-slate-500 cursor-pointer active:scale-95 shrink-0"
-          title={isCollapsed ? t('common.expandMenu') : t('common.collapseMenu')}
-        >
-          <span className="text-xs font-bold leading-none">
-            {isMounted && isCollapsed ? '▶' : '◀'}
-          </span>
-        </button>
-        {!(isMounted && isCollapsed) ? (
-          <div className="text-[9px] text-slate-400 text-center font-bold uppercase tracking-wider animate-fadeIn">
-            © 2026 HR System
-            <span className="block mt-0.5 text-slate-500 font-medium">Developed by Team Bawui Dev</span>
-          </div>
-        ) : (
-          <div className="text-[8px] text-slate-500 text-center font-bold font-mono tracking-tighter" title="Developed by Team Bawui Dev">
-            BAWUI
-          </div>
-        )}
+        </div>
       </div>
     </aside>
   );

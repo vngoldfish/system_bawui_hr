@@ -213,11 +213,11 @@ export default function ReportsClient({ employees }: { employees: Employee[] }) 
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card title={isVi ? 'Nhân sự theo bộ phận' : isEn ? 'Headcount by Department' : isZh ? '各部门人数' : isTh ? 'จำนวนคนแบ่งตามแผนก' : '部署別人数'} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+            <Card title={isVi ? 'Nhân sự theo bộ phận' : isEn ? 'Headcount by Department' : isZh ? '各部门人数' : isTh ? 'จำนวนคนแบ่งตามแผนก' : '部署別人数'} className="">
               <BarChart data={stats.byDept.map((d, i) => ({ label: getDepartmentLabel(d.department, t), value: d.count, color: deptColors[i % deptColors.length] }))}
                 maxVal={Math.max(...stats.byDept.map(d => d.count))} />
             </Card>
-            <Card title={isVi ? 'Nhân sự theo chức vụ' : isEn ? 'Headcount by Position' : isZh ? '各职位人数' : isTh ? 'จำนวนคนแบ่งตามตำแหน่ง' : '役職別人数'} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+            <Card title={isVi ? 'Nhân sự theo chức vụ' : isEn ? 'Headcount by Position' : isZh ? '各职位人数' : isTh ? 'จำนวนคนแบ่งตามตำแหน่ง' : '役職別人数'} className="">
               <BarChart data={stats.byPosition.map((d, i) => ({ label: getPositionLabel(d.position, t), value: d.count, color: posColors[i % posColors.length] }))}
                 maxVal={Math.max(...stats.byPosition.map(d => d.count))} />
             </Card>
@@ -230,7 +230,7 @@ export default function ReportsClient({ employees }: { employees: Employee[] }) 
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {stats.byDept.map((dept, i) => (
-              <Card key={dept.department} title="" className="bg-white border border-slate-200/60 shadow-sm rounded-2xl animate-fadeIn">
+              <Card key={dept.department} title="" className="animate-fadeIn">
                 <div className="p-1">
                   <div className="flex items-center gap-3 mb-4">
                     <div className={`w-10 h-10 rounded-xl ${deptColors[i % deptColors.length]} flex items-center justify-center text-white text-base font-black shadow-sm`}>
@@ -272,7 +272,7 @@ export default function ReportsClient({ employees }: { employees: Employee[] }) 
             ))}
           </div>
 
-          <Card title={isVi ? 'So sánh lương giữa các bộ phận' : isEn ? 'Salary Comparison by Department' : isZh ? '各部门平均薪资对比' : isTh ? 'เปรียบเทียบเงินเดือนเฉลี่ยแต่ละแผนก' : '部署別 給与比較'} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl animate-fadeIn">
+          <Card title={isVi ? 'So sánh lương giữa các bộ phận' : isEn ? 'Salary Comparison by Department' : isZh ? '各部门平均薪资对比' : isTh ? 'เปรียบเทียบเงินเดือนเฉลี่ยแต่ละแผนก' : '部署別 給与比較'} className="animate-fadeIn">
             <BarChart data={stats.byDept.map((d, i) => ({ label: getDepartmentLabel(d.department, t), value: d.avgSalary, color: deptColors[i % deptColors.length] }))}
               maxVal={Math.max(...stats.byDept.map(d => d.avgSalary))} />
           </Card>
@@ -282,13 +282,13 @@ export default function ReportsClient({ employees }: { employees: Employee[] }) 
       {/* Salary Report */}
       {selectedReport === 'salary' && (
         <>
-          <Card title={isVi ? 'Phân bổ mức lương' : isEn ? 'Salary Distribution' : isZh ? '薪资区间分布图' : isTh ? 'ช่วงการกระจายเงินเดือน' : '給与分布'} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+          <Card title={isVi ? 'Phân bổ mức lương' : isEn ? 'Salary Distribution' : isZh ? '薪资区间分布图' : isTh ? 'ช่วงการกระจายเงินเดือน' : '給与分布'} className="">
             <BarChart data={stats.salaryRanges.map((d, i) => ({
               label: d.label, value: d.count, color: ['bg-blue-400', 'bg-blue-500', 'bg-blue-600', 'bg-blue-700', 'bg-blue-800', 'bg-blue-900'][i],
             }))} maxVal={Math.max(...stats.salaryRanges.map(d => d.count))} />
           </Card>
 
-          <Card title={isVi ? 'Phân tích lương theo chức vụ' : isEn ? 'Salary Analytics by Position' : isZh ? '各职位薪资分析' : isTh ? 'วิเคราะห์เงินเดือนแบ่งตามตำแหน่ง' : '役職別 給与分析'} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+          <Card title={isVi ? 'Phân tích lương theo chức vụ' : isEn ? 'Salary Analytics by Position' : isZh ? '各职位薪资分析' : isTh ? 'วิเคราะห์เงินเดือนแบ่งตามตำแหน่ง' : '役職別 給与分析'} className="">
             <div className="overflow-x-auto rounded-xl border border-slate-200/60">
               <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '750px' }}>
                 <colgroup>
@@ -330,7 +330,7 @@ export default function ReportsClient({ employees }: { employees: Employee[] }) 
             </div>
           </Card>
 
-          <Card title={isVi ? 'Top 5 nhân viên lương cao nhất' : isEn ? 'Top 5 Salaries' : isZh ? '薪资排名前五 (TOP 5)' : isTh ? 'อันดับเงินเดือนสูงสุด 5 อันดับแรก' : '給与 TOP 5'} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+          <Card title={isVi ? 'Top 5 nhân viên lương cao nhất' : isEn ? 'Top 5 Salaries' : isZh ? '薪资排名前五 (TOP 5)' : isTh ? 'อันดับเงินเดือนสูงสุด 5 อันดับแรก' : '給与 TOP 5'} className="">
             <div className="space-y-3">
               {[...employees].sort((a, b) => b.salary - a.salary).slice(0, 5).map((e, i) => (
                 <div key={e.id} className="flex items-center gap-3 p-3 bg-slate-50 border rounded-2xl hover:shadow-xs transition-all duration-350">
@@ -353,20 +353,20 @@ export default function ReportsClient({ employees }: { employees: Employee[] }) 
       {selectedReport === 'demographics' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card title={isVi ? 'Tỷ lệ nhân sự theo bộ phận' : isEn ? 'Department Composition' : isZh ? '各部门人员占比' : isTh ? 'สัดส่วนจำนวนคนแยกตามแผนก' : '部署別 構成比'} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+            <Card title={isVi ? 'Tỷ lệ nhân sự theo bộ phận' : isEn ? 'Department Composition' : isZh ? '各部门人员占比' : isTh ? 'สัดส่วนจำนวนคนแยกตามแผนก' : '部署別 構成比'} className="">
               <DonutChart data={stats.byDept.map((d, i) => ({
                 label: getDepartmentLabel(d.department, t), value: d.count, color: deptColors[i % deptColors.length],
               }))} locale={locale} />
             </Card>
 
-            <Card title={isVi ? 'Tỷ lệ nhân sự theo chức vụ' : isEn ? 'Position Composition' : isZh ? '各职位人员占比' : isTh ? 'สัดส่วนจำนวนคนแยกตามตำแหน่ง' : '役職別 構成比'} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+            <Card title={isVi ? 'Tỷ lệ nhân sự theo chức vụ' : isEn ? 'Position Composition' : isZh ? '各职位人员占比' : isTh ? 'สัดส่วนจำนวนคนแยกตามตำแหน่ง' : '役職別 構成比'} className="">
               <DonutChart data={stats.byPosition.map((d, i) => ({
                 label: getPositionLabel(d.position, t), value: d.count, color: posColors[i % posColors.length],
               }))} locale={locale} />
             </Card>
           </div>
 
-          <Card title={isVi ? 'Tải xuống danh sách nhân viên' : isEn ? 'Download Employee List' : isZh ? '员工名册/数据导出' : isTh ? 'ดาวน์โหลดรายชื่อพนักงาน' : '従業員一覧 ダウンロード'} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+          <Card title={isVi ? 'Tải xuống danh sách nhân viên' : isEn ? 'Download Employee List' : isZh ? '员工名册/数据导出' : isTh ? 'ดาวน์โหลดรายชื่อพนักงาน' : '従業員一覧 ダウンロード'} className="">
             <div className="flex gap-3">
               <button className="px-4.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow-md cursor-pointer">
                 {t('reports.exportExcel')}

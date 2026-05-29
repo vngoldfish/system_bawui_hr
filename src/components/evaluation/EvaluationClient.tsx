@@ -276,7 +276,7 @@ export default function EvaluationClient({ employees }: { employees: Employee[] 
       )}
 
       {/* Grade Distribution */}
-      <Card title={t('evaluation.cardDistribution')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+      <Card title={t('evaluation.cardDistribution')} className="">
         <p className="text-xs text-slate-400 -mt-2 mb-4">{t('evaluation.distributionSubtitle')}</p>
         <div className="grid grid-cols-5 gap-3.5">
           {stats.gradeDist.map(g => (
@@ -290,7 +290,7 @@ export default function EvaluationClient({ employees }: { employees: Employee[] 
       </Card>
 
       {/* Evaluations Table */}
-      <Card title={t('evaluation.cardList')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+      <Card title={t('evaluation.cardList')} className="">
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

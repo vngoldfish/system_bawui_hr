@@ -362,7 +362,7 @@ export default function AuditLogsClient({
       </div>
 
       {/* Filter controls */}
-      <Card className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+      <Card className="">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
           {/* Keyword Search */}
           <div className="relative lg:col-span-2">
@@ -428,7 +428,7 @@ export default function AuditLogsClient({
       </Card>
 
       {/* Logs Table Card */}
-      <Card className="bg-white border border-slate-200/60 shadow-sm rounded-2xl overflow-hidden p-0 relative">
+      <Card className="overflow-hidden p-0 relative">
         {loading && (
           <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>

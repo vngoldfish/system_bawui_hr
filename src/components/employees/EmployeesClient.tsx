@@ -221,16 +221,16 @@ function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee
 
   return (
     <Portal>
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-100 animate-fadeIn" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-premium max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-100 animate-fadeIn" onClick={e => e.stopPropagation()}>
         {/* Modal Header */}
         <div className="p-6 border-b border-slate-100 flex-shrink-0 flex items-center justify-between bg-slate-50/50 rounded-t-3xl relative">
           <div className="flex items-center gap-4">
             <div className="relative">
               {employee.avatar ? (
-                <img src={employee.avatar} alt="" className="w-16 h-16 rounded-full object-cover ring-4 ring-blue-50 shadow-md" />
+                <img src={employee.avatar} alt="" className="w-16 h-16 rounded-full object-cover ring-4 ring-indigo-50 shadow-md" />
               ) : (
-                <div className="w-16 h-16 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-md ring-4 ring-blue-50">
+                <div className="w-16 h-16 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-md ring-4 ring-indigo-50">
                   {employee.firstNameKana?.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -239,8 +239,8 @@ function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-blue-600 font-mono font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60">{employee.employeeCode}</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                  employee.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' :
-                  employee.status === 'ON_LEAVE' ? 'bg-blue-50 text-blue-700 border-blue-200/60' :
+                  employee.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-700 border-emerald-250/20' :
+                  employee.status === 'ON_LEAVE' ? 'bg-blue-500/10 text-blue-700 border-blue-250/20' :
                   'bg-slate-50 text-slate-400 border-slate-200/60'
                 }`}>
                   {employee.status === 'ACTIVE' ? t('client.statusActive') : employee.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive')}
@@ -251,24 +251,24 @@ function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleExportPDF} className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-xs font-bold flex items-center gap-1.5 shadow-sm hover:scale-[1.02] active:scale-95 transition-all">
+            <button onClick={handleExportPDF} className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:scale-[1.02] active:scale-95 transition-all">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               {t('client.pdfBtn')}
             </button>
-            <button onClick={onEdit} className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-xs font-bold shadow-sm hover:scale-[1.02] active:scale-95 transition-all">{t('client.editBtn')}</button>
+            <button onClick={onEdit} className="px-4 py-2 premium-btn-primary rounded-xl text-xs font-bold shadow-sm hover:scale-[1.02] active:scale-95 transition-all">{t('client.editBtn')}</button>
             <button onClick={onClose} className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-400 hover:text-slate-655 flex items-center justify-center text-lg leading-none hover:bg-slate-50 transition-colors">&times;</button>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex bg-slate-100/80 p-1.5 rounded-2xl mx-6 my-4 border border-slate-200/50 flex-shrink-0 gap-1">
+        <div className="flex bg-slate-100/60 p-1 rounded-2xl mx-6 my-4 border border-slate-205/50 flex-shrink-0 gap-1">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-xl transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200/10'
+                  ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/10'
                   : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
               }`}
             >
@@ -958,12 +958,12 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
           {
             label: t('client.totalEmployees'),
             value: statusCounts.all,
-            color: 'text-slate-900',
-            borderColor: 'border-slate-200/80',
+            color: 'text-slate-800',
+            borderColor: 'border-slate-200/50',
             bg: 'bg-white',
             accent: 'bg-slate-500',
             icon: (
-              <svg className="w-5 h-5 text-slate-505" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             )
@@ -972,7 +972,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
             label: t('client.statusActive'),
             value: statusCounts.active,
             color: 'text-emerald-600',
-            borderColor: 'border-emerald-200/80',
+            borderColor: 'border-emerald-200/40',
             bg: 'bg-emerald-50/20',
             accent: 'bg-emerald-500',
             icon: (
@@ -986,7 +986,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
             label: t('client.statusLeave'),
             value: statusCounts.onLeave,
             color: 'text-sky-600',
-            borderColor: 'border-sky-200/80',
+            borderColor: 'border-sky-200/40',
             bg: 'bg-sky-50/20',
             accent: 'bg-sky-500',
             icon: (
@@ -999,7 +999,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
             label: t('client.statusInactive'),
             value: statusCounts.inactive,
             color: 'text-slate-400',
-            borderColor: 'border-slate-200/80',
+            borderColor: 'border-slate-200/40',
             bg: 'bg-slate-50/30',
             accent: 'bg-slate-300',
             icon: (
@@ -1009,16 +1009,16 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
             )
           },
         ].map(s => (
-          <div key={s.label} className={`${s.bg} border ${s.borderColor} rounded-2xl p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.06)] flex justify-between items-start relative overflow-hidden group`}>
+          <div key={s.label} className={`${s.bg} border ${s.borderColor} rounded-3xl p-5 shadow-premium transition-all duration-300 hover:translate-y-[-2px] hover:shadow-premium-hover flex justify-between items-start relative overflow-hidden group`}>
             <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-transparent to-transparent group-hover:from-blue-500 group-hover:to-indigo-600 transition-all duration-300" />
             <div className="space-y-2">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{s.label}</span>
               <div className="flex items-baseline gap-1.5">
-                <span className={`text-3xl font-extrabold ${s.color} tracking-tight`}>{s.value}</span>
+                <span className={`text-3xl font-black ${s.color} tracking-tight`}>{s.value}</span>
                 <span className="text-xs text-slate-400 font-bold">{t('common.personUnit')}</span>
               </div>
             </div>
-            <div className="p-3 bg-white border border-slate-100 rounded-xl shadow-sm flex items-center justify-center relative">
+            <div className="p-3 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-center justify-center relative">
               {s.pulse && (
                 <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -1044,13 +1044,13 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
         }
       >
         {/* Search & Export */}
-        <div className="flex flex-col lg:flex-row gap-3 mb-6 bg-slate-50/50 p-4 border border-slate-200/60 rounded-2xl">
+        <div className="flex flex-col lg:flex-row gap-3 mb-6 bg-slate-50/30 p-4 border border-slate-200/40 rounded-3xl">
           <div className="flex flex-col sm:flex-row gap-2.5 flex-1">
             <div className="relative">
               <select
                 value={searchField}
                 onChange={e => { setSearchField(e.target.value); setCurrentPage(1); }}
-                className="pl-3 pr-8 py-2.5 border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer select-none appearance-none shadow-xs w-full sm:w-[140px]"
+                className="pl-3 pr-8 py-2.5 premium-input rounded-xl text-xs font-bold bg-white cursor-pointer select-none appearance-none w-full sm:w-[140px]"
               >
                 <option value="all">{t('client.searchAll')}</option>
                 <option value="name">{t('client.colName')}</option>
@@ -1079,28 +1079,28 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                 placeholder={searchField === 'all' ? t('client.searchFieldPrompt') : t('client.searchFieldPromptSelected')}
                 value={search}
                 onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-9 pr-4 py-2.5 border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs shadow-xs"
+                className="w-full pl-9 pr-4 py-2.5 premium-input rounded-xl text-xs"
               />
             </div>
           </div>
           <div className="flex flex-wrap sm:flex-nowrap gap-2.5 items-center">
             <select value={columnFilters.department?.[0] || ''} onChange={e => handleColumnFilter('department', e.target.value ? [e.target.value] : [])}
-              className="px-3 py-2.5 border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs">
+              className="px-3 py-2.5 premium-input rounded-xl text-xs font-bold bg-white cursor-pointer">
               <option value="">{t('client.allDepts')}</option>
               {departments.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
             </select>
             <select value={columnFilters.status?.[0] || ''} onChange={e => handleColumnFilter('status', e.target.value ? [e.target.value] : [])}
-              className="px-3 py-2.5 border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs">
+              className="px-3 py-2.5 premium-input rounded-xl text-xs font-bold bg-white cursor-pointer">
               <option value="">{t('client.allStatuses')}</option>
               {statusOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
             <div className="relative">
-              <button onClick={() => setShowColumnSettings(!showColumnSettings)} className="px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 flex items-center gap-1.5 shadow-xs bg-white">
+              <button onClick={() => setShowColumnSettings(!showColumnSettings)} className="px-3.5 py-2.5 premium-input rounded-xl text-xs font-bold hover:bg-slate-50 flex items-center gap-1.5 bg-white cursor-pointer">
                 <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 {t('client.displayCols')}
               </button>
               {showColumnSettings && (
-                <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200/80 rounded-2xl shadow-xl z-20 p-4 min-w-[200px] animate-fadeIn">
+                <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200/50 rounded-3xl shadow-premium z-20 p-4 min-w-[200px] animate-fadeIn">
                   <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider pb-1.5 border-b">{t('common.selectColumns')}</p>
                   <div className="space-y-1 max-h-[240px] overflow-y-auto pr-1">
                     {allColumns.map(col => (
@@ -1145,7 +1145,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto border border-slate-200/70 rounded-2xl shadow-xs mb-5 bg-white">
+        <div className="overflow-x-auto border border-slate-200/65 rounded-2xl shadow-premium mb-5 bg-white">
           <table className="table-fixed border-collapse" style={{ width: '100%', minWidth: `${totalTableWidth}px` }}>
             <colgroup>
               {activeColumns.map(col => (
@@ -1154,7 +1154,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
               <col style={{ width: '100px' }} />
             </colgroup>
             <thead>
-              <tr className="bg-slate-50/75 border-b border-slate-200">
+              <tr className="bg-slate-50/80 border-b border-slate-200/60 text-slate-500 text-xs">
                 {activeColumns.map(col => (
                   <th
                     key={col.key}
@@ -1272,15 +1272,15 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-200">
+        <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-200/60">
           <p className="text-xs text-slate-500 font-bold">
             {getPaginationText((currentPage - 1) * PAGE_SIZE + 1, Math.min(currentPage * PAGE_SIZE, filtered.length), filtered.length)}
           </p>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 font-mono">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-3.5 py-2 text-xs font-bold border border-slate-200/80 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed bg-white shadow-xs"
+              className="px-3.5 py-2 text-xs font-bold border border-slate-200/60 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed bg-white shadow-xs"
             >
               {t('client.prev')}
             </button>
@@ -1290,8 +1290,8 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                 onClick={() => setCurrentPage(page)}
                 className={`px-3 py-1.5 text-xs font-extrabold rounded-xl transition-all ${
                   page === currentPage
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'border border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                    ? 'bg-indigo-600 text-white shadow-sm border border-indigo-600/20'
+                    : 'border border-slate-200/60 bg-white hover:bg-slate-50 text-slate-700'
                 }`}
               >
                 {page}
@@ -1300,7 +1300,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="px-3.5 py-2 text-xs font-bold border border-slate-200/80 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed bg-white shadow-xs"
+              className="px-3.5 py-2 text-xs font-bold border border-slate-200/60 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed bg-white shadow-xs"
             >
               {t('client.next')}
             </button>

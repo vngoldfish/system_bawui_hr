@@ -169,7 +169,7 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Basic Info */}
-        <Card title={t('company.cardBasic')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+        <Card title={t('company.cardBasic')} className="">
           <div className="space-y-4">
             <Field label={t('company.labelName')} value={data.name} editing={editing} onChange={v => handleChange('name', v)} />
             <Field label={t('company.labelNameKana')} value={data.nameKana} editing={editing} onChange={v => handleChange('nameKana', v)} />
@@ -184,7 +184,7 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
         </Card>
 
         {/* Contact Info */}
-        <Card title={t('company.cardContact')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+        <Card title={t('company.cardContact')} className="">
           <div className="space-y-4">
             <Field label={t('company.labelAddress')} value={data.address} editing={editing} onChange={v => handleChange('address', v)} textarea />
             <Field label={t('company.labelPhone')} value={data.phone} editing={editing} onChange={v => handleChange('phone', v)} type="tel" />
@@ -195,7 +195,7 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
         </Card>
 
         {/* Bank Info */}
-        <Card title={t('company.cardBank')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+        <Card title={t('company.cardBank')} className="">
           <div className="space-y-4">
             <Field label={t('company.labelBankName')} value={data.bankName} editing={editing} onChange={v => handleChange('bankName', v)} />
             <Field label={t('company.labelBranchName')} value={data.branchName} editing={editing} onChange={v => handleChange('branchName', v)} />
@@ -206,7 +206,7 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
         </Card>
 
         {/* Payroll Settings */}
-        <Card title={t('company.cardSettings')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+        <Card title={t('company.cardSettings')} className="">
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
               <label className="text-xs font-bold text-slate-500 uppercase sm:w-32 flex-shrink-0">{t('company.labelCutoff')}</label>
@@ -264,7 +264,7 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
         </Card>
 
         {/* Preview Card */}
-        <Card title={t('company.cardPreview')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+        <Card title={t('company.cardPreview')} className="">
           <div className="bg-slate-50 rounded-2xl p-6 border">
             <div className="text-center mb-6">
               <h2 className="text-lg font-black text-slate-850">{data.name}</h2>

@@ -300,23 +300,25 @@ export default function DepartmentsClient({
             <div
               key={dept.id}
               onClick={() => handleSelectDept(dept)}
-              className={`p-5 rounded-2xl border transition-all duration-300 cursor-pointer flex flex-col justify-between ${
+              className={`p-6 rounded-3xl border transition-all duration-300 cursor-pointer flex flex-col justify-between ${
                 isSelected
-                  ? 'bg-blue-50/40 border-blue-500 ring-2 ring-blue-500/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)]'
-                  : 'bg-white border-slate-200/60 hover:border-slate-350 hover:shadow-md hover:-translate-y-0.5'
+                  ? 'bg-gradient-to-br from-indigo-50/60 to-blue-50/20 border-indigo-500/80 shadow-premium ring-4 ring-indigo-500/10'
+                  : 'bg-white border-slate-200/50 hover:border-slate-300 hover:shadow-premium-hover shadow-premium hover:-translate-y-1'
               }`}
             >
-              <div className="flex justify-between items-start">
-                <div className="min-w-0 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl filter drop-shadow-sm">{icon}</span>
-                    <h3 className="text-sm font-extrabold text-slate-800 truncate tracking-wide">{dept.name}</h3>
+              <div className="flex justify-between items-start gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-xl shadow-xs flex-shrink-0">
+                    {icon}
                   </div>
-                  <p className="text-[10px] text-slate-400 font-bold tracking-wider truncate uppercase">{dept.nameKana}</p>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-black text-slate-800 truncate tracking-wide">{dept.name}</h3>
+                    <p className="text-[10px] text-slate-400 font-extrabold tracking-wider truncate uppercase">{dept.nameKana}</p>
+                  </div>
                 </div>
-                <div className="text-right ml-2 bg-slate-50 border border-slate-200/80 px-3 py-1 rounded-xl">
-                  <p className="text-sm font-black text-blue-600 tracking-tight">{dept._count?.employees || 0}</p>
-                  <p className="text-[9px] text-slate-450 font-bold -mt-0.5">{t('common.personUnit').trim()}</p>
+                <div className="bg-indigo-50/50 border border-indigo-100/30 px-2.5 py-1 rounded-xl text-center flex flex-col justify-center min-w-[48px] h-10 flex-shrink-0">
+                  <p className="text-sm font-black text-indigo-600 tracking-tight leading-none">{dept._count?.employees || 0}</p>
+                  <p className="text-[9px] text-indigo-500 font-bold mt-1 leading-none">{t('common.personUnit').trim()}</p>
                 </div>
               </div>
               {dept.description && (
@@ -357,21 +359,26 @@ export default function DepartmentsClient({
           {deptStats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: t('departments.totalPayroll'), value: formatCurrency(deptStats.totalSalary), color: 'text-slate-800', bg: 'bg-white border-slate-200/60 shadow-sm' },
-                { label: t('departments.averageSalary'), value: formatCurrency(deptStats.avgSalary), color: 'text-blue-600', bg: 'bg-white border-slate-200/60 shadow-sm' },
-                { label: t('departments.ratioLabel'), value: `${deptStats.activeCount} / ${deptStats.onLeaveCount} / ${deptStats.inactiveCount}`, color: 'text-slate-800', bg: 'bg-white border-slate-200/60 shadow-sm' },
+                { label: t('departments.totalPayroll'), value: formatCurrency(deptStats.totalSalary), color: 'text-slate-800', bg: 'bg-white border-slate-200/50 shadow-premium', accent: 'bg-indigo-500' },
+                { label: t('departments.averageSalary'), value: formatCurrency(deptStats.avgSalary), color: 'text-blue-600', bg: 'bg-white border-slate-200/50 shadow-premium', accent: 'bg-blue-500' },
+                { label: t('departments.ratioLabel'), value: `${deptStats.activeCount} / ${deptStats.onLeaveCount} / ${deptStats.inactiveCount}`, color: 'text-slate-800', bg: 'bg-white border-slate-200/50 shadow-premium', accent: 'bg-violet-500' },
                 {
                   label: t('departments.attendanceRate'),
                   value: monthlyStats.length > 0 && monthlyStats[monthlyStats.length - 1].total > 0
                     ? `${Math.round((monthlyStats[monthlyStats.length - 1].present / (monthlyStats[monthlyStats.length - 1].total)) * 100)}%`
                     : '-',
                   color: 'text-emerald-600',
-                  bg: 'bg-emerald-50/40 border-emerald-100 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.1)]',
+                  bg: 'bg-emerald-50/20 border-emerald-200/60 shadow-premium',
+                  accent: 'bg-emerald-500',
                 },
               ].map((kpi, idx) => (
-                <div key={idx} className={`${kpi.bg} p-4.5 rounded-2xl border`}>
-                  <p className="text-xs text-slate-500 font-semibold mb-1">{kpi.label}</p>
-                  <p className={`text-lg font-black tracking-tight ${kpi.color}`}>{kpi.value}</p>
+                <div key={idx} className={`${kpi.bg} p-5 rounded-3xl border transition-all hover:translate-y-[-2px] hover:shadow-premium-hover flex justify-between items-center relative overflow-hidden group`}>
+                  <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-transparent to-transparent group-hover:from-blue-500 group-hover:to-indigo-600 transition-all duration-300" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{kpi.label}</p>
+                    <p className={`text-xl font-extrabold tracking-tight ${kpi.color}`}>{kpi.value}</p>
+                  </div>
+                  <div className={`w-2.5 h-2.5 rounded-full ${kpi.accent} opacity-60`} />
                 </div>
               ))}
             </div>
@@ -381,7 +388,7 @@ export default function DepartmentsClient({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Clustered Column Chart - Redesigned with proper SVG rounded gradients */}
             <div className="lg:col-span-2">
-              <Card title={t('departments.attendanceHistoryTitle')} className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+              <Card title={t('departments.attendanceHistoryTitle')} className="">
                 <p className="text-xs text-slate-400 -mt-2 mb-6">{t('departments.attendanceHistoryDesc')}</p>
                 {monthlyStats.length > 0 ? (
                   <div className="relative h-64 w-full">
@@ -424,7 +431,7 @@ export default function DepartmentsClient({
                           <g key={mIdx}>
                             {/* Present Bar */}
                             <g className="group cursor-pointer">
-                              <rect x={xStart - 12} y={160 - hPresent - 22} width="40" height="18" rx="5" fill="#1e293b" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                              <rect x={xStart - 42} y={160 - hPresent - 22} width="100" height="18" rx="5" fill="#0f172a" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                               <text x={xStart + 8} y={160 - hPresent - 10} fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                 {t('departments.presentCount').replace('{count}', String(stat.present))}
                               </text>
@@ -441,7 +448,7 @@ export default function DepartmentsClient({
 
                             {/* Late Bar */}
                             <g className="group cursor-pointer">
-                              <rect x={xStart + 8} y={160 - hLate - 22} width="40" height="18" rx="5" fill="#1e293b" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                              <rect x={xStart - 22} y={160 - hLate - 22} width="100" height="18" rx="5" fill="#0f172a" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                               <text x={xStart + 28} y={160 - hLate - 10} fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                 {t('departments.lateCount').replace('{count}', String(stat.late))}
                               </text>
@@ -458,7 +465,7 @@ export default function DepartmentsClient({
 
                             {/* Absent Bar */}
                             <g className="group cursor-pointer">
-                              <rect x={xStart + 28} y={160 - hAbsent - 22} width="40" height="18" rx="5" fill="#1e293b" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                              <rect x={xStart - 2} y={160 - hAbsent - 22} width="100" height="18" rx="5" fill="#0f172a" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                               <text x={xStart + 48} y={160 - hAbsent - 10} fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle" className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                 {t('departments.absentCount').replace('{count}', String(stat.absent))}
                               </text>
@@ -504,17 +511,17 @@ export default function DepartmentsClient({
 
             {/* Department Breakdown / Labor Cost Details */}
             <div className="lg:col-span-1">
-              <Card title={t('departments.ratioTitle')} className="bg-white border border-slate-200/60 shadow-sm h-full rounded-2xl">
+              <Card title={t('departments.ratioTitle')} className="h-full">
                 <p className="text-xs text-slate-400 -mt-2 mb-4">{t('departments.ratioDesc')}</p>
                 {deptStats ? (
                   <div className="space-y-5">
                     {/* Status Progress Tracks */}
                     <div className="space-y-3">
-                      <h4 className="text-xs font-bold text-slate-455 uppercase tracking-wider">{t('departments.ratioHeader')}</h4>
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('departments.ratioHeader')}</h4>
                       {[
-                        { label: t('client.statusActive'), count: deptStats.activeCount, color: 'bg-emerald-550', total: employees.length },
-                        { label: t('client.statusLeave'), count: deptStats.onLeaveCount, color: 'bg-amber-550', total: employees.length },
-                        { label: t('client.statusInactive'), count: deptStats.inactiveCount, color: 'bg-slate-350', total: employees.length },
+                        { label: t('client.statusActive'), count: deptStats.activeCount, color: 'bg-emerald-500', total: employees.length },
+                        { label: t('client.statusLeave'), count: deptStats.onLeaveCount, color: 'bg-amber-500', total: employees.length },
+                        { label: t('client.statusInactive'), count: deptStats.inactiveCount, color: 'bg-slate-400', total: employees.length },
                       ].map((item, idx) => {
                         const pct = item.total > 0 ? Math.round((item.count / item.total) * 100) : 0;
                         return (
@@ -532,8 +539,8 @@ export default function DepartmentsClient({
                     </div>
 
                     <div className="border-t border-slate-100 pt-4 space-y-2">
-                      <h4 className="text-xs font-bold text-slate-455 uppercase tracking-wider">{t('departments.payrollEstimateHeader')}</h4>
-                      <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl shadow-sm">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('departments.payrollEstimateHeader')}</h4>
+                      <div className="p-4.5 bg-slate-50/50 border border-slate-200/50 rounded-2xl shadow-sm">
                         <p className="text-[10px] text-slate-400 font-extrabold uppercase">Department Payroll Base</p>
                         <p className="text-xl font-black text-slate-800 tracking-tight mt-0.5">{formatCurrency(deptStats.totalSalary)}</p>
                         <p className="text-xs text-slate-500 font-semibold mt-2.5 border-t border-slate-200/60 pt-2">
@@ -552,7 +559,7 @@ export default function DepartmentsClient({
           {/* Members Table Card - Spacious, premium layout */}
           <Card
             title={t('departments.membersListTitle').replace('{dept}', selectedDept.name)}
-            className="bg-white border border-slate-200/60 shadow-sm rounded-2xl"
+            className=""
             action={
               <button
                 onClick={() => {
@@ -581,13 +588,13 @@ export default function DepartmentsClient({
                   placeholder={t('departments.searchPrompt')}
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  className="w-full pl-9 pr-4 py-2.5 premium-input rounded-xl text-sm"
                 />
               </div>
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
-                className="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                className="px-3 py-2.5 premium-input rounded-xl text-sm bg-white cursor-pointer"
               >
                 <option value="ALL">{t('departments.allStatuses')}</option>
                 <option value="ACTIVE">{t('client.statusActive')}</option>
@@ -597,7 +604,7 @@ export default function DepartmentsClient({
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as any)}
-                className="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                className="px-3 py-2.5 premium-input rounded-xl text-sm bg-white cursor-pointer"
               >
                 <option value="name">{t('departments.sortName')}</option>
                 <option value="salary">{t('departments.sortSalary')}</option>
@@ -614,7 +621,7 @@ export default function DepartmentsClient({
                 {t('departments.noMembersFound')}
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200/60">
+              <div className="overflow-x-auto border border-slate-200/65 rounded-2xl shadow-premium mb-5 bg-white">
                 <table className="w-full table-fixed text-left border-collapse" style={{ minWidth: '700px' }}>
                   <colgroup>
                     <col style={{ width: '120px' }} />
@@ -624,32 +631,32 @@ export default function DepartmentsClient({
                     <col style={{ width: '130px' }} />
                   </colgroup>
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="px-4 py-3">{t('departments.colCode')}</th>
-                      <th className="px-4 py-3">{t('departments.colName')}</th>
-                      <th className="px-4 py-3">{t('departments.colPos')}</th>
-                      <th className="px-4 py-3">{t('departments.colStatus')}</th>
-                      <th className="px-4 py-3 text-right">{t('departments.colSalary')}</th>
+                    <tr className="border-b border-slate-200/60 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="px-4 py-3.5">{t('departments.colCode')}</th>
+                      <th className="px-4 py-3.5">{t('departments.colName')}</th>
+                      <th className="px-4 py-3.5">{t('departments.colPos')}</th>
+                      <th className="px-4 py-3.5">{t('departments.colStatus')}</th>
+                      <th className="px-4 py-3.5 text-right">{t('departments.colSalary')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {filteredEmployees.map((emp) => {
                       const posName = typeof emp.position === 'object' ? emp.position?.name || '-' : emp.position || '-';
                       return (
-                        <tr key={emp.id} className="hover:bg-slate-50/30 transition-colors">
-                          <td className="px-4 py-3 font-mono text-xs text-blue-600 font-bold">{emp.employeeCode}</td>
-                          <td className="px-4 py-3 font-semibold text-slate-800">{emp.lastName} {emp.firstName}</td>
-                          <td className="px-4 py-3 text-slate-500 font-medium">{posName}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex px-2.5 py-0.5 rounded-lg text-xs font-bold ${
-                              emp.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border border-green-200' :
-                              emp.status === 'ON_LEAVE' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                              'bg-slate-100 text-slate-500 border border-slate-200'
+                        <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3.5 font-mono text-xs text-blue-600 font-bold">{emp.employeeCode}</td>
+                          <td className="px-4 py-3.5 font-semibold text-slate-800">{emp.lastName} {emp.firstName}</td>
+                          <td className="px-4 py-3.5 text-slate-500 font-medium">{posName}</td>
+                          <td className="px-4 py-3.5">
+                            <span className={`inline-flex px-2.5 py-0.5 rounded-lg text-xs font-bold border ${
+                              emp.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-700 border-emerald-250/20' :
+                              emp.status === 'ON_LEAVE' ? 'bg-amber-500/10 text-amber-700 border-amber-250/20' :
+                              'bg-slate-55/50 text-slate-400 border-slate-200/60'
                             }`}>
                               {emp.status === 'ACTIVE' ? t('client.statusActive') : emp.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive')}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right font-mono font-black text-slate-700">{formatCurrency(emp.salary)}</td>
+                          <td className="px-4 py-3.5 text-right font-mono font-black text-slate-700">{formatCurrency(emp.salary)}</td>
                         </tr>
                       );
                     })}

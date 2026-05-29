@@ -502,7 +502,7 @@ export default function RolesClient({ employees: initialEmployees, initialRolePe
       {activeTab === 'accounts' && (
         <>
           {/* Control Card */}
-          <Card className="bg-white border border-slate-200/60 shadow-sm rounded-2xl">
+          <Card className="">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="w-full md:max-w-md relative">
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -526,7 +526,7 @@ export default function RolesClient({ employees: initialEmployees, initialRolePe
           </Card>
 
           {/* Accounts Table Card */}
-          <Card className="bg-white border border-slate-200/60 shadow-sm rounded-2xl overflow-hidden p-0">
+          <Card className="overflow-hidden p-0">
             <div className="overflow-x-auto">
               <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '1000px' }}>
                 <colgroup>
@@ -659,7 +659,7 @@ export default function RolesClient({ employees: initialEmployees, initialRolePe
       {activeTab === 'matrix' && (
         <div className="space-y-4">
           {/* Instructions and Control Header */}
-          <Card className="bg-white border border-slate-200/60 shadow-sm rounded-2xl p-6">
+          <Card className="p-6">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
               <div>
                 <h3 className="text-base font-bold text-slate-800">
@@ -695,7 +695,7 @@ export default function RolesClient({ employees: initialEmployees, initialRolePe
           </Card>
 
           {/* Matrix Table */}
-          <Card className="bg-white border border-slate-200/60 shadow-sm rounded-2xl overflow-hidden p-0">
+          <Card className="overflow-hidden p-0">
             <div className="overflow-x-auto">
               <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '1000px' }}>
                 <colgroup>
