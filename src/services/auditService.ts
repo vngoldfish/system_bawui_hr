@@ -33,7 +33,7 @@ export function getAuditLogs({
   search?: string | null;
 }) {
   const logFilePath = path.join(process.cwd(), 'logs', 'audit.jsonl');
-  let logs: AuditLogEntry[] = [];
+  const logs: AuditLogEntry[] = [];
 
   if (fs.existsSync(logFilePath)) {
     const fileContent = fs.readFileSync(logFilePath, 'utf-8');

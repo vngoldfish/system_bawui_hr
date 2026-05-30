@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
 import Portal from '@/components/common/Portal';
@@ -53,7 +53,7 @@ export default function ShitensClient({
   const [loadingEmps, setLoadingEmps] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const fetchShitens = async () => {
+  const fetchShitens = useCallback(async () => {
     try {
       const res = await fetch('/api/shitens');
       if (!res.ok) throw new Error('Failed to fetch branches');
@@ -75,9 +75,9 @@ export default function ShitensClient({
     } catch (err) {
       console.error('Failed to fetch branches:', err);
     }
-  };
+  }, [selectedShiten]);
 
-  const fetchAllEmployees = async () => {
+  const fetchAllEmployees = useCallback(async () => {
     try {
       const res = await fetch('/api/employees?limit=1000');
       if (!res.ok) throw new Error('Failed to fetch employees');
@@ -88,12 +88,12 @@ export default function ShitensClient({
       console.error('Failed to fetch all employees:', err);
       setAllEmployees([]);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchShitens();
     fetchAllEmployees();
-  }, []);
+  }, [fetchShitens, fetchAllEmployees]);
 
   // Auto-select first branch on load if none selected
   useEffect(() => {
@@ -102,7 +102,7 @@ export default function ShitensClient({
       setSelectedShiten(first);
       setEmployees(first.employees || []);
     }
-  }, [shitens]);
+  }, [shitens, selectedShiten]);
 
   const handleSelectShiten = (shiten: Shiten) => {
     setSelectedShiten(shiten);

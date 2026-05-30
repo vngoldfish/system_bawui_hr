@@ -35,10 +35,29 @@ export async function POST(request: NextRequest) {
       return errorResponse('No file uploaded', 400);
     }
 
+    // 1. File size check (max 5MB)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      return errorResponse('File size exceeds the 5MB limit.', 400);
+    }
+
+    // 2. MIME type check
+    const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      return errorResponse('Invalid file type. Only JPEG, PNG, GIF, WEBP images and PDF files are allowed.', 400);
+    }
+
+    // 3. Extension check
+    const rawExt = file.name.split('.').pop()?.toLowerCase() || '';
+    const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+    if (!ALLOWED_EXTENSIONS.includes(rawExt)) {
+      return errorResponse('Invalid file extension.', 400);
+    }
+    const ext = rawExt;
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const ext = file.name.split('.').pop() || 'png';
     const timestamp = Date.now();
 
     // 1. Cloudinary Upload

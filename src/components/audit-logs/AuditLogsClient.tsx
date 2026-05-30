@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
 
@@ -233,21 +233,7 @@ export default function AuditLogsClient({
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Debounced search trigger or load handler
-  useEffect(() => {
-    // Skip initial mount fetch since we have initialLogs
-    if (page === 1 && search === '' && action === '' && model === '' && startDate === '' && endDate === '') {
-      return;
-    }
-    
-    const handler = setTimeout(() => {
-      fetchLogs();
-    }, 300);
-
-    return () => clearTimeout(handler);
-  }, [search, action, model, startDate, endDate, page]);
-
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -274,7 +260,21 @@ export default function AuditLogsClient({
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search, action, model, startDate, endDate]);
+
+  // Debounced search trigger or load handler
+  useEffect(() => {
+    // Skip initial mount fetch since we have initialLogs
+    if (page === 1 && search === '' && action === '' && model === '' && startDate === '' && endDate === '') {
+      return;
+    }
+    
+    const handler = setTimeout(() => {
+      fetchLogs();
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [fetchLogs, page, search, action, model, startDate, endDate]);
 
   // Reset page to 1 when filters change
   const handleFilterChange = (setter: (val: string) => void, val: string) => {

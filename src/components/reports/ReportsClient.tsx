@@ -88,21 +88,25 @@ function BarChart({ data, maxVal }: { data: { label: string; value: number; colo
 
 function DonutChart({ data, locale }: { data: { label: string; value: number; color: string }[]; locale: string }) {
   const total = data.reduce((s, d) => s + d.value, 0);
+  
+  const renderedCircles: React.ReactNode[] = [];
   let cumulative = 0;
+  for (const d of data) {
+    const pct = total > 0 ? (d.value / total) * 100 : 0;
+    const dasharray = `${pct} ${100 - pct}`;
+    const dashoffset = 100 - cumulative;
+    cumulative += pct;
+    renderedCircles.push(
+      <circle key={d.label} cx="18" cy="18" r="15.9" fill="none" stroke={d.color.replace('bg-', '').replace('-500', '')}
+        className={d.color} strokeWidth="3.5" strokeDasharray={dasharray} strokeDashoffset={dashoffset} />
+    );
+  }
+
   return (
     <div className="flex items-center gap-8">
       <div className="relative w-32 h-32 flex-shrink-0">
         <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-          {data.map(d => {
-            const pct = total > 0 ? (d.value / total) * 100 : 0;
-            const dasharray = `${pct} ${100 - pct}`;
-            const dashoffset = 100 - cumulative;
-            cumulative += pct;
-            return (
-              <circle key={d.label} cx="18" cy="18" r="15.9" fill="none" stroke={d.color.replace('bg-', '').replace('-500', '')}
-                className={d.color} strokeWidth="3.5" strokeDasharray={dasharray} strokeDashoffset={dashoffset} />
-            );
-          })}
+          {renderedCircles}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-xl font-black text-slate-800 leading-none">{total}</span>

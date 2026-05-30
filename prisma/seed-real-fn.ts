@@ -20,8 +20,39 @@ export async function seedReal(prisma: PrismaClient) {
   await prisma.contractType.deleteMany();
   await prisma.rolePermission.deleteMany();
   await prisma.permission.deleteMany();
+  await prisma.company.deleteMany();
 
   console.log('Cleaned all existing tables.');
+
+  // Create default Company
+  await prisma.company.create({
+    data: {
+      name: '株式会社ロング',
+      nameKana: 'カブシキガイシャロング',
+      representative: 'ロン グエン',
+      representativeTitle: '代表取締役',
+      established: '2015-04-01',
+      capital: '10,000,000円',
+      employees: '14名',
+      industry: 'IT・ソフトウェア',
+      registrationNumber: 'T1234567890123',
+      address: '〒100-0001 東京都千代田区千代田1-1-1 ロングビル3F',
+      phone: '03-1234-5678',
+      fax: '03-1234-5679',
+      email: 'info@long-corp.jp',
+      website: 'https://www.long-corp.jp',
+      bankName: '三菱UFJ銀行',
+      branchName: '東京支店',
+      accountType: '普通',
+      accountNumber: '1234567',
+      accountHolder: 'カブシキガイシャロング',
+      salaryCutoffDay: '末日',
+      payday: '25',
+      roundingPolicy: 'exact',
+    }
+  });
+
+  console.log('Seeded default company info.');
 
   // 2. Create basic departments
   const kanri = await prisma.department.create({ data: { name: '管理部', nameKana: 'かんりぶ', description: '管理業務全般' } });

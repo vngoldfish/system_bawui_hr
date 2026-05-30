@@ -150,7 +150,7 @@ export const translations: Record<string, Record<string, unknown>> = {
       },
     },
     auth: {
-      systemName: '人事管理システム',
+      systemName: 'BAWUI 人事管理システム',
       email: 'メールアドレス',
       password: 'パスワード',
       login: 'ログイン',
@@ -540,7 +540,7 @@ export const translations: Record<string, Record<string, unknown>> = {
       },
     },
     auth: {
-      systemName: 'HR Management System',
+      systemName: 'BAWUI HR Management System',
       email: 'Email Address',
       password: 'Password',
       login: 'Login',
@@ -930,7 +930,7 @@ export const translations: Record<string, Record<string, unknown>> = {
       },
     },
     auth: {
-      systemName: 'Hệ thống Quản lý Nhân sự',
+      systemName: 'Hệ thống Quản lý Nhân sự BAWUI',
       email: 'Địa chỉ email',
       password: 'Mật khẩu',
       login: 'Đăng nhập',
@@ -1323,7 +1323,7 @@ export const translations: Record<string, Record<string, unknown>> = {
       },
     },
     auth: {
-      systemName: '人事管理系统',
+      systemName: 'BAWUI 人事管理系统',
       email: '电子邮箱',
       password: '密码',
       login: '登录',
@@ -1900,36 +1900,32 @@ const I18nContext = createContext<I18nContextProps>({
 });
 
 export function I18nProvider({ children, initialLocale = 'ja' }: { children: React.ReactNode; initialLocale?: string }) {
-  const [locale, setLocaleState] = useState<string>(initialLocale);
-
-  useEffect(() => {
-    // 1. Check local storage
-    const localLang = window.localStorage.getItem('app_lang');
-    if (localLang && ['ja', 'en', 'vi', 'zh', 'th'].includes(localLang)) {
-      if (localLang !== locale) {
-        setLocaleState(localLang);
+  const [locale, setLocaleState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      // 1. Check local storage
+      const localLang = window.localStorage.getItem('app_lang');
+      if (localLang && ['ja', 'en', 'vi', 'zh', 'th'].includes(localLang)) {
+        return localLang;
       }
-      return;
-    }
-    // 2. Check session_user cookie
-    const cookieValue = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('session_user='))
-      ?.split('=')[1];
-    if (cookieValue) {
-      try {
-        const parsed = JSON.parse(decodeURIComponent(cookieValue));
-        if (parsed?.language && ['ja', 'en', 'vi', 'zh', 'th'].includes(parsed.language)) {
-          window.localStorage.setItem('app_lang', parsed.language);
-          if (parsed.language !== locale) {
-            setLocaleState(parsed.language);
+      // 2. Check session_user cookie
+      const cookieValue = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('session_user='))
+        ?.split('=')[1];
+      if (cookieValue) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(cookieValue));
+          if (parsed?.language && ['ja', 'en', 'vi', 'zh', 'th'].includes(parsed.language)) {
+            window.localStorage.setItem('app_lang', parsed.language);
+            return parsed.language;
           }
+        } catch (_) {
+          // ignore parsing errors
         }
-      } catch (_) {
-        // ignore parsing errors
       }
     }
-  }, [initialLocale]);
+    return initialLocale;
+  });
 
   const setLocale = (newLocale: string) => {
   if (!['ja', 'en', 'vi', 'zh', 'th'].includes(newLocale)) return;

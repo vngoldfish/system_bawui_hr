@@ -147,7 +147,7 @@ export default async function PayrollPage() {
         const monthStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
         
         const baseSalary = dbUser.salary || 450000;
-        const overtimeHours = Math.floor(Math.random() * 15);
+        const overtimeHours = (dbUser.firstName.length + current.getFullYear() + (current.getMonth() + 1)) % 15;
         const hourlyEquiv = baseSalary / 176;
         const overtimePay = Math.round(hourlyEquiv * 1.25 * overtimeHours);
         const allowances = 15000 + 30000 + 10000; // transportation, housing, meal

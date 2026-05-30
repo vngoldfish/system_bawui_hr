@@ -88,46 +88,69 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<CompanyInfo>(defaultCompany);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load from localStorage on mount
+  // Fetch company info from database API on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedInfo = localStorage.getItem('company_info');
-      if (savedInfo) {
-        try {
-          const parsed = JSON.parse(savedInfo);
-          const loaded = { ...defaultCompany, ...parsed, ...initialData };
+    const loadCompany = async () => {
+      try {
+        const res = await fetch('/api/company');
+        if (res.ok) {
+          const data = await res.json();
+          const loaded = { ...defaultCompany, ...data, ...initialData };
           setCompany(loaded);
           setDraft(loaded);
-        } catch (e) {
-          console.error('Failed to load company info:', e);
         }
-      } else {
-        const loaded = { ...defaultCompany, ...initialData };
-        setCompany(loaded);
-        setDraft(loaded);
+      } catch (e) {
+        console.error('Failed to load company info:', e);
       }
-    }
+    };
+    loadCompany();
   }, [initialData]);
 
   const handleEdit = () => {
     setDraft(company);
     setEditing(true);
     setSaved(false);
+    setError(null);
   };
 
   const handleCancel = () => {
     setEditing(false);
+    setError(null);
   };
 
-  const handleSave = () => {
-    setCompany(draft);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('company_info', JSON.stringify(draft));
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/company', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(draft),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const updated = { ...defaultCompany, ...data };
+        setCompany(updated);
+        setDraft(updated);
+        setEditing(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to save company settings');
+      }
+    } catch (e) {
+      console.error(e);
+      setError('Network error: Failed to save company settings');
+    } finally {
+      setSaving(false);
     }
-    setEditing(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
   };
 
   const handleChange = (field: keyof CompanyInfo, value: string) => {
@@ -146,17 +169,25 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
         </div>
       )}
 
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3 animate-fadeIn text-red-800">
+          <span className="text-lg font-bold">⚠️</span>
+          <span className="text-xs font-bold">{error}</span>
+        </div>
+      )}
+
       {/* Action Bar */}
       <div className="flex justify-end gap-3">
         {editing ? (
           <>
-            <button onClick={handleCancel}
-              className="px-4 py-2.5 border border-slate-250 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
+            <button onClick={handleCancel} disabled={saving}
+              className="px-4 py-2.5 border border-slate-250 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
               {t('company.cancelBtn')}
             </button>
-            <button onClick={handleSave}
-              className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-xs font-black transition-all cursor-pointer shadow-sm">
-              {t('company.saveBtn')}
+            <button onClick={handleSave} disabled={saving}
+              className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-xs font-black transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              {saving ? '...' : t('company.saveBtn')}
             </button>
           </>
         ) : (

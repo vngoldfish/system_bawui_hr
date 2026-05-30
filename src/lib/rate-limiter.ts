@@ -9,7 +9,7 @@ const rateLimitMap = new Map<string, RateLimitStore>();
 
 // Clean up old entries every 5 minutes to prevent memory leaks
 if (typeof global !== 'undefined') {
-  const globalAny = global as any;
+  const globalAny = global as typeof globalThis & { __rateLimitInterval?: NodeJS.Timeout };
   if (!globalAny.__rateLimitInterval) {
     globalAny.__rateLimitInterval = setInterval(() => {
       const now = Date.now();

@@ -1,0 +1,112 @@
+import { NextRequest } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { successResponse, errorResponse, handleApiError } from '@/lib/api-utils';
+import { z } from 'zod';
+import { logDatabaseChange } from '@/lib/audit-logger';
+import { getSessionUser } from '@/lib/session';
+
+const updateCompanySchema = z.object({
+  name: z.string().min(1, '会社名は必須です'),
+  nameKana: z.string().default(''),
+  representative: z.string().default(''),
+  representativeTitle: z.string().default(''),
+  established: z.string().default(''),
+  capital: z.string().default(''),
+  employees: z.string().default(''),
+  industry: z.string().default(''),
+  registrationNumber: z.string().default(''),
+  address: z.string().default(''),
+  phone: z.string().default(''),
+  fax: z.string().default(''),
+  email: z.string().default(''),
+  website: z.string().default(''),
+  bankName: z.string().default(''),
+  branchName: z.string().default(''),
+  accountType: z.string().default(''),
+  accountNumber: z.string().default(''),
+  accountHolder: z.string().default(''),
+  roundingPolicy: z.string().default('exact'),
+  salaryCutoffDay: z.string().default('末日'),
+  payday: z.string().default('25'),
+});
+
+// GET company info (Public)
+export async function GET(request: NextRequest) {
+  try {
+    let company = await prisma.company.findFirst();
+    if (!company) {
+      // Create a default fallback record if it doesn't exist
+      company = await prisma.company.create({
+        data: {
+          name: '株式会社ロング',
+          nameKana: 'カブシキガイシャロング',
+          representative: 'ロン グエン',
+          representativeTitle: '代表取締役',
+          established: '2015-04-01',
+          capital: '10,000,000円',
+          employees: '14名',
+          industry: 'IT・ソフトウェア',
+          registrationNumber: 'T1234567890123',
+          address: '〒100-0001 東京都千代田区千代田1-1-1 ロングビル3F',
+          phone: '03-1234-5678',
+          fax: '03-1234-5679',
+          email: 'info@long-corp.jp',
+          website: 'https://www.long-corp.jp',
+          bankName: '三菱UFJ銀行',
+          branchName: '東京支店',
+          accountType: '普通',
+          accountNumber: '1234567',
+          accountHolder: 'カブシキガイシャロング',
+          salaryCutoffDay: '末日',
+          payday: '25',
+          roundingPolicy: 'exact',
+        },
+      });
+    }
+    return successResponse(company);
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+// PUT update company info
+export async function PUT(request: NextRequest) {
+  try {
+    const user = getSessionUser(request);
+    if (!user) {
+      return errorResponse('Unauthorized', 401);
+    }
+    if (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER') {
+      return errorResponse('Forbidden', 403);
+    }
+
+    const body = await request.json();
+    const data = updateCompanySchema.parse(body);
+
+    let company = await prisma.company.findFirst();
+    if (company) {
+      company = await prisma.company.update({
+        where: { id: company.id },
+        data,
+      });
+    } else {
+      company = await prisma.company.create({
+        data,
+      });
+    }
+
+    logDatabaseChange({
+      request,
+      action: 'UPDATE',
+      model: 'Company',
+      recordId: company.id,
+      details: {
+        name: company.name,
+      },
+    });
+
+    return successResponse(company);
+  } catch (error) {
+    return handleApiError(error);
+  }
+}

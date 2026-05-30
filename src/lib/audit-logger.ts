@@ -35,28 +35,39 @@ export function logDatabaseChange({
   model,
   recordId,
   details,
+  user,
 }: {
-  request: NextRequest;
+  request?: NextRequest;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
   model: string;
   recordId: string;
   details: any;
+  user?: any;
 }) {
   let userDetails: any = 'System/Anonymous';
 
-  try {
-    const cookie = request.cookies.get('session_user');
-    if (cookie) {
-      const parsedUser = JSON.parse(decodeURIComponent(cookie.value));
-      userDetails = {
-        id: parsedUser.id || parsedUser.employeeCode || 'unknown',
-        email: parsedUser.email || 'unknown',
-        name: `${parsedUser.lastName || ''} ${parsedUser.firstName || ''}`.trim() || parsedUser.name || 'unknown',
-        role: parsedUser.role || 'unknown',
-      };
+  if (user) {
+    userDetails = {
+      id: user.id || 'unknown',
+      email: user.email || 'unknown',
+      name: `${user.lastName || ''} ${user.firstName || ''}`.trim() || user.name || 'unknown',
+      role: user.role || 'unknown',
+    };
+  } else if (request) {
+    try {
+      const cookie = request.cookies.get('session_user');
+      if (cookie) {
+        const parsedUser = JSON.parse(decodeURIComponent(cookie.value));
+        userDetails = {
+          id: parsedUser.id || parsedUser.employeeCode || 'unknown',
+          email: parsedUser.email || 'unknown',
+          name: `${parsedUser.lastName || ''} ${parsedUser.firstName || ''}`.trim() || parsedUser.name || 'unknown',
+          role: parsedUser.role || 'unknown',
+        };
+      }
+    } catch (e) {
+      // Fall back to System/Anonymous
     }
-  } catch (e) {
-    // Fall back to System/Anonymous
   }
 
   const logEntry: AuditLogEntry = {

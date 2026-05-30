@@ -47,3 +47,6 @@ next-env.d.ts
 
 # Misc
 *.pem
+
+# Gemini scratch files
+scratch/

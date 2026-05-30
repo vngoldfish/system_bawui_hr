@@ -16,13 +16,13 @@ export interface SessionUser {
   nationality?: string;
 }
 
-export function signToken(payload: any): string {
+export function signToken(payload: SessionUser | Record<string, unknown>): string {
   const data = JSON.stringify(payload);
   const signature = crypto.createHmac('sha256', SECRET).update(data).digest('hex');
   return `${Buffer.from(data).toString('base64')}.${signature}`;
 }
 
-export function verifyToken(token: string): any | null {
+export function verifyToken(token: string): SessionUser | null {
   const parts = token.split('.');
   if (parts.length !== 2) return null;
   const [base64Payload, signature] = parts;
@@ -35,7 +35,7 @@ export function verifyToken(token: string): any | null {
     const expectedBuf = Buffer.from(expectedSignature, 'hex');
     
     if (sigBuf.length === expectedBuf.length && crypto.timingSafeEqual(sigBuf, expectedBuf)) {
-      return JSON.parse(data);
+      return JSON.parse(data) as SessionUser;
     }
   } catch (e) {
     // Ignore error
@@ -46,10 +46,10 @@ export function verifyToken(token: string): any | null {
 export function getSessionUser(request: NextRequest): SessionUser | null {
   const tokenCookie = request.cookies.get('session_token');
   if (!tokenCookie) return null;
-  return verifyToken(tokenCookie.value) as SessionUser | null;
+  return verifyToken(tokenCookie.value);
 }
 
-export function setSessionCookies(response: NextResponse, user: any) {
+export function setSessionCookies(response: NextResponse, user: SessionUser) {
   const token = signToken(user);
   
   // Set HttpOnly signed cookie for secure API access

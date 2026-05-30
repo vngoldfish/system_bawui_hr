@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Employee, Dependent, Education, Certification, ResidenceCardHistory, Department, Position, ContractType, Shiten } from '@/types';
 import ManagementModal from '@/components/common/ManagementModal';
 import Portal from '@/components/common/Portal';
@@ -119,6 +119,30 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
 
   const isForeign = formData.nationality !== '日本';
 
+  const fetchDepartments = useCallback(async () => {
+    const res = await fetch('/api/departments');
+    const data = await res.json();
+    setDepartments(data);
+  }, []);
+
+  const fetchPositions = useCallback(async () => {
+    const res = await fetch('/api/positions');
+    const data = await res.json();
+    setPositions(data);
+  }, []);
+
+  const fetchContractTypes = useCallback(async () => {
+    const res = await fetch('/api/contract-types');
+    const data = await res.json();
+    setContractTypes(data);
+  }, []);
+
+  const fetchShitens = useCallback(async () => {
+    const res = await fetch('/api/shitens');
+    const data = await res.json();
+    setShitens(data);
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       fetchDepartments();
@@ -126,7 +150,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
       fetchContractTypes();
       fetchShitens();
     }
-  }, [isOpen]);
+  }, [isOpen, fetchDepartments, fetchPositions, fetchContractTypes, fetchShitens]);
 
   useEffect(() => {
     if (employee) {
@@ -201,29 +225,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
     }
   }, [employee, isOpen]);
 
-  const fetchDepartments = async () => {
-    const res = await fetch('/api/departments');
-    const data = await res.json();
-    setDepartments(data);
-  };
 
-  const fetchPositions = async () => {
-    const res = await fetch('/api/positions');
-    const data = await res.json();
-    setPositions(data);
-  };
-
-  const fetchContractTypes = async () => {
-    const res = await fetch('/api/contract-types');
-    const data = await res.json();
-    setContractTypes(data);
-  };
-
-  const fetchShitens = async () => {
-    const res = await fetch('/api/shitens');
-    const data = await res.json();
-    setShitens(data);
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

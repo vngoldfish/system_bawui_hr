@@ -109,7 +109,7 @@ export async function PUT(request: NextRequest) {
     const updatedSessionUser = {
       ...sessionUser,
       language: updatedEmployee.language,
-      avatar: updatedEmployee.avatar,
+      avatar: updatedEmployee.avatar || undefined,
       nationality: updatedEmployee.nationality,
     };
 
