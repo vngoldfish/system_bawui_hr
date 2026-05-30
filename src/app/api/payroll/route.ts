@@ -91,9 +91,51 @@ export async function POST(request: NextRequest) {
     const isArray = Array.isArray(body);
     const recordsData = isArray ? body : [body];
 
+    // Verify operator role in database
+    const dbOperator = await prisma.employee.findUnique({
+      where: { id: user.id }
+    });
+    if (!dbOperator || (dbOperator.role !== 'SUPER_ADMIN' && dbOperator.role !== 'HR_MANAGER')) {
+      return errorResponse('Forbidden: Insufficient privileges', 403);
+    }
+
+    const today = new Date();
+    const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // Perform validation checks for all entries
+    for (const data of recordsData) {
+      if (!data.month || !/^\d{4}-\d{2}$/.test(data.month)) {
+        return errorResponse('Invalid month format. Expected YYYY-MM', 400);
+      }
+      const [year, monthVal] = data.month.split('-').map(Number);
+      const recordDate = new Date(year, monthVal - 1, 1);
+      if (recordDate > currentMonthStart) {
+        return errorResponse('Cannot generate payroll records for future months', 400);
+      }
+
+      const baseSalary = parseFloat(data.baseSalary) || 0;
+      const overtimePay = parseFloat(data.overtimePay) || 0;
+      const allowances = parseFloat(data.allowances || data.bonus) || 0;
+      const deductions = parseFloat(data.deductions) || 0;
+      const tax = parseFloat(data.tax) || 0;
+      const insurance = parseFloat(data.insurance) || 0;
+
+      if (baseSalary < 0 || overtimePay < 0 || allowances < 0 || deductions < 0 || tax < 0 || insurance < 0) {
+        return errorResponse('Payroll values cannot be negative', 400);
+      }
+    }
+
     const results = await prisma.$transaction(
-      recordsData.map((data: any) =>
-        prisma.payrollRecord.upsert({
+      recordsData.map((data: any) => {
+        const baseSalary = parseFloat(data.baseSalary) || 0;
+        const overtimePay = parseFloat(data.overtimePay) || 0;
+        const allowances = parseFloat(data.allowances || data.bonus) || 0;
+        const deductions = parseFloat(data.deductions) || 0;
+        const tax = parseFloat(data.tax) || 0;
+        const insurance = parseFloat(data.insurance) || 0;
+        const calculatedNet = baseSalary + overtimePay + allowances - (deductions + tax + insurance);
+
+        return prisma.payrollRecord.upsert({
           where: {
             employeeId_month: {
               employeeId: data.employeeId,
@@ -101,31 +143,31 @@ export async function POST(request: NextRequest) {
             },
           },
           update: {
-            baseSalary: parseFloat(data.baseSalary),
-            overtimePay: parseFloat(data.overtimePay) || 0,
-            bonus: parseFloat(data.allowances || data.bonus) || 0, // allowances map to bonus
-            deductions: parseFloat(data.deductions) || 0,
-            tax: parseFloat(data.tax) || 0,
-            insurance: parseFloat(data.insurance) || 0,
-            netSalary: parseFloat(data.netSalary),
+            baseSalary,
+            overtimePay,
+            bonus: allowances,
+            deductions,
+            tax,
+            insurance,
+            netSalary: calculatedNet,
             paymentDate: new Date(data.paymentDate || `${data.month}-25`),
             status: data.status || 'PENDING',
           },
           create: {
             employeeId: data.employeeId,
             month: data.month,
-            baseSalary: parseFloat(data.baseSalary),
-            overtimePay: parseFloat(data.overtimePay) || 0,
-            bonus: parseFloat(data.allowances || data.bonus) || 0, // allowances map to bonus
-            deductions: parseFloat(data.deductions) || 0,
-            tax: parseFloat(data.tax) || 0,
-            insurance: parseFloat(data.insurance) || 0,
-            netSalary: parseFloat(data.netSalary),
+            baseSalary,
+            overtimePay,
+            bonus: allowances,
+            deductions,
+            tax,
+            insurance,
+            netSalary: calculatedNet,
             paymentDate: new Date(data.paymentDate || `${data.month}-25`),
             status: data.status || 'PENDING',
           },
-        })
-      )
+        });
+      })
     );
 
     logDatabaseChange({
