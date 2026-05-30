@@ -123,6 +123,25 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
   const [filteredSections, setFilteredSections] = useState<MenuSection[]>([]);
   const [companyName, setCompanyName] = useState('');
 
+  // Fetch latest company info from database API on mount
+  useEffect(() => {
+    const loadCompany = async () => {
+      try {
+        const res = await fetch('/api/company');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.name) {
+            setCompanyName(data.name);
+            localStorage.setItem('company_info', JSON.stringify(data));
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    loadCompany();
+  }, []);
+
   // Load collapse state and user permissions on mount
   useEffect(() => {
     setIsMounted(true);
@@ -188,7 +207,7 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
         .filter(s => s.items.some(i => pathname.startsWith(i.href)))
         .map(s => s.label)
     );
-  }, [pathname]);
+  }, [pathname, t]);
 
   const toggleCollapse = () => {
     const newVal = !isCollapsed;

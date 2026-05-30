@@ -217,6 +217,22 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
         }
       }
     }
+
+    const loadCompany = async () => {
+      try {
+        const res = await fetch('/api/company');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.roundingPolicy) {
+            setRoundingPolicy(data.roundingPolicy);
+            localStorage.setItem('company_info', JSON.stringify(data));
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    loadCompany();
   }, []);
 
   // Selection States

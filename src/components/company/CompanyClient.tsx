@@ -138,6 +138,9 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
         const updated = { ...defaultCompany, ...data };
         setCompany(updated);
         setDraft(updated);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('company_info', JSON.stringify(updated));
+        }
         setEditing(false);
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
