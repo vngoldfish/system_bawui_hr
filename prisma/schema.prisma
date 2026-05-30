@@ -328,6 +328,8 @@ enum AttendanceStatus {
 
 enum PayrollStatus {
   PENDING
+  CALCULATED
+  APPROVED
   PAID
   CANCELLED
 }
