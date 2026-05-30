@@ -149,7 +149,7 @@ async function main() {
         role: 'EMPLOYEE',
         password: hashedPassword,
         nationality: 'ベトナム',
-        residenceStatus: '技術・人文知識・国際業務',
+        residenceStatus: emp.residenceStatus || '特定技能',
         residenceCardNumber: emp.residenceCardNumber || null,
         residenceCardIssueDate: issueDate,
         residenceExpiry: expiryDate,

@@ -8,6 +8,7 @@
     "residenceCardNumber": "LL62058319AM",
     "residenceCardIssueDate": "2024-02-21",
     "residenceExpiry": "2027-02-21",
+    "residenceStatus": "特定技能",
     "address": "東京都新宿区歌舞伎町2-44-1"
   },
   {
@@ -19,6 +20,7 @@
     "residenceCardNumber": "MK81640275BE",
     "residenceCardIssueDate": "2023-11-15",
     "residenceExpiry": "2028-11-15",
+    "residenceStatus": "特定技能",
     "address": "神奈川県横浜市中区山下町279"
   },
   {
@@ -30,6 +32,7 @@
     "residenceCardNumber": "EP30948172AL",
     "residenceCardIssueDate": "2024-06-10",
     "residenceExpiry": "2029-06-10",
+    "residenceStatus": "特定技能",
     "address": "大阪府大阪市北区梅田3-1-3"
   },
   {
@@ -41,6 +44,7 @@
     "residenceCardNumber": "GH52910483PT",
     "residenceCardIssueDate": "2024-09-18",
     "residenceExpiry": "2027-09-18",
+    "residenceStatus": "特定技能",
     "address": "愛知県名古屋市中村区名駅1-1-4"
   },
   {
@@ -52,6 +56,7 @@
     "residenceCardNumber": "WN40281953KL",
     "residenceCardIssueDate": "2023-04-05",
     "residenceExpiry": "2028-04-05",
+    "residenceStatus": "特定技能",
     "address": "福岡県福岡市博多区博多駅前2-2-1"
   },
   {
@@ -63,6 +68,7 @@
     "residenceCardNumber": "TC19385028BN",
     "residenceCardIssueDate": "2024-01-14",
     "residenceExpiry": "2029-01-14",
+    "residenceStatus": "特定技能",
     "address": "千葉県船橋市本町7-1-1"
   },
   {
@@ -74,6 +80,7 @@
     "residenceCardNumber": "QA74019283MS",
     "residenceCardIssueDate": "2023-10-11",
     "residenceExpiry": "2026-10-11",
+    "residenceStatus": "特定技能",
     "address": "埼玉県さいたま市大宮区仲町1-54"
   },
   {
@@ -85,6 +92,7 @@
     "residenceCardNumber": "RE82940153LK",
     "residenceCardIssueDate": "2025-07-25",
     "residenceExpiry": "2028-07-25",
+    "residenceStatus": "特定技能",
     "address": "東京都豊島区東池袋3-1-1"
   },
   {
@@ -96,6 +104,7 @@
     "residenceCardNumber": "PL91820394JH",
     "residenceCardIssueDate": "2024-12-03",
     "residenceExpiry": "2027-12-03",
+    "residenceStatus": "特定技能",
     "address": "京都府京都市下京区烏丸通塩小路上ル東塩小路町901"
   },
   {
@@ -107,6 +116,7 @@
     "residenceCardNumber": "OK50291834ZX",
     "residenceCardIssueDate": "2024-03-19",
     "residenceExpiry": "2029-03-19",
+    "residenceStatus": "特定技能",
     "address": "兵庫県神戸市中央区三宮町1-10-1"
   },
   {
@@ -118,6 +128,7 @@
     "residenceCardNumber": "AB98765432CD",
     "residenceCardIssueDate": "2024-05-20",
     "residenceExpiry": "2027-05-20",
+    "residenceStatus": "特定技能",
     "address": "東京都渋谷区神南1-21-1"
   },
   {
@@ -129,6 +140,7 @@
     "residenceCardNumber": "EF12345678GH",
     "residenceCardIssueDate": "2023-12-15",
     "residenceExpiry": "2026-12-15",
+    "residenceStatus": "特定技能",
     "address": "神奈川県川崎市川崎区駅前本町26-2"
   },
   {
@@ -140,6 +152,7 @@
     "residenceCardNumber": "IJ87654321KL",
     "residenceCardIssueDate": "2025-02-10",
     "residenceExpiry": "2030-02-10",
+    "residenceStatus": "特定技能",
     "address": "大阪府大阪市中央区難波4-1-17"
   },
   {
@@ -151,6 +164,7 @@
     "residenceCardNumber": "MN43210987OP",
     "residenceCardIssueDate": "2024-07-01",
     "residenceExpiry": "2027-07-01",
+    "residenceStatus": "特定技能",
     "address": "愛知県名古屋市中区栄3-5-1"
   },
   {
@@ -162,6 +176,7 @@
     "residenceCardNumber": "QR56789012ST",
     "residenceCardIssueDate": "2024-10-11",
     "residenceExpiry": "2029-10-11",
+    "residenceStatus": "特定技能",
     "address": "東京都江東区豊洲2-4-9"
   },
   {
@@ -173,6 +188,7 @@
     "residenceCardNumber": "UV90123456WX",
     "residenceCardIssueDate": "2023-08-22",
     "residenceExpiry": "2028-08-22",
+    "residenceStatus": "特定技能",
     "address": "福岡県福岡市中央区天神1-11-17"
   },
   {
@@ -184,6 +200,7 @@
     "residenceCardNumber": "YZ34567890AB",
     "residenceCardIssueDate": "2024-11-05",
     "residenceExpiry": "2026-11-05",
+    "residenceStatus": "特定技能",
     "address": "埼玉県川口市並木3-1-1"
   },
   {
@@ -195,6 +212,7 @@
     "residenceCardNumber": "CD76543210EF",
     "residenceCardIssueDate": "2024-03-14",
     "residenceExpiry": "2029-03-14",
+    "residenceStatus": "特定技能",
     "address": "千葉県市川市市川1-1-1"
   },
   {
@@ -206,6 +224,7 @@
     "residenceCardNumber": "GH21098765IJ",
     "residenceCardIssueDate": "2025-01-20",
     "residenceExpiry": "2028-01-20",
+    "residenceStatus": "特定技能",
     "address": "東京都 墨田区 押上1-1-2"
   }
 ]
