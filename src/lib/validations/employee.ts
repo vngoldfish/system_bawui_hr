@@ -33,6 +33,8 @@ const benefitsSchema = z.object({
   familyAllowance: z.number().default(0),
   overtimeAllowance: z.number().default(0),
   dependents: z.number().default(0),
+  residentTax: z.boolean().default(false),
+  residentTaxAmount: z.number().default(0),
 }).optional().nullable();
 
 export const createEmployeeSchema = z.object({

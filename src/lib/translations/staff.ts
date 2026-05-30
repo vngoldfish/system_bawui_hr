@@ -90,6 +90,8 @@ export const staffTranslations = {
       salaryTypeMonthly: '月給',
       salaryTypeDaily: '日給',
       salaryTypeHourly: '時給',
+      residentTax: '住民税の特別徴収',
+      residentTaxAmount: '住民税月額（円）',
     },
     client: {
       alertTitle: '在留カード期限アラート ({count}件)',
@@ -356,6 +358,8 @@ export const staffTranslations = {
       salaryTypeMonthly: 'Monthly',
       salaryTypeDaily: 'Daily',
       salaryTypeHourly: 'Hourly',
+      residentTax: 'Special Collection of Resident Tax',
+      residentTaxAmount: 'Monthly Resident Tax (JPY)',
     },
     client: {
       alertTitle: 'Residence Card Expiry Alert ({count})',
@@ -622,6 +626,8 @@ export const staffTranslations = {
       salaryTypeMonthly: 'Lương tháng',
       salaryTypeDaily: 'Lương ngày',
       salaryTypeHourly: 'Lương giờ',
+      residentTax: 'Thu hộ thuế cư trú (Đặc biệt trưng thu)',
+      residentTaxAmount: 'Thuế cư trú hằng tháng (Yên)',
     },
     client: {
       alertTitle: 'Cảnh báo thẻ ngoại kiều hết hạn ({count} người)',
@@ -884,6 +890,8 @@ export const staffTranslations = {
       salaryTypeMonthly: '月薪',
       salaryTypeDaily: '日薪',
       salaryTypeHourly: '时薪',
+      residentTax: '居民税特别征收',
+      residentTaxAmount: '每月居民税（日元）',
     },
     client: {
       alertTitle: '在留卡到期警告 ({count}件)',
@@ -1146,6 +1154,8 @@ export const staffTranslations = {
       salaryTypeMonthly: 'เงินเดือนรายเดือน',
       salaryTypeDaily: 'ค่าจ้างรายวัน',
       salaryTypeHourly: 'ค่าจ้างรายชั่วโมง',
+      residentTax: 'หักภาษีผู้อยู่อาศัย (การจัดเก็บพิเศษ)',
+      residentTaxAmount: 'ภาษีผู้อยู่อาศัยรายเดือน (เยน)',
     },
     client: {
       alertTitle: 'แจ้งเตือนบัตรผู้พำนักหมดอายุ ({count} รายการ)',

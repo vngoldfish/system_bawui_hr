@@ -15,9 +15,18 @@ interface Employee {
   contractType: string; benefits: {
     healthInsurance: boolean; pension: boolean; employmentInsurance: boolean; workersComp: boolean;
     transportation: number; housing: number; meal: number;
+    residentTax?: boolean;
+    residentTaxAmount?: number;
   };
   birthDate?: string | null;
-  dependentsCount?: number;
+  dependents?: Array<{
+    id: string;
+    name: string;
+    relationship: string;
+    birthDate: string | null;
+    gender: string | null;
+    cohabitation: string;
+  }>;
 }
 
 interface PayrollRecord {
@@ -192,7 +201,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
       benefits: employee.benefits,
       birthDate: employee.birthDate,
       month: record.month,
-      dependentsCount: employee.dependentsCount || 0,
+      dependents: employee.dependents,
       customAllowances: fixedAllowances + editFields.allowances,
       customBonus: editFields.bonus,
     });
@@ -997,7 +1006,7 @@ export default function PayrollClient({
             benefits: emp.benefits,
             birthDate: emp.birthDate,
             month: endMonth,
-            dependentsCount: emp.dependentsCount
+            dependents: emp.dependents
           });
 
           return {

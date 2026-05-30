@@ -15,7 +15,9 @@ const mergeBenefits = (benefits: any) => {
     workersComp: true,
     transportation: 0,
     housing: 0,
-    meal: 0
+    meal: 0,
+    residentTax: false,
+    residentTaxAmount: 0
   };
   if (!benefits || typeof benefits !== 'object') return defaults;
   return {
@@ -26,6 +28,8 @@ const mergeBenefits = (benefits: any) => {
     transportation: benefits.transportation ?? defaults.transportation,
     housing: benefits.housing ?? defaults.housing,
     meal: benefits.meal ?? defaults.meal,
+    residentTax: benefits.residentTax ?? defaults.residentTax,
+    residentTaxAmount: benefits.residentTaxAmount ?? defaults.residentTaxAmount,
   };
 };
 
@@ -162,7 +166,14 @@ export default async function PayrollPage() {
       contractType: '正社員',
       benefits: mergeBenefits(dbUser.benefits),
       birthDate: dbUser.birthDate ? dbUser.birthDate.toISOString() : null,
-      dependentsCount: dbUser.dependents ? dbUser.dependents.length : 0,
+      dependents: dbUser.dependents ? dbUser.dependents.map(d => ({
+        id: d.id,
+        name: d.name,
+        relationship: d.relationship,
+        birthDate: d.birthDate ? d.birthDate.toISOString() : null,
+        gender: d.gender,
+        cohabitation: d.cohabitation,
+      })) : [],
     }];
 
     return (
@@ -212,7 +223,14 @@ export default async function PayrollPage() {
       contractType: emp.employeeContracts?.[0]?.contractType?.name || '正社員',
       benefits: mergeBenefits(emp.benefits),
       birthDate: emp.birthDate ? emp.birthDate.toISOString() : null,
-      dependentsCount: emp.dependents ? emp.dependents.length : 0,
+      dependents: emp.dependents ? emp.dependents.map(d => ({
+        id: d.id,
+        name: d.name,
+        relationship: d.relationship,
+        birthDate: d.birthDate ? d.birthDate.toISOString() : null,
+        gender: d.gender,
+        cohabitation: d.cohabitation,
+      })) : [],
     }));
 
     // Fetch existing database records for Admin view

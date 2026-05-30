@@ -167,6 +167,7 @@ export function calculatePayrollDetails({
   birthDate,
   month = '2026-05',
   dependentsCount = 0,
+  dependents,
   customAllowances,
   customBonus
 }: {
@@ -180,6 +181,7 @@ export function calculatePayrollDetails({
   birthDate?: string | null;
   month?: string;
   dependentsCount?: number;
+  dependents?: any[];
   customAllowances?: number;
   customBonus?: number;
 }) {
@@ -191,6 +193,8 @@ export function calculatePayrollDetails({
     transportation: 0,
     housing: 0,
     meal: 0,
+    residentTax: false,
+    residentTaxAmount: 0,
   };
 
   const b = {
@@ -201,6 +205,8 @@ export function calculatePayrollDetails({
     transportation: benefits?.transportation ?? benefits?.commutingAllowance ?? defaults.transportation,
     housing: benefits?.housing ?? benefits?.housingAllowance ?? defaults.housing,
     meal: benefits?.meal ?? benefits?.mealAllowance ?? defaults.meal,
+    residentTax: benefits?.residentTax ?? defaults.residentTax,
+    residentTaxAmount: benefits?.residentTaxAmount ?? defaults.residentTaxAmount,
   };
 
   let calculatedBase = 0;
@@ -262,10 +268,27 @@ export function calculatePayrollDetails({
 
   // 6. Income Tax (所得税): Tính trên Gross trừ trợ cấp đi lại miễn thuế và trừ tổng bảo hiểm xã hội
   const taxableIncome = Math.max(0, totalGross - b.transportation - totalSocialInsurance);
-  const incomeTax = estimateIncomeTaxGetsugakuhyo(taxableIncome, dependentsCount);
+  
+  let finalDependentsCount = dependentsCount;
+  if (dependents && Array.isArray(dependents)) {
+    const [yearStr] = month.split('-');
+    const taxYear = parseInt(yearStr);
+    if (!isNaN(taxYear)) {
+      finalDependentsCount = dependents.filter((dep: any) => {
+        if (!dep.birthDate) return false;
+        const depBirthDate = new Date(dep.birthDate);
+        if (isNaN(depBirthDate.getTime())) return false;
+        
+        // Theo luật thuế thu nhập Nhật Bản: tuổi được tính bằng (Năm tính thuế - Năm sinh)
+        return (taxYear - depBirthDate.getFullYear()) >= 16;
+      }).length;
+    }
+  }
 
-  // 7. Resident Tax (住民税): 4% tổng thu nhập hoặc do Master nhập tĩnh (được tính trung bình 4% cho mock, thực tế nhập tĩnh ở PayslipModal)
-  const residentTax = Math.round(totalGross * 0.04);
+  const incomeTax = estimateIncomeTaxGetsugakuhyo(taxableIncome, finalDependentsCount);
+
+  // 7. Resident Tax (住民税): Thu hộ (特別徴収) nếu được bật, ngược lại bằng 0
+  const residentTax = b.residentTax ? b.residentTaxAmount : 0;
 
   const totalDeductions = totalSocialInsurance + incomeTax + residentTax;
   const netSalary = totalGross - totalDeductions;

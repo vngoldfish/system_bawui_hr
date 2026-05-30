@@ -44,6 +44,8 @@ interface EmployeeFormData {
     transportation: string;
     housing: string;
     meal: string;
+    residentTax: boolean;
+    residentTaxAmount: string;
   };
   dependentList: Dependent[];
   education: Education[];
@@ -88,7 +90,7 @@ const emptyForm: EmployeeFormData = {
   salaryType: '月給',
   hourlyRate: '',
   dailyRate: '',
-  benefits: { healthInsurance: false, pension: false, employmentInsurance: false, workersComp: false, transportation: '', housing: '', meal: '' },
+  benefits: { healthInsurance: false, pension: false, employmentInsurance: false, workersComp: false, transportation: '', housing: '', meal: '', residentTax: false, residentTaxAmount: '' },
   dependentList: [],
   education: [],
   certifications: [],
@@ -191,6 +193,8 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
           transportation: toInputValue(benefits?.transportation),
           housing: toInputValue(benefits?.housing),
           meal: toInputValue(benefits?.meal),
+          residentTax: !!benefits?.residentTax,
+          residentTaxAmount: toInputValue(benefits?.residentTaxAmount),
         },
         dependentList: (employee.dependents || []).map(d => ({
           ...d,
@@ -385,6 +389,8 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
           familyAllowance: parseFloat((employee?.benefits as any)?.familyAllowance) || 0,
           overtimeAllowance: parseFloat((employee?.benefits as any)?.overtimeAllowance) || 0,
           dependents: parseFloat((employee?.benefits as any)?.dependents) || 0,
+          residentTax: formData.benefits.residentTax,
+          residentTaxAmount: parseFloat(formData.benefits.residentTaxAmount) || 0,
         },
         dependents: formData.dependentList,
         education: formData.education,
@@ -607,6 +613,23 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                     <input type="checkbox" checked={formData.benefits.workersComp} onChange={e => handleBenefitsChange('workersComp', e.target.checked)} className="rounded border-slate-300 text-blue-600" />
                     <span className="text-sm text-slate-700">{t('form.workersComp')}</span>
                   </label>
+                </div>
+              </div>
+              <div className="mt-4">
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">{t('form.residentTax')}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2 pt-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={formData.benefits.residentTax} onChange={e => handleBenefitsChange('residentTax', e.target.checked)} className="rounded border-slate-300 text-blue-600" />
+                      <span className="text-sm text-slate-700">{t('form.residentTax')}</span>
+                    </label>
+                  </div>
+                  {formData.benefits.residentTax && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">{t('form.residentTaxAmount')}</label>
+                      <input type="number" value={formData.benefits.residentTaxAmount} onChange={e => handleBenefitsChange('residentTaxAmount', e.target.value)} placeholder="10000" className={inputCls} />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="mt-4">
