@@ -42,18 +42,37 @@ async function main() {
     return;
   }
 
-  // 1. Fetch default Relations
-  let dept = await prisma.department.findFirst({ where: { name: '開発部' } });
-  if (!dept) dept = await prisma.department.findFirst();
+  // 1. Fetch or Create '現場' (Genba) Department
+  let dept = await prisma.department.findFirst({ where: { name: '現場' } });
+  if (!dept) {
+    dept = await prisma.department.create({
+      data: {
+        name: '現場',
+        nameKana: 'げんば',
+        description: '現場業務・作業全般'
+      }
+    });
+    console.log('Created "現場" (Genba) department in database.');
+  }
 
-  let pos = await prisma.position.findFirst({ where: { name: '一般社員' } });
-  if (!pos) pos = await prisma.position.findFirst();
+  // Fetch or Create '作業員' (Worker) Position
+  let pos = await prisma.position.findFirst({ where: { name: '作業員' } });
+  if (!pos) {
+    pos = await prisma.position.create({
+      data: {
+        name: '作業員',
+        nameKana: 'さぎょういん',
+        description: '現場作業および関連業務'
+      }
+    });
+    console.log('Created "作業員" (Worker) position in database.');
+  }
 
   let ct = await prisma.contractType.findFirst({ where: { name: '正社員' } });
   if (!ct) ct = await prisma.contractType.findFirst();
 
   if (!dept || !pos || !ct) {
-    console.error('Error: Required basic departments, positions, or contract types are missing. Please run "npm run seed:real" first to build the schema base.');
+    console.error('Error: Required basic contract types are missing. Please run "npm run seed:real" first to build the schema base.');
     process.exit(1);
   }
 
