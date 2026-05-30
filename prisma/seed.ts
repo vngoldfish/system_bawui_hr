@@ -66,7 +66,7 @@ async function main() {
       birthDate: '1992-03-15', departmentId: eigyo.id, positionId: posShunin.id,
       hireDate: '2020-04-01', salary: 450000, status: 'ACTIVE' as const,
       nationality: '日本', contractTypeId: ctSeishain.id, contractStartDate: '2020-04-01',
-      salaryType: '月給', benefits: { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 30000, meal: 10000 },
+      salaryType: '月給', benefits: { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 30000, meal: 10000, residentTax: true, residentTaxAmount: 12000 },
       dependents: [
         { name: '山田 花子', relationship: '配偶者', birthDate: '1992-05-15', gender: '女性', cohabitation: '同居' },
         { name: '山田 太一', relationship: '子', birthDate: '2022-03-10', gender: '男性', cohabitation: '同居' },
@@ -83,7 +83,7 @@ async function main() {
       birthDate: '1990-06-20', departmentId: kaihatsu.id, positionId: posLeadEng.id,
       hireDate: '2019-07-01', salary: 550000, status: 'ACTIVE' as const,
       nationality: '日本', contractTypeId: ctSeishain.id, contractStartDate: '2019-07-01',
-      salaryType: '月給', benefits: { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 30000, meal: 10000 },
+      salaryType: '月給', benefits: { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 30000, meal: 10000, residentTax: true, residentTaxAmount: 18000 },
       dependents: [
         { name: '佐藤 一郎', relationship: '配偶者', birthDate: '1990-11-20', gender: '男性', cohabitation: '同居' },
       ],
@@ -103,10 +103,10 @@ async function main() {
       birthDate: '1988-11-05', departmentId: jinji.id, positionId: posKakaricho.id,
       hireDate: '2018-10-01', salary: 500000, status: 'ACTIVE' as const,
       nationality: '日本', contractTypeId: ctSeishain.id, contractStartDate: '2018-10-01',
-      salaryType: '月給', benefits: { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 30000, meal: 10000 },
+      salaryType: '月給', benefits: { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 30000, meal: 10000, residentTax: false, residentTaxAmount: 0 },
       dependents: [
         { name: '高橋 真理', relationship: '配偶者', birthDate: '1991-08-22', gender: '女性', cohabitation: '同居' },
-        { name: '高橋 悠', relationship: '子', birthDate: '2019-12-05', gender: '男性', cohabitation: '同居' },
+        { name: '高橋 悠', relationship: '子', birthDate: '2008-12-05', gender: '男性', cohabitation: '同居' }, // Đủ 18 tuổi (>=16)
         { name: '高橋 さくら', relationship: '子', birthDate: '2021-07-18', gender: '女性', cohabitation: '同居' },
       ],
       education: [{ school: '慶應義塾大学', degree: '学士', major: '文学部', graduationYear: '2016' }],
@@ -165,10 +165,10 @@ async function main() {
       birthDate: '1989-02-14', departmentId: kaihatsu.id, positionId: posSeniorEng.id,
       hireDate: '2017-06-01', salary: 620000, status: 'ACTIVE' as const,
       nationality: '日本', contractTypeId: ctSeishain.id, contractStartDate: '2017-06-01',
-      salaryType: '月給', benefits: { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 30000, meal: 10000 },
+      salaryType: '月給', benefits: { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 30000, meal: 10000, residentTax: true, residentTaxAmount: 22000 },
       dependents: [
         { name: '渡辺 恵子', relationship: '配偶者', birthDate: '1989-02-14', gender: '女性', cohabitation: '同居' },
-        { name: '渡辺 遼', relationship: '子', birthDate: '2017-09-30', gender: '男性', cohabitation: '同居' },
+        { name: '渡辺 遼', relationship: '子', birthDate: '2009-09-30', gender: '男性', cohabitation: '同居' }, // Đủ 17 tuổi (>=16)
         { name: '渡辺 結菜', relationship: '子', birthDate: '2020-01-25', gender: '女性', cohabitation: '同居' },
         { name: '渡辺 正雄', relationship: '父', birthDate: '1960-04-08', gender: '男性', cohabitation: '別居' },
       ],
@@ -245,7 +245,7 @@ async function main() {
       nationality: 'ベトナム', residenceStatus: '技術・人文知識・国際業務', residenceCardNumber: 'YT20230601',
       residenceCardIssueDate: '2023-05-20', residenceExpiry: '2026-06-15', workRestriction: '就労可',
       contractTypeId: ctKeiyaku.id, contractStartDate: '2023-06-01', contractEndDate: '2026-05-31',
-      salaryType: '月給', benefits: { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 20000, meal: 10000 },
+      salaryType: '月給', benefits: { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 20000, meal: 10000, residentTax: true, residentTaxAmount: 15000 },
       dependents: [],
       education: [{ school: 'ベトナム国家大学ハノイ', degree: '学士', major: 'コンピュータ工学', graduationYear: '2020' }],
       certifications: [
