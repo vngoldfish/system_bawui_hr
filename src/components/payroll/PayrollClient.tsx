@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/utils';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { useI18n } from '@/lib/i18n';
+import { calculatePayrollDetails } from '@/lib/payroll-calculator';
 
 interface Employee {
   id: string; employeeCode: string; firstName: string; lastName: string; firstNameKana: string; lastNameKana: string;
@@ -365,66 +366,114 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
   };
 
   // Auto-calculate payroll
-  const handleCalculate = () => {
+  const handleCalculate = async () => {
     setCalculating(true);
-    const newRecords: PayrollRecord[] = employees
-      .filter(e => e.salary > 0 || e.hourlyRate > 0 || e.dailyRate > 0)
-      .map(emp => {
-        const workDays = 22;
-        const dailyHours = 8;
-        const overtimeHours = Math.floor(Math.random() * 20);
+    try {
+      // Fetch actual attendance records for the selected endMonth
+      const res = await fetch(`/api/attendance?month=${endMonth}`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch attendance data');
+      }
+      const attendanceData = await res.json();
+      const attendanceList = attendanceData.data || attendanceData || [];
 
-        let baseSalary = 0;
-        let workHours = 0;
+      const newRecordsData = employees
+        .filter(e => e.salary > 0 || e.hourlyRate > 0 || e.dailyRate > 0)
+        .map(emp => {
+          // Filter attendance for this specific employee
+          const empAttendance = Array.isArray(attendanceList)
+            ? attendanceList.filter((a: any) => a.employeeId === emp.id)
+            : [];
 
-        if (emp.salaryType === '月給') {
-          baseSalary = emp.salary;
-          workHours = workDays * dailyHours;
-        } else if (emp.salaryType === '日給') {
-          baseSalary = emp.dailyRate * workDays;
-          workHours = workDays * dailyHours;
-        } else if (emp.salaryType === '時給') {
-          const hoursPerDay = 6;
-          baseSalary = emp.hourlyRate * hoursPerDay * workDays;
-          workHours = hoursPerDay * workDays;
-        }
+          // Compute actual work days (PRESENT or LATE)
+          const workDays = empAttendance.length > 0
+            ? empAttendance.filter((a: any) => a.status === 'PRESENT' || a.status === 'LATE').length
+            : 22; // default fallback if no attendance recorded
 
-        const hourlyEquiv = emp.salaryType === '時給' ? emp.hourlyRate : baseSalary / workHours;
-        const overtimePay = Math.round(hourlyEquiv * 1.25 * overtimeHours);
+          const absentDays = empAttendance.length > 0
+            ? empAttendance.filter((a: any) => a.status === 'ABSENT').length
+            : 0;
 
-        const allowances = (emp.benefits?.transportation || 0) + (emp.benefits?.housing || 0) + (emp.benefits?.meal || 0);
-        const totalGross = baseSalary + overtimePay + allowances;
+          // Compute actual overtime hours
+          const overtimeHours = empAttendance.length > 0
+            ? empAttendance.reduce((sum: number, a: any) => sum + (a.overtimeHours || 0), 0)
+            : 0;
 
-        const healthInsurance = emp.benefits?.healthInsurance ? Math.round(totalGross * 0.05) : 0;
-        const pension = emp.benefits?.pension ? Math.round(totalGross * 0.09) : 0;
-        const employmentInsurance = emp.benefits?.employmentInsurance ? Math.round(totalGross * 0.006) : 0;
-        const workersComp = emp.benefits?.workersComp ? Math.round(totalGross * 0.003) : 0;
-        const incomeTax = Math.round(totalGross * 0.05);
-        const residentTax = Math.round(totalGross * 0.1);
+          const payrollDetails = calculatePayrollDetails({
+            baseSalary: emp.salary || 0,
+            salaryType: emp.salaryType || '月給',
+            workDays,
+            hourlyRate: emp.hourlyRate || 0,
+            dailyRate: emp.dailyRate || 0,
+            overtimeHours,
+            benefits: emp.benefits
+          });
 
-        const totalDeductions = healthInsurance + pension + employmentInsurance + workersComp + incomeTax + residentTax;
-        const netSalary = totalGross - totalDeductions;
+          return {
+            employeeId: emp.id,
+            month: endMonth,
+            baseSalary: payrollDetails.baseSalary,
+            overtimePay: payrollDetails.overtimePay,
+            allowances: payrollDetails.allowances, // maps to bonus on save
+            deductions: 0,
+            tax: payrollDetails.incomeTax + payrollDetails.residentTax,
+            insurance: payrollDetails.healthInsurance + payrollDetails.pension + payrollDetails.employmentInsurance,
+            netSalary: payrollDetails.netSalary,
+            paymentDate: `${endMonth}-25`,
+            status: 'APPROVED' as const, // Automatically approve calculations when calculated and saved
+            // Extra client-only fields to match state type:
+            healthInsurance: payrollDetails.healthInsurance,
+            pension: payrollDetails.pension,
+            employmentInsurance: payrollDetails.employmentInsurance,
+            workersComp: payrollDetails.workersComp,
+            incomeTax: payrollDetails.incomeTax,
+            residentTax: payrollDetails.residentTax,
+            totalGross: payrollDetails.totalGross,
+            totalDeductions: payrollDetails.totalDeductions,
+            salaryType: emp.salaryType,
+            workDays,
+            workHours: payrollDetails.workHours,
+            overtimeHours,
+            absentDays,
+          };
+        });
 
+      // Batch save calculated records to database
+      const saveRes = await fetch('/api/payroll', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newRecordsData),
+      });
+
+      if (!saveRes.ok) {
+        throw new Error('Failed to save payroll calculations to database');
+      }
+
+      const savedData = await saveRes.json();
+      const savedList = Array.isArray(savedData.data || savedData) ? (savedData.data || savedData) : [];
+
+      // Construct final records mapping for UI state using the saved database IDs
+      const finalRecords: PayrollRecord[] = newRecordsData.map(record => {
+        const matchingDb = savedList.find((s: any) => s.employeeId === record.employeeId && s.month === record.month);
         return {
-          id: `payroll-${emp.id}-${endMonth}`,
-          employeeId: emp.id,
-          month: endMonth,
-          baseSalary, overtimePay, allowances,
-          healthInsurance, pension, employmentInsurance, workersComp,
-          incomeTax, residentTax,
-          totalGross, totalDeductions, netSalary,
-          salaryType: emp.salaryType,
-          workDays, workHours, overtimeHours,
-          absentDays: 0,
-          status: 'CALCULATED',
+          ...record,
+          id: matchingDb?.id || `payroll-${record.employeeId}-${record.month}`,
+          status: matchingDb?.status || record.status,
         };
       });
 
-    setRecords(prev => {
-      const filtered = prev.filter(r => r.month !== endMonth);
-      return [...newRecords, ...filtered];
-    });
-    setCalculating(false);
+      setRecords(prev => {
+        const filtered = prev.filter(r => r.month !== endMonth);
+        return [...finalRecords, ...filtered];
+      });
+    } catch (err: any) {
+      console.error(err);
+      alert('Error calculating payroll: ' + (err.message || String(err)));
+    } finally {
+      setCalculating(false);
+    }
   };
 
   const monthRecords = useMemo(() => {

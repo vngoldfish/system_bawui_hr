@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import PayrollClient from '@/components/payroll/PayrollClient';
+import { calculatePayrollDetails } from '@/lib/payroll-calculator';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,10 +82,10 @@ export default async function PayrollPage() {
       const allowances = r.bonus;
       const totalGross = r.baseSalary + r.overtimePay + allowances;
       
-      const healthInsurance = Math.round(r.insurance * 5 / 14.6);
-      const pension = Math.round(r.insurance * 9 / 14.6);
-      const employmentInsurance = Math.round(r.insurance * 0.3 / 14.6);
-      const workersComp = Math.max(0, r.insurance - healthInsurance - pension - employmentInsurance);
+      const healthInsurance = Math.round(r.insurance * 5 / 14.3);
+      const pension = Math.round(r.insurance * 9 / 14.3);
+      const employmentInsurance = Math.round(r.insurance * 0.3 / 14.3);
+      const workersComp = 0;
       
       const incomeTax = Math.round(r.tax * 2 / 6);
       const residentTax = Math.max(0, r.tax - incomeTax);
@@ -107,7 +108,7 @@ export default async function PayrollPage() {
 
       const workDays = attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
       const absentDays = attendance.filter(a => a.status === 'ABSENT').length;
-      const overtimeHours = attendance.reduce((sum, a) => sum + a.overtimeHours, 0);
+      const overtimeHours = attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0);
       const workHours = workDays * 8;
 
       return {
@@ -178,46 +179,26 @@ export default async function PayrollPage() {
           : 0;
 
         const overtimeHours = attendance.length > 0
-          ? attendance.reduce((sum, a) => sum + a.overtimeHours, 0)
-          : (dbUser.firstName.length + current.getFullYear() + (current.getMonth() + 1)) % 15;
+          ? attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0)
+          : 0;
 
-        const workHours = workDays * 8;
-
-        const baseSalary = dbUser.salary || 450000;
-        const hourlyEquiv = baseSalary / 176;
-        const overtimePay = Math.round(hourlyEquiv * 1.25 * overtimeHours);
-        const allowances = 15000 + 30000 + 10000; // transportation, housing, meal
-        const totalGross = baseSalary + overtimePay + allowances;
-        
-        const healthInsurance = Math.round(totalGross * 0.05);
-        const pension = Math.round(totalGross * 0.09);
-        const employmentInsurance = Math.round(totalGross * 0.003);
-        const workersComp = Math.round(totalGross * 0.003);
-        const incomeTax = Math.round(totalGross * 0.02);
-        const residentTax = Math.round(totalGross * 0.04);
-        const totalDeductions = healthInsurance + pension + employmentInsurance + workersComp + incomeTax + residentTax;
-        const netSalary = totalGross - totalDeductions;
+        const payrollDetails = calculatePayrollDetails({
+          baseSalary: dbUser.salary || 450000,
+          salaryType: dbUser.salaryType || '月給',
+          workDays,
+          hourlyRate: dbUser.hourlyRate || 0,
+          dailyRate: dbUser.dailyRate || 0,
+          overtimeHours,
+          benefits: dbUser.benefits,
+        });
 
         generated.push({
           id: `gen-${dbUser.id}-${monthStr}`,
           employeeId: dbUser.id,
           month: monthStr,
-          baseSalary,
-          overtimePay,
-          allowances,
-          healthInsurance,
-          pension,
-          employmentInsurance,
-          workersComp,
-          incomeTax,
-          residentTax,
-          totalGross,
-          totalDeductions,
-          netSalary,
+          ...payrollDetails,
           salaryType: dbUser.salaryType || '月給',
           workDays,
-          workHours,
-          overtimeHours,
           absentDays,
           status: 'PAID',
           paymentDate: `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-25`,
@@ -298,10 +279,10 @@ export default async function PayrollPage() {
       const allowances = r.bonus;
       const totalGross = r.baseSalary + r.overtimePay + allowances;
       
-      const healthInsurance = Math.round(r.insurance * 5 / 14.6);
-      const pension = Math.round(r.insurance * 9 / 14.6);
-      const employmentInsurance = Math.round(r.insurance * 0.3 / 14.6);
-      const workersComp = Math.max(0, r.insurance - healthInsurance - pension - employmentInsurance);
+      const healthInsurance = Math.round(r.insurance * 5 / 14.3);
+      const pension = Math.round(r.insurance * 9 / 14.3);
+      const employmentInsurance = Math.round(r.insurance * 0.3 / 14.3);
+      const workersComp = 0;
       
       const incomeTax = Math.round(r.tax * 2 / 6);
       const residentTax = Math.max(0, r.tax - incomeTax);
@@ -326,7 +307,7 @@ export default async function PayrollPage() {
 
       const workDays = attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
       const absentDays = attendance.filter(a => a.status === 'ABSENT').length;
-      const overtimeHours = attendance.reduce((sum, a) => sum + a.overtimeHours, 0);
+      const overtimeHours = attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0);
       const workHours = workDays * 8;
 
       return {

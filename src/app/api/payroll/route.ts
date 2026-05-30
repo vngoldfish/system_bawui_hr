@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST new payroll record
+// POST new payroll record(s)
 export async function POST(request: NextRequest) {
   try {
     const user = getSessionUser(request);
@@ -87,38 +87,59 @@ export async function POST(request: NextRequest) {
       return errorResponse('Forbidden', 403);
     }
 
-    const data = await request.json();
+    const body = await request.json();
+    const isArray = Array.isArray(body);
+    const recordsData = isArray ? body : [body];
 
-    const record = await prisma.payrollRecord.create({
-      data: {
-        employeeId: data.employeeId,
-        month: data.month,
-        baseSalary: parseFloat(data.baseSalary),
-        overtimePay: parseFloat(data.overtimePay) || 0,
-        bonus: parseFloat(data.bonus) || 0,
-        deductions: parseFloat(data.deductions) || 0,
-        tax: parseFloat(data.tax) || 0,
-        insurance: parseFloat(data.insurance) || 0,
-        netSalary: parseFloat(data.netSalary),
-        paymentDate: new Date(data.paymentDate),
-        status: data.status || 'PENDING',
-      },
-    });
+    const results = await prisma.$transaction(
+      recordsData.map((data: any) =>
+        prisma.payrollRecord.upsert({
+          where: {
+            employeeId_month: {
+              employeeId: data.employeeId,
+              month: data.month,
+            },
+          },
+          update: {
+            baseSalary: parseFloat(data.baseSalary),
+            overtimePay: parseFloat(data.overtimePay) || 0,
+            bonus: parseFloat(data.allowances || data.bonus) || 0, // allowances map to bonus
+            deductions: parseFloat(data.deductions) || 0,
+            tax: parseFloat(data.tax) || 0,
+            insurance: parseFloat(data.insurance) || 0,
+            netSalary: parseFloat(data.netSalary),
+            paymentDate: new Date(data.paymentDate || `${data.month}-25`),
+            status: data.status || 'PENDING',
+          },
+          create: {
+            employeeId: data.employeeId,
+            month: data.month,
+            baseSalary: parseFloat(data.baseSalary),
+            overtimePay: parseFloat(data.overtimePay) || 0,
+            bonus: parseFloat(data.allowances || data.bonus) || 0, // allowances map to bonus
+            deductions: parseFloat(data.deductions) || 0,
+            tax: parseFloat(data.tax) || 0,
+            insurance: parseFloat(data.insurance) || 0,
+            netSalary: parseFloat(data.netSalary),
+            paymentDate: new Date(data.paymentDate || `${data.month}-25`),
+            status: data.status || 'PENDING',
+          },
+        })
+      )
+    );
 
     logDatabaseChange({
       request,
       action: 'CREATE',
       model: 'PayrollRecord',
-      recordId: record.id,
+      recordId: isArray ? 'BATCH' : results[0].id,
       details: {
-        employeeId: record.employeeId,
-        month: record.month,
-        netSalary: record.netSalary,
-        status: record.status,
+        count: results.length,
+        month: recordsData[0]?.month,
       },
     });
 
-    return createdResponse(record);
+    return createdResponse(isArray ? results : results[0]);
   } catch (error) {
     return handleApiError(error);
   }
