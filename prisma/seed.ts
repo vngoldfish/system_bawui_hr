@@ -27,6 +27,7 @@ async function main() {
   await prisma.contractType.deleteMany();
 
   // Create departments
+  const kanri = await prisma.department.create({ data: { name: '管理部', nameKana: 'かんりぶ', description: '管理業務全般' } });
   const eigyo = await prisma.department.create({ data: { name: '営業部', nameKana: 'えいぎょうぶ', description: '営業・販売を担当' } });
   const kaihatsu = await prisma.department.create({ data: { name: '開発部', nameKana: 'かいはつぶ', description: 'システム開発を担当' } });
   const jinji = await prisma.department.create({ data: { name: '人事部', nameKana: 'じんじぶ', description: '人事・労務を担当' } });
@@ -361,6 +362,34 @@ async function main() {
 
     console.log(`Created employee: ${employee.lastName} ${employee.firstName}`);
   }
+
+  // Create Super Admin User (admin@bawui.com)
+  const adminEmail = 'admin@bawui.com';
+  const adminPassword = '1234@abcd';
+  
+  await prisma.employee.create({
+    data: {
+      employeeCode: 'ADMIN001',
+      firstName: '管理者',
+      lastName: 'システム',
+      firstNameKana: 'かんりしゃ',
+      lastNameKana: 'システム',
+      email: adminEmail,
+      phone: '090-0000-0000',
+      birthDate: new Date('1990-01-01'),
+      hireDate: new Date('2026-05-30'),
+      salary: 0,
+      status: 'ACTIVE',
+      role: 'SUPER_ADMIN',
+      password: hashPassword(adminPassword),
+      nationality: '日本',
+      departmentId: kanri.id,
+      positionId: posBucho.id,
+      contractTypeId: ctSeishain.id,
+      benefits: {},
+    }
+  });
+  console.log(`Created Super Admin user: ${adminEmail}`);
 
   // Seed leave requests, attendance, overtime requests and payroll records
   console.log('Seeding leave requests...');
