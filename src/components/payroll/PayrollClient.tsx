@@ -100,7 +100,7 @@ function FilterTh({ label, filterKey, options, activeFilter, columnFilters, onFi
   const hasFilter = (columnFilters[filterKey]?.length ?? 0) > 0;
   const isActive = activeFilter === filterKey;
   return (
-    <th className={`px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer select-none relative ${widthClass || ''}`}
+    <th className={`px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer select-none relative whitespace-nowrap ${widthClass || ''}`}
       onDoubleClick={() => onActiveFilterChange(isActive ? null : filterKey)} title="ダブルクリックでフィルター">
       <div className="flex items-center gap-1">
         <span>{label}</span>
@@ -721,33 +721,33 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
         )}
 
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '950px' }}>
+          <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '1150px' }}>
             <colgroup>
-              <col style={{ width: '180px' }} />
-              <col style={{ width: '80px' }} />
+              <col style={{ width: '200px' }} />
+              <col style={{ width: '160px' }} />
+              <col style={{ width: '120px' }} />
+              <col style={{ width: '110px' }} />
+              <col style={{ width: '110px' }} />
+              <col style={{ width: '120px' }} />
+              <col style={{ width: '125px' }} />
               <col style={{ width: '110px' }} />
               <col style={{ width: '90px' }} />
-              <col style={{ width: '90px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '80px' }} />
             </colgroup>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 {(isEmployeeMode || viewType === 'employee') ? (
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('payroll.processMonth')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.processMonth')}</th>
                 ) : (
                   <FilterTh label={t('payroll.colName')} filterKey="name" options={nameOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
                 )}
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">{t('payroll.contractSalaryType')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('payroll.baseSalarySubject')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('payroll.overtimeHours')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('payroll.colAllowance')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('payroll.colDeduction')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">{t('payroll.colNet')}</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('payroll.colStatus')}</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">{t('payroll.detailBtn')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.contractSalaryType')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.baseSalarySubject')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.overtimeHours')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colAllowance')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colDeduction')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colNet')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colStatus')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.detailBtn')}</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
@@ -759,39 +759,39 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
                 const emp = employees.find(e => e.id === record.employeeId);
                 return (
                   <tr key={record.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       {(isEmployeeMode || viewType === 'employee') ? (
                         <span className="font-bold text-slate-800">{getDisplayMonth(record.month, locale)}</span>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs">{emp?.firstNameKana?.charAt(0).toUpperCase()}</div>
-                          <div>
-                            <span className="text-sm font-medium text-slate-800">{emp?.lastName} {emp?.firstName}</span>
+                          <div className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs shrink-0">{emp?.firstNameKana?.charAt(0).toUpperCase()}</div>
+                          <div className="min-w-0">
+                            <span className="text-sm font-medium text-slate-800 block truncate">{emp?.lastName} {emp?.firstName}</span>
                             {startMonth !== endMonth && (
                               <span className="text-xs text-blue-600 dark:text-blue-400 font-bold ml-1.5">
                                 ({getDisplayMonth(record.month, locale)})
                               </span>
                             )}
-                            <p className="text-xs text-slate-400">{emp?.department}</p>
+                            <p className="text-xs text-slate-400 truncate">{emp?.department}</p>
                           </div>
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3"><span className={`px-2 py-0.5 text-xs rounded ${salaryTypeColor(record.salaryType)}`}>{record.salaryType === '月給' ? t('payroll.typeMonthly') : record.salaryType === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly')}</span></td>
-                    <td className="px-4 py-3 text-sm text-right text-slate-600">{formatCurrency(record.baseSalary)}</td>
-                    <td className="px-4 py-3 text-sm text-right text-slate-600">{record.overtimePay > 0 ? formatCurrency(record.overtimePay) : '-'}</td>
-                    <td className="px-4 py-3 text-sm text-right text-slate-600">{record.allowances > 0 ? formatCurrency(record.allowances) : '-'}</td>
-                    <td className="px-4 py-3 text-sm text-right text-red-600">{formatCurrency(record.totalDeductions)}</td>
-                    <td className="px-4 py-3 text-sm text-right font-medium text-slate-800">{formatCurrency(record.netSalary)}</td>
-                    <td className="px-4 py-3 text-center"><span className={`px-2 py-0.5 text-xs rounded ${statusColor(record.status)}`}>{
+                    <td className="px-4 py-3 whitespace-nowrap"><span className={`px-2 py-0.5 text-xs rounded ${salaryTypeColor(record.salaryType)}`}>{record.salaryType === '月給' ? t('payroll.typeMonthly') : record.salaryType === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly')}</span></td>
+                    <td className="px-4 py-3 text-sm text-right text-slate-600 whitespace-nowrap">{formatCurrency(record.baseSalary)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-slate-600 whitespace-nowrap">{record.overtimePay > 0 ? formatCurrency(record.overtimePay) : '-'}</td>
+                    <td className="px-4 py-3 text-sm text-right text-slate-600 whitespace-nowrap">{record.allowances > 0 ? formatCurrency(record.allowances) : '-'}</td>
+                    <td className="px-4 py-3 text-sm text-right text-red-600 whitespace-nowrap">{formatCurrency(record.totalDeductions)}</td>
+                    <td className="px-4 py-3 text-sm text-right font-medium text-slate-800 whitespace-nowrap">{formatCurrency(record.netSalary)}</td>
+                    <td className="px-4 py-3 text-center whitespace-nowrap"><span className={`px-2 py-0.5 text-xs rounded ${statusColor(record.status)}`}>{
                       record.status === 'PAID' ? t('payroll.statusPaid') :
                       record.status === 'APPROVED' ? t('payroll.statusApproved') :
                       record.status === 'CALCULATED' ? t('payroll.statusCalculated') :
                       record.status === 'PENDING' ? t('payroll.statusPending') : record.status
                     }</span></td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
                       {emp && <button onClick={() => setSelectedPayslip(record)}
-                        className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors">{t('payroll.detailBtn')}</button>}
+                        className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors whitespace-nowrap">{t('payroll.detailBtn')}</button>}
                     </td>
                   </tr>
                 );
