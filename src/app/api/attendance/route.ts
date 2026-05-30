@@ -87,6 +87,24 @@ export async function POST(request: NextRequest) {
 
     const data = await request.json();
 
+    // Check if payroll is locked for this month
+    const recordDate = new Date(data.date);
+    if (!isNaN(recordDate.getTime())) {
+      const monthStr = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
+      const payrollRecord = await prisma.payrollRecord.findFirst({
+        where: {
+          employeeId: data.employeeId,
+          month: monthStr,
+          status: {
+            in: ['APPROVED', 'PAID']
+          }
+        }
+      });
+      if (payrollRecord) {
+        return errorResponse('この月の給与計算がすでに確定されているため、勤怠データを変更できません。 (Bảng lương tháng này đã được chốt, không thể thay đổi dữ liệu chấm công.)', 400);
+      }
+    }
+
     const record = await prisma.attendanceRecord.create({
       data: {
         employeeId: data.employeeId,
@@ -146,6 +164,29 @@ export async function PUT(request: NextRequest) {
 
     if (!data.id) {
       return errorResponse('Record ID is required', 400);
+    }
+
+    // Get current attendance record to determine employeeId and month
+    const currentRecord = await prisma.attendanceRecord.findUnique({
+      where: { id: data.id }
+    });
+    if (!currentRecord) {
+      return errorResponse('Attendance record not found', 404);
+    }
+
+    const recordDate = new Date(currentRecord.date);
+    const monthStr = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
+    const payrollRecord = await prisma.payrollRecord.findFirst({
+      where: {
+        employeeId: currentRecord.employeeId,
+        month: monthStr,
+        status: {
+          in: ['APPROVED', 'PAID']
+        }
+      }
+    });
+    if (payrollRecord) {
+      return errorResponse('この月の給与計算がすでに確定されているため、勤怠データを変更できません。 (Bảng lương tháng này đã được chốt, không thể thay đổi dữ liệu chấm công.)', 400);
     }
 
     const record = await prisma.attendanceRecord.update({

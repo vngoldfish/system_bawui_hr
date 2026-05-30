@@ -313,10 +313,51 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                     </button>
                   </>
                 ) : (
-                  <button onClick={() => setIsEditing(true)} className="px-3.5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium shadow-sm transition-colors cursor-pointer flex items-center gap-1.5">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                    編集
-                  </button>
+                  <>
+                    {(record.status === 'APPROVED' || record.status === 'PAID') ? (
+                      <button 
+                        onClick={async () => {
+                          if (confirm('この給与明細を未確定に戻しますか？勤怠や明細の修正が可能になります。(Bạn có muốn hủy chốt bảng lương này không? Sẽ có thể sửa lại chấm công và chi tiết lương.)')) {
+                            setSaving(true);
+                            try {
+                              const res = await fetch('/api/payroll', {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: record.id, status: 'CALCULATED' })
+                              });
+                              if (res.ok) {
+                                const json = await res.json();
+                                const updated = json.data || json;
+                                if (onSave) {
+                                  onSave({
+                                    ...record,
+                                    status: 'CALCULATED'
+                                  });
+                                }
+                                alert('未確定に戻しました。 (Đã hủy chốt bảng lương.)');
+                              } else {
+                                alert('Failed to change status');
+                              }
+                            } catch (e) {
+                              console.error(e);
+                            } finally {
+                              setSaving(false);
+                            }
+                          }
+                        }}
+                        disabled={saving}
+                        className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
+                        未確定に戻す
+                      </button>
+                    ) : (
+                      <button onClick={() => setIsEditing(true)} className="px-3.5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium shadow-sm transition-colors cursor-pointer flex items-center gap-1.5">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        編集
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -584,6 +625,67 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
               <span className="text-3xl font-black text-blue-600 print:text-black tracking-wide">{formatCurrency(currentNetSalary)}</span>
             </div>
           </div>
+
+          {/* Employer Cost Section (Only visible to Admin) */}
+          {isAdmin && (
+            <div className="mt-6 border border-slate-200 rounded-xl p-5 bg-slate-50/80 space-y-3 print:hidden">
+              <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest border-b border-slate-200 pb-1.5 flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                会社負担分 (Khoản Công ty chi trả thực tế)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-slate-600">
+                    <span>健康保険・厚生年金・介護保険 (会社折半)</span>
+                    <span className="font-semibold">{formatCurrency(Math.max(0, currentInsurance - Math.round(currentTotalGross * 0.006)))}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>雇用保険 (会社負担分: 0.95%)</span>
+                    <span className="font-semibold">{formatCurrency(Math.round(currentTotalGross * 0.0095))}</span>
+                  </div>
+                </div>
+                <div className="space-y-2 md:border-l md:border-slate-200 md:pl-4">
+                  <div className="flex justify-between text-slate-600">
+                    <span>労災保険 (会社全額負担: 0.3%)</span>
+                    <span className="font-semibold">{formatCurrency(Math.round(currentTotalGross * 0.003))}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>子ども・子育て拠出金 (会社全額負担: ~0.36%)</span>
+                    <span className="font-semibold">{formatCurrency(Math.round(currentInsurance * 0.04))}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-slate-200 pt-2.5 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-700">法定福利費 会社負担合計 (Tổng BHXH doanh nghiệp trả)</span>
+                  <p className="text-[10px] text-slate-400">Total Employer Social Insurance Burden</p>
+                </div>
+                <span className="text-sm font-bold text-slate-800">
+                  +{formatCurrency(
+                    Math.max(0, currentInsurance - Math.round(currentTotalGross * 0.006)) +
+                    Math.round(currentTotalGross * 0.0095) +
+                    Math.round(currentTotalGross * 0.003) +
+                    Math.round(currentInsurance * 0.04)
+                  )}
+                </span>
+              </div>
+              <div className="border-t border-slate-200 pt-2.5 flex items-center justify-between bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
+                <div>
+                  <span className="text-xs font-extrabold text-blue-800">総人件費 (Tổng chi phí nhân sự thực tế của Công ty)</span>
+                  <p className="text-[10px] text-blue-500">Gross Salary + Employer Burden</p>
+                </div>
+                <span className="text-base font-black text-blue-700">
+                  {formatCurrency(
+                    currentTotalGross +
+                    Math.max(0, currentInsurance - Math.round(currentTotalGross * 0.006)) +
+                    Math.round(currentTotalGross * 0.0095) +
+                    Math.round(currentTotalGross * 0.003) +
+                    Math.round(currentInsurance * 0.04)
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
 
         </div>
 
@@ -1289,6 +1391,18 @@ export default function PayrollClient({
                                 className="px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
                               >
                                 支払
+                              </button>
+                            )}
+                            {(record.status === 'APPROVED' || record.status === 'PAID') && (
+                              <button 
+                                onClick={() => {
+                                  if (confirm('この給与明細を未確定に戻しますか？勤怠や明細の修正が可能になります。(Bạn có muốn hủy chốt bảng lương này không? Sẽ có thể sửa lại chấm công và chi tiết lương.)')) {
+                                    handleUpdateStatus(record.id, 'CALCULATED');
+                                  }
+                                }}
+                                className="px-2 py-1 text-xs bg-red-50 text-red-750 hover:bg-red-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                              >
+                                未確定
                               </button>
                             )}
                           </>

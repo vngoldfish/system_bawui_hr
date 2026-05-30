@@ -45,6 +45,25 @@ export async function POST(request: NextRequest) {
     }
     const employeeId = user.id;
 
+    // Check if payroll is locked for the current month
+    const nowCheck = new Date();
+    const jstStrCheck = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(nowCheck);
+    const todayStartCheck = new Date(`${jstStrCheck}T00:00:00+09:00`);
+    const monthStrCheck = `${todayStartCheck.getFullYear()}-${String(todayStartCheck.getMonth() + 1).padStart(2, '0')}`;
+
+    const payrollRecord = await prisma.payrollRecord.findFirst({
+      where: {
+        employeeId,
+        month: monthStrCheck,
+        status: {
+          in: ['APPROVED', 'PAID']
+        }
+      }
+    });
+    if (payrollRecord) {
+      return errorResponse('この月の給与計算がすでに確定されているため、打刻できません。 (Bảng lương tháng này đã được chốt, không thể thực hiện chấm công.)', 400);
+    }
+
     const body = await request.json();
     const { action } = body; // 'checkIn' | 'breakStart' | 'breakEnd' | 'checkOut'
 

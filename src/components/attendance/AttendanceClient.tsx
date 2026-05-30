@@ -244,6 +244,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
   const [showInputModal, setShowInputModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+  const [isPayrollLocked, setIsPayrollLocked] = useState(false);
 
   // Filters for Employee selector
   const [empSearch, setEmpSearch] = useState('');
@@ -337,6 +338,25 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     setTempBreakEnd(defaultBreakEnd);
     setTempHasBreak(defaultHasBreak);
   }, [defaultCheckIn, defaultCheckOut, defaultBreakStart, defaultBreakEnd, defaultHasBreak]);
+
+  useEffect(() => {
+    const checkPayrollLock = async () => {
+      if (!selectedEmployee) return;
+      try {
+        const monthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+        const res = await fetch(`/api/payroll?employeeId=${selectedEmployee.id}&month=${monthStr}`);
+        if (res.ok) {
+          const data = await res.json();
+          const recordsList = data.data || data || [];
+          const isLocked = recordsList.some((r: any) => r.status === 'APPROVED' || r.status === 'PAID');
+          setIsPayrollLocked(isLocked);
+        }
+      } catch (e) {
+        console.error('Failed to check payroll status:', e);
+      }
+    };
+    checkPayrollLock();
+  }, [selectedEmployee, selectedYear, selectedMonth]);
 
   const saveMonthlyDefaults = (checkIn: string, checkOut: string, breakStart: string, breakEnd: string, hasBreak: boolean) => {
     if (!selectedEmployee) return;
@@ -641,6 +661,10 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
 
   // Open modal
   const openModal = (date: string, record?: AttendanceRecord) => {
+    if (isPayrollLocked && !isEmployeeMode) {
+      alert('この月の給与計算は確定済みのため、勤怠データの編集はできません。');
+      return;
+    }
     setSelectedDate(date);
     setEditingRecord(record || null);
     
@@ -1189,11 +1213,20 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
               {/* Monthly Shift Pattern Settings Button */}
               {!isEmployeeMode && (
                 <button
-                  onClick={() => setShowSettingsDrawer(!showSettingsDrawer)}
+                  onClick={() => {
+                    if (isPayrollLocked) {
+                      alert('この月の給与計算は確定済みのため、シフトパターンの変更はできません。');
+                      return;
+                    }
+                    setShowSettingsDrawer(!showSettingsDrawer);
+                  }}
+                  disabled={isPayrollLocked}
                   className={`px-3.5 py-2 border rounded-xl text-xs font-bold outline-none transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                    showSettingsDrawer 
-                      ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400' 
-                      : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-750'
+                    isPayrollLocked
+                      ? 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-350 dark:text-slate-600 cursor-not-allowed'
+                      : showSettingsDrawer 
+                        ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900 text-blue-650 dark:text-blue-400' 
+                        : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-750'
                   }`}
                 >
                   {getAttendanceText('patternSettings', locale)}
@@ -1322,6 +1355,13 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
             <h3 className="text-xs font-bold text-slate-450 dark:text-slate-400 uppercase tracking-widest mb-4">
               {locale === 'ja' || locale === 'zh' ? `${selectedYear}${getAttendanceText('yearUnit', locale)}${selectedMonth}${getAttendanceText('monthUnit', locale)}` : `${getAttendanceText('monthUnit', locale)}${selectedMonth} ${getAttendanceText('yearUnit', locale)}${selectedYear}`} {getAttendanceText('attendanceLog', locale)} ({daysInMonth.length}{getAttendanceText('daysUnit', locale)})
             </h3>
+
+            {isPayrollLocked && (
+              <div className="mb-4 p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/60 rounded-xl text-red-650 dark:text-red-400 text-xs font-bold flex items-center gap-2 shadow-sm animate-pulse">
+                <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <span>この月の給与計算は確定済みのため、勤怠データの編集および ca Cài đặt はロックされています。 (Bảng lương tháng này đã chốt, dữ liệu chấm công bị khóa.)</span>
+              </div>
+            )}
 
             {viewMode === 'box' ? (
               <div className="space-y-5">
