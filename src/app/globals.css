@@ -28,6 +28,13 @@
   --shadow-premium-hover: var(--shadow-premium-hover);
 }
 
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden !important;
+  position: relative;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

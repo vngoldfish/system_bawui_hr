@@ -110,7 +110,7 @@ export default function DashboardLayout({ children, title, subtitle }: Dashboard
   const translatedSubtitle = translateSubtitle(subtitle, t);
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden relative">
+    <div className="flex h-screen w-full max-w-full bg-slate-50 overflow-hidden relative">
       {/* Sidebar overlay on mobile */}
       {isMobileOpen && (
         <div 
@@ -126,7 +126,7 @@ export default function DashboardLayout({ children, title, subtitle }: Dashboard
         onCloseMobile={handleCloseMobile}
       />
       
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 max-w-full overflow-hidden">
         <Header 
           title={translatedTitle} 
           subtitle={translatedSubtitle} 
