@@ -69,7 +69,7 @@ export default async function PayrollPage() {
     const nowMonth = now.getMonth() + 1;
     const nowMonthStr = `${nowYear}-${String(nowMonth).padStart(2, '0')}`;
 
-    // 1. Regular Employee Mode: Only fetch/generate their own records from hire date to now
+    // 1. Regular Employee Mode: Only fetch real database records that are APPROVED or PAID from hire date to now
     const dbRecords = await prisma.payrollRecord.findMany({
       where: {
         employeeId: dbUser.id,
@@ -77,6 +77,9 @@ export default async function PayrollPage() {
           gte: hireMonthStr,
           lte: nowMonthStr,
         },
+        status: {
+          in: ['APPROVED', 'PAID']
+        }
       },
       orderBy: { month: 'desc' },
     });
@@ -140,78 +143,7 @@ export default async function PayrollPage() {
       };
     }));
 
-    // Generate monthly historical payslips if DB is currently empty for this user
-    if (records.length === 0) {
-      const hire = new Date(dbUser.hireDate);
-      const now = new Date();
-      const current = new Date(hire.getFullYear(), hire.getMonth(), 1);
-      const generated: any[] = [];
-      
-      while (current <= now) {
-        const monthStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
-        
-        // Calculate payment date for this month's salary (25th of the following month)
-        const paymentDate = new Date(current.getFullYear(), current.getMonth() + 1, 25);
-        
-        // Only include if the payment date has already passed compared to the current date
-        if (paymentDate > now) {
-          current.setMonth(current.getMonth() + 1);
-          continue;
-        }
-
-        // Query attendance records for this month
-        const startOfMonth = new Date(`${monthStr}-01T00:00:00Z`);
-        const endOfMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0, 23, 59, 59, 999);
-
-        const attendance = await prisma.attendanceRecord.findMany({
-          where: {
-            employeeId: dbUser.id,
-            date: {
-              gte: startOfMonth,
-              lte: endOfMonth,
-            }
-          }
-        });
-
-        const workDays = attendance.length > 0
-          ? attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length
-          : 22; // default fallback if no attendance recorded
-        
-        const absentDays = attendance.length > 0
-          ? attendance.filter(a => a.status === 'ABSENT').length
-          : 0;
-
-        const overtimeHours = attendance.length > 0
-          ? attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0)
-          : 0;
-
-        const payrollDetails = calculatePayrollDetails({
-          baseSalary: dbUser.salary || 450000,
-          salaryType: dbUser.salaryType || '月給',
-          workDays,
-          hourlyRate: dbUser.hourlyRate || 0,
-          dailyRate: dbUser.dailyRate || 0,
-          overtimeHours,
-          benefits: dbUser.benefits,
-        });
-
-        generated.push({
-          id: `gen-${dbUser.id}-${monthStr}`,
-          employeeId: dbUser.id,
-          month: monthStr,
-          ...payrollDetails,
-          salaryType: dbUser.salaryType || '月給',
-          workDays,
-          absentDays,
-          status: 'PAID',
-          paymentDate: `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-25`,
-        });
-        
-        current.setMonth(current.getMonth() + 1);
-      }
-      
-      records = generated.reverse();
-    }
+    // Do not generate mock/hypothetical records when empty, display empty table based on real database records instead
 
     const singleEmployeeList = [{
       id: dbUser.id,
