@@ -188,9 +188,9 @@ export function calculatePayrollDetails({
     pension: true,
     employmentInsurance: true,
     workersComp: true,
-    transportation: 15000,
-    housing: 30000,
-    meal: 10000,
+    transportation: 0,
+    housing: 0,
+    meal: 0,
   };
 
   const b = {
