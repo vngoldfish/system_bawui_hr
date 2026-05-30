@@ -1,0 +1,20 @@
+[
+  {
+    "lastName": "Nguyen",
+    "firstName": "Van An",
+    "lastNameKana": "グエン",
+    "firstNameKana": "ヴァン・アン",
+    "birthDate": "1997-04-12",
+    "residenceCardNumber": "AA1234567890",
+    "residenceExpiry": "2029-04-12"
+  },
+  {
+    "lastName": "Tran",
+    "firstName": "Thi Binh",
+    "lastNameKana": "チャン",
+    "firstNameKana": "ティ・ビン",
+    "birthDate": "1999-09-25",
+    "residenceCardNumber": "BB9876543210",
+    "residenceExpiry": "2028-09-25"
+  }
+]
