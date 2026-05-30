@@ -155,8 +155,35 @@ export default async function PayrollPage() {
           continue;
         }
 
+        // Query attendance records for this month
+        const startOfMonth = new Date(`${monthStr}-01T00:00:00Z`);
+        const endOfMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        const attendance = await prisma.attendanceRecord.findMany({
+          where: {
+            employeeId: dbUser.id,
+            date: {
+              gte: startOfMonth,
+              lte: endOfMonth,
+            }
+          }
+        });
+
+        const workDays = attendance.length > 0
+          ? attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length
+          : 22; // default fallback if no attendance recorded
+        
+        const absentDays = attendance.length > 0
+          ? attendance.filter(a => a.status === 'ABSENT').length
+          : 0;
+
+        const overtimeHours = attendance.length > 0
+          ? attendance.reduce((sum, a) => sum + a.overtimeHours, 0)
+          : (dbUser.firstName.length + current.getFullYear() + (current.getMonth() + 1)) % 15;
+
+        const workHours = workDays * 8;
+
         const baseSalary = dbUser.salary || 450000;
-        const overtimeHours = (dbUser.firstName.length + current.getFullYear() + (current.getMonth() + 1)) % 15;
         const hourlyEquiv = baseSalary / 176;
         const overtimePay = Math.round(hourlyEquiv * 1.25 * overtimeHours);
         const allowances = 15000 + 30000 + 10000; // transportation, housing, meal
@@ -188,10 +215,10 @@ export default async function PayrollPage() {
           totalDeductions,
           netSalary,
           salaryType: dbUser.salaryType || '月給',
-          workDays: 22,
-          workHours: 176,
+          workDays,
+          workHours,
           overtimeHours,
-          absentDays: 0,
+          absentDays,
           status: 'PAID',
           paymentDate: `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-25`,
         });
