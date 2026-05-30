@@ -106,6 +106,7 @@ async function main() {
 
     const birthDate = emp.birthDate ? new Date(emp.birthDate) : null;
     const expiryDate = emp.residenceExpiry ? new Date(emp.residenceExpiry) : null;
+    const issueDate = emp.residenceCardIssueDate ? new Date(emp.residenceCardIssueDate) : null;
 
     const phone = `080-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -129,6 +130,7 @@ async function main() {
         nationality: 'ベトナム',
         residenceStatus: '技術・人文知識・国際業務',
         residenceCardNumber: emp.residenceCardNumber || null,
+        residenceCardIssueDate: issueDate,
         residenceExpiry: expiryDate,
         departmentId: dept.id,
         positionId: pos.id,
