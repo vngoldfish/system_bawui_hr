@@ -130,8 +130,20 @@ function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee
     const html2canvas = (await import('html2canvas-pro')).default;
     const { jsPDF } = await import('jspdf');
 
-    const companyName = t('common.companyName');
-    const companyAddress = t('common.companyAddress');
+    let companyName = t('common.companyName');
+    let companyAddress = t('common.companyAddress');
+    if (typeof window !== 'undefined') {
+      const savedInfo = localStorage.getItem('company_info');
+      if (savedInfo) {
+        try {
+          const parsed = JSON.parse(savedInfo);
+          if (parsed.name) companyName = parsed.name;
+          if (parsed.address) companyAddress = parsed.address;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
     const scale = 2;
 
     const footerEl = document.createElement('div');

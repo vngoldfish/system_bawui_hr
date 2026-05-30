@@ -52,6 +52,9 @@ export default async function PayrollPage() {
     redirect('/login');
   }
 
+  // Fetch company details from database
+  const company = await prisma.company.findFirst();
+
   const viewMode = cookieStore.get('view_mode')?.value || 'admin';
   const isEmployee = dbUser.role === 'EMPLOYEE' || viewMode === 'employee';
 
@@ -233,8 +236,12 @@ export default async function PayrollPage() {
           <PayrollClient 
             employees={singleEmployeeList} 
             initialRecords={records} 
-            payrollSettings={{ cutoffDay: '末日', payday: '25' }} 
+            payrollSettings={{ 
+              cutoffDay: company?.salaryCutoffDay || '末日', 
+              payday: company?.payday || '25' 
+            }} 
             isEmployeeMode={true}
+            companyInfo={company ? { name: company.name, address: company.address } : undefined}
           />
         </div>
       </DashboardLayout>
@@ -337,13 +344,17 @@ export default async function PayrollPage() {
     }));
 
     return (
-      <DashboardLayout title="給与計算" subtitle="給与の自動計算と明細管理">
+      <DashboardLayout title="給与計算" subtitle="給与の自動計算 và 明細管理">
         <div className="space-y-6">
           <PayrollClient 
             employees={employees} 
             initialRecords={records} 
-            payrollSettings={{ cutoffDay: '末日', payday: '25' }} 
+            payrollSettings={{ 
+              cutoffDay: company?.salaryCutoffDay || '末日', 
+              payday: company?.payday || '25' 
+            }} 
             isEmployeeMode={false}
+            companyInfo={company ? { name: company.name, address: company.address } : undefined}
           />
         </div>
       </DashboardLayout>

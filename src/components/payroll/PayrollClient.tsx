@@ -112,7 +112,12 @@ function FilterTh({ label, filterKey, options, activeFilter, columnFilters, onFi
   );
 }
 
-function PayslipModal({ record, employee, onClose }: { record: PayrollRecord; employee: Employee; onClose: () => void }) {
+function PayslipModal({ record, employee, companyInfo, onClose }: { 
+  record: PayrollRecord; 
+  employee: Employee; 
+  companyInfo?: { name: string; address: string };
+  onClose: () => void 
+}) {
   const { t, locale } = useI18n();
   const [emailing, setEmailing] = useState(false);
   const [emailStatus, setEmailStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -228,8 +233,8 @@ function PayslipModal({ record, employee, onClose }: { record: PayrollRecord; em
               <div className="flex"><span className="w-28 font-medium text-slate-500 print:text-black">{t('payroll.deptPos')}:</span><span>{employee.department} / {employee.position}</span></div>
             </div>
             <div className="space-y-2 text-sm text-slate-700 print:text-black md:text-right md:border-l md:border-slate-200 md:pl-6 print:border-black">
-              <div className="font-bold text-base">{t('payroll.companyName')}</div>
-              <div>{t('payroll.companyAddress')}</div>
+              <div className="font-bold text-base">{companyInfo?.name || t('payroll.companyName')}</div>
+              <div>{companyInfo?.address || t('payroll.companyAddress')}</div>
               <div className="flex md:justify-end"><span className="w-28 font-medium text-slate-500 print:text-black text-left md:text-right mr-2">{t('payroll.payDate')}:</span><span className="font-semibold">{record.paymentDate ? formatPayday(record.paymentDate) : '2026/05/25'}</span></div>
             </div>
           </div>
@@ -337,8 +342,18 @@ interface PayrollSettings {
   payday: string;
 }
 
-export default function PayrollClient({ employees, initialRecords, payrollSettings, isEmployeeMode = false }: {
-  employees: Employee[]; initialRecords: PayrollRecord[]; payrollSettings?: PayrollSettings; isEmployeeMode?: boolean;
+export default function PayrollClient({ 
+  employees, 
+  initialRecords, 
+  payrollSettings, 
+  isEmployeeMode = false,
+  companyInfo
+}: {
+  employees: Employee[]; 
+  initialRecords: PayrollRecord[]; 
+  payrollSettings?: PayrollSettings; 
+  isEmployeeMode?: boolean;
+  companyInfo?: { name: string; address: string };
 }) {
   const { t, locale } = useI18n();
   const [records, setRecords] = useState(initialRecords);
@@ -875,7 +890,7 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
       {/* Payslip Modal */}
       {selectedPayslip && (() => {
         const emp = employees.find(e => e.id === selectedPayslip.employeeId);
-        return emp ? <PayslipModal record={selectedPayslip} employee={emp} onClose={() => setSelectedPayslip(null)} /> : null;
+        return emp ? <PayslipModal record={selectedPayslip} employee={emp} companyInfo={companyInfo} onClose={() => setSelectedPayslip(null)} /> : null;
       })()}
     </>
   );

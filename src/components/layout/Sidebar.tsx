@@ -145,7 +145,7 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
   // Load collapse state and user permissions on mount
   useEffect(() => {
     setIsMounted(true);
-    setCompanyName(t('common.companyName'));
+    let initialName = '';
     if (typeof window !== 'undefined') {
       const savedCollapsed = localStorage.getItem('sidebar_collapsed');
       if (savedCollapsed) {
@@ -156,13 +156,14 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
         try {
           const parsed = JSON.parse(savedInfo);
           if (parsed.name) {
-            setCompanyName(parsed.name);
+            initialName = parsed.name;
           }
         } catch (e) {
           console.error('Failed to parse company_info', e);
         }
       }
     }
+    setCompanyName(initialName || t('common.companyName'));
     
     const loggedUser = getLoggedUser();
     setUser(loggedUser);

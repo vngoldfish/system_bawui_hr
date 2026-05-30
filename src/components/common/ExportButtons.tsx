@@ -65,8 +65,20 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
     const margin = 10;
     const imgW = pdfW - margin * 2;
 
-    const companyName = t('common.companyName');
-    const companyAddress = t('common.companyAddress');
+    let companyName = t('common.companyName');
+    let companyAddress = t('common.companyAddress');
+    if (typeof window !== 'undefined') {
+      const savedInfo = localStorage.getItem('company_info');
+      if (savedInfo) {
+        try {
+          const parsed = JSON.parse(savedInfo);
+          if (parsed.name) companyName = parsed.name;
+          if (parsed.address) companyAddress = parsed.address;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
 
     const headerHtml = `<tr style="background:#334155;color:white;">${columns.map(c => `<th style="padding:8px 12px;text-align:left;border:1px solid #475569;">${c.header}</th>`).join('')}</tr>`;
     const rowHtml = (row: Record<string, unknown>, i: number) =>
