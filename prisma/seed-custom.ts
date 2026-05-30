@@ -119,6 +119,7 @@ async function main() {
         email,
         phone,
         birthDate,
+        address: emp.address || '',
         hireDate: new Date(),
         salary: 280000, // Default 280,000 JPY
         salaryType: ct.defaultSalaryType || '月給',

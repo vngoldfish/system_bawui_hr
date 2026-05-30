@@ -6,7 +6,8 @@
     "firstNameKana": "ヴァン・アン",
     "birthDate": "1997-04-12",
     "residenceCardNumber": "AA1234567890",
-    "residenceExpiry": "2029-04-12"
+    "residenceExpiry": "2029-04-12",
+    "address": "東京都新宿区西新宿1-1-1"
   },
   {
     "lastName": "Tran",
@@ -15,6 +16,7 @@
     "firstNameKana": "ティ・ビン",
     "birthDate": "1999-09-25",
     "residenceCardNumber": "BB9876543210",
-    "residenceExpiry": "2028-09-25"
+    "residenceExpiry": "2028-09-25",
+    "address": "大阪府大阪市北区梅田2-2-2"
   }
 ]
