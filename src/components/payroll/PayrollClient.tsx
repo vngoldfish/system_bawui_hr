@@ -614,14 +614,31 @@ export default function PayrollClient({
   const [viewType, setViewType] = useState<'month' | 'employee'>('month');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(() => employees[0]?.id || '');
   const [empCodeInput, setEmpCodeInput] = useState(() => employees[0]?.employeeCode || '');
-  const [startMonth, setStartMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  });
-  const [endMonth, setEndMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [selectedYear, setSelectedYear] = useState<number>(() => new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => new Date().getMonth() + 1);
+
+  const targetMonthStr = useMemo(() => {
+    return `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+  }, [selectedYear, selectedMonth]);
+
+  const startMonth = useMemo(() => {
+    if (isEmployeeMode || viewType === 'employee') {
+      return `${selectedYear}-01`;
+    }
+    return targetMonthStr;
+  }, [selectedYear, targetMonthStr, isEmployeeMode, viewType]);
+
+  const endMonth = useMemo(() => {
+    if (isEmployeeMode || viewType === 'employee') {
+      return `${selectedYear}-12`;
+    }
+    return targetMonthStr;
+  }, [selectedYear, targetMonthStr, isEmployeeMode, viewType]);
+
+  const years = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 8 }, (_, i) => currentYear - 4 + i);
+  }, []);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -882,17 +899,44 @@ export default function PayrollClient({
             </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 shadow-sm">
-            {viewType === 'month' ? (
-              <>
-                <div className="flex gap-3 items-center">
-                  <label className="text-sm font-medium text-slate-600 dark:text-slate-400">{t('payroll.monthRange')}:</label>
-                  <input type="month" value={startMonth} onChange={e => { setStartMonth(e.target.value); setCurrentPage(1); }}
-                    className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer" />
-                  <span className="text-slate-400">〜</span>
-                  <input type="month" value={endMonth} onChange={e => { setEndMonth(e.target.value); setCurrentPage(1); }}
-                    className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer" />
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-4 flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <select 
+                  value={selectedYear} 
+                  onChange={e => { setSelectedYear(parseInt(e.target.value)); setCurrentPage(1); }} 
+                  className="px-3.5 py-2 border border-slate-200 bg-white dark:bg-slate-850 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer text-slate-800"
+                >
+                  {years.map(y => <option key={y} value={y}>{locale === 'ja' || locale === 'zh' ? `${y}年` : `Year ${y}`}</option>)}
+                </select>
+                
+                {/* Tabbed Capsule for months */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-850 p-0.5 rounded-xl border border-slate-200 dark:border-slate-800 max-w-full overflow-x-auto text-slate-850">
+                  <button 
+                    onClick={() => { setSelectedMonth(prev => prev === 1 ? 12 : prev - 1); setCurrentPage(1); }} 
+                    className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold"
+                  >
+                    &lt;
+                  </button>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                    <button 
+                      key={m} 
+                      onClick={() => { setSelectedMonth(m); setCurrentPage(1); }} 
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${selectedMonth === m ? 'bg-white dark:bg-slate-800 text-blue-650 dark:text-blue-455 shadow-sm font-black' : 'text-slate-600 hover:text-slate-950 dark:hover:text-white'}`}
+                    >
+                      {locale === 'ja' || locale === 'zh' ? `${m}月` : `Month ${m}`}
+                    </button>
+                  ))}
+                  <button 
+                    onClick={() => { setSelectedMonth(prev => prev === 12 ? 1 : prev + 1); setCurrentPage(1); }} 
+                    className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold"
+                  >
+                    &gt;
+                  </button>
                 </div>
+              </div>
+
+              {viewType === 'month' && (
                 <div className="flex gap-2 flex-wrap items-center">
                   <button onClick={handleCalculate} disabled={calculating}
                     className="px-4 py-2 bg-blue-650 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold disabled:opacity-50 cursor-pointer shadow-sm">
@@ -909,9 +953,11 @@ export default function PayrollClient({
                     全支払 (Pay All)
                   </button>
                 </div>
-              </>
-            ) : (
-              <div className="flex flex-wrap gap-4 items-center w-full justify-between">
+              )}
+            </div>
+
+            {viewType === 'employee' && (
+              <div className="flex flex-wrap gap-4 items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3">
                 <div className="flex flex-wrap gap-4 items-center">
                   <div className="flex gap-3 items-center">
                     <label className="text-sm font-medium text-slate-600 dark:text-slate-400 shrink-0">{t('payroll.employeeCode')}:</label>
@@ -944,21 +990,13 @@ export default function PayrollClient({
                         }
                         setCurrentPage(1);
                       }}
-                      className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer min-w-[180px]"
+                      className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer min-w-[180px] text-slate-850"
                     >
                       {employees.map(emp => (
                         <option key={emp.id} value={emp.id}>{emp.lastName} {emp.firstName} ({emp.employeeCode})</option>
                       ))}
                     </select>
                   </div>
-                </div>
-                <div className="flex gap-3 items-center">
-                  <label className="text-sm font-medium text-slate-600 dark:text-slate-400">{t('payroll.monthRange')}:</label>
-                  <input type="month" value={startMonth} onChange={e => { setStartMonth(e.target.value); setCurrentPage(1); }}
-                    className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer" />
-                  <span className="text-slate-400">〜</span>
-                  <input type="month" value={endMonth} onChange={e => { setEndMonth(e.target.value); setCurrentPage(1); }}
-                    className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer" />
                 </div>
               </div>
             )}
@@ -1034,13 +1072,39 @@ export default function PayrollClient({
       )}
 
       {isEmployeeMode && (
-        <div className="flex gap-3 items-center bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 shadow-sm w-fit mb-4">
-          <label className="text-sm font-medium text-slate-650 dark:text-slate-400">{t('payroll.monthRange')}:</label>
-          <input type="month" value={startMonth} onChange={e => { setStartMonth(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer" />
-          <span className="text-slate-400">〜</span>
-          <input type="month" value={endMonth} onChange={e => { setEndMonth(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-4 flex items-center gap-3 w-fit mb-4 text-slate-850">
+          <select 
+            value={selectedYear} 
+            onChange={e => { setSelectedYear(parseInt(e.target.value)); setCurrentPage(1); }} 
+            className="px-3.5 py-2 border border-slate-200 bg-white dark:bg-slate-850 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+          >
+            {years.map(y => <option key={y} value={y}>{locale === 'ja' || locale === 'zh' ? `${y}年` : `Year ${y}`}</option>)}
+          </select>
+          
+          {/* Tabbed Capsule for months */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-850 p-0.5 rounded-xl border border-slate-200 dark:border-slate-800 max-w-full overflow-x-auto">
+            <button 
+              onClick={() => { setSelectedMonth(prev => prev === 1 ? 12 : prev - 1); setCurrentPage(1); }} 
+              className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold"
+            >
+              &lt;
+            </button>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+              <button 
+                key={m} 
+                onClick={() => { setSelectedMonth(m); setCurrentPage(1); }} 
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${selectedMonth === m ? 'bg-white dark:bg-slate-800 text-blue-650 dark:text-blue-455 shadow-sm font-black' : 'text-slate-600 hover:text-slate-950 dark:hover:text-white'}`}
+              >
+                {locale === 'ja' || locale === 'zh' ? `${m}月` : `Month ${m}`}
+              </button>
+            ))}
+            <button 
+              onClick={() => { setSelectedMonth(prev => prev === 12 ? 1 : prev + 1); setCurrentPage(1); }} 
+              className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold"
+            >
+              &gt;
+            </button>
+          </div>
         </div>
       )}
 
