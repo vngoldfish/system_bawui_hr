@@ -28,6 +28,9 @@ interface PayrollRecord {
   absentDays: number;
   status: string;
   paymentDate?: string;
+  deductions?: number;
+  tax?: number;
+  insurance?: number;
 }
 
 const getDisplayMonth = (monthStr: string, loc: string) => {
@@ -112,15 +115,43 @@ function FilterTh({ label, filterKey, options, activeFilter, columnFilters, onFi
   );
 }
 
-function PayslipModal({ record, employee, companyInfo, onClose }: { 
+function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, onClose }: { 
   record: PayrollRecord; 
   employee: Employee; 
   companyInfo?: { name: string; address: string };
+  isAdmin?: boolean;
+  onSave?: (updated: PayrollRecord) => void;
   onClose: () => void 
 }) {
   const { t, locale } = useI18n();
   const [emailing, setEmailing] = useState(false);
   const [emailStatus, setEmailStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFields, setEditFields] = useState({
+    baseSalary: record.baseSalary,
+    overtimePay: record.overtimePay,
+    allowances: record.allowances,
+    deductions: record.deductions,
+    tax: record.tax,
+    insurance: record.insurance,
+    paymentDate: record.paymentDate ? new Date(record.paymentDate).toISOString().split('T')[0] : record.month + '-25',
+    status: record.status,
+  });
+  const [saving, setSaving] = useState(false);
+
+  // Sync edits if record changes
+  useEffect(() => {
+    setEditFields({
+      baseSalary: record.baseSalary,
+      overtimePay: record.overtimePay,
+      allowances: record.allowances,
+      deductions: record.deductions,
+      tax: record.tax,
+      insurance: record.insurance,
+      paymentDate: record.paymentDate ? new Date(record.paymentDate).toISOString().split('T')[0] : record.month + '-25',
+      status: record.status,
+    });
+  }, [record]);
 
   const handlePrint = () => {
     window.print();
@@ -168,20 +199,77 @@ function PayslipModal({ record, employee, companyInfo, onClose }: {
     }
   };
 
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/payroll', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: record.id,
+          ...editFields,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to save edits');
+      }
+
+      const updatedRes = await res.json();
+      const updated = updatedRes.data || updatedRes;
+
+      if (onSave) {
+        onSave({
+          ...record,
+          baseSalary: updated.baseSalary,
+          overtimePay: updated.overtimePay,
+          allowances: updated.bonus, // backend bonus maps to allowances
+          deductions: updated.deductions,
+          tax: updated.tax,
+          insurance: updated.insurance,
+          netSalary: updated.netSalary,
+          status: updated.status,
+          paymentDate: updated.paymentDate,
+          // Recalculated values for client UI consistency
+          totalGross: updated.baseSalary + updated.overtimePay + updated.bonus,
+          totalDeductions: updated.deductions + updated.tax + updated.insurance,
+        });
+      }
+      setIsEditing(false);
+    } catch (e: any) {
+      console.error(e);
+      alert('Error updating payroll: ' + (e.message || String(e)));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const displayMonth = getDisplayMonth(record.month, locale);
 
-  // Format date to local date string
   const formatPayday = (dateStrOrObj: any) => {
     if (!dateStrOrObj) return '-';
     const date = new Date(dateStrOrObj);
     return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
   };
 
-  // Extract benefits
   const transAllow = employee.benefits?.transportation || 0;
   const houseAllow = employee.benefits?.housing || 0;
   const mealAllow = employee.benefits?.meal || 0;
-  const otherAllow = Math.max(0, record.allowances - transAllow - houseAllow - mealAllow);
+
+  const currentBase = (isEditing ? editFields.baseSalary : record.baseSalary) || 0;
+  const currentOTPay = (isEditing ? editFields.overtimePay : record.overtimePay) || 0;
+  const currentAllowances = (isEditing ? editFields.allowances : record.allowances) || 0;
+  const currentDeductions = (isEditing ? editFields.deductions : record.deductions) || 0;
+  const currentTax = (isEditing ? editFields.tax : record.tax) || 0;
+  const currentInsurance = (isEditing ? editFields.insurance : record.insurance) || 0;
+
+  const currentOtherAllow = Math.max(0, currentAllowances - transAllow - houseAllow - mealAllow);
+  const currentTotalGross = currentBase + currentOTPay + currentAllowances;
+  const currentTotalDeductions = currentDeductions + currentTax + currentInsurance;
+  const currentNetSalary = currentTotalGross - currentTotalDeductions;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 print:p-0 print:bg-white print:static" onClick={onClose}>
@@ -189,7 +277,7 @@ function PayslipModal({ record, employee, companyInfo, onClose }: {
         
         {/* Action Toolbar */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between print:hidden bg-slate-50 rounded-t-2xl">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap items-center">
             <button onClick={handlePrint} className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer">
               <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
               {t('payroll.printBtn')}
@@ -210,8 +298,28 @@ function PayslipModal({ record, employee, companyInfo, onClose }: {
             </button>
             {emailStatus === 'success' && <span className="text-green-600 text-xs flex items-center gap-1 font-semibold">{t('payroll.emailSuccess')}</span>}
             {emailStatus === 'error' && <span className="text-red-600 text-xs flex items-center gap-1 font-semibold">{t('payroll.emailFailed')}</span>}
+
+            {isAdmin && (
+              <div className="ml-auto flex gap-2">
+                {isEditing ? (
+                  <>
+                    <button onClick={handleSave} disabled={saving} className="px-3.5 py-2 bg-green-650 hover:bg-green-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors cursor-pointer disabled:opacity-50">
+                      {saving ? '保存中...' : '保存'}
+                    </button>
+                    <button onClick={() => setIsEditing(false)} className="px-3.5 py-2 bg-white border border-slate-350 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium shadow-sm transition-colors cursor-pointer">
+                      キャンセル
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={() => setIsEditing(true)} className="px-3.5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium shadow-sm transition-colors cursor-pointer flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    編集
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer ml-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -235,7 +343,34 @@ function PayslipModal({ record, employee, companyInfo, onClose }: {
             <div className="space-y-2 text-sm text-slate-700 print:text-black md:text-right md:border-l md:border-slate-200 md:pl-6 print:border-black">
               <div className="font-bold text-base">{companyInfo?.name || t('payroll.companyName')}</div>
               <div>{companyInfo?.address || t('payroll.companyAddress')}</div>
-              <div className="flex md:justify-end"><span className="w-28 font-medium text-slate-500 print:text-black text-left md:text-right mr-2">{t('payroll.payDate')}:</span><span className="font-semibold">{record.paymentDate ? formatPayday(record.paymentDate) : '2026/05/25'}</span></div>
+              <div className="flex md:justify-end items-center">
+                <span className="w-28 font-medium text-slate-500 print:text-black text-left md:text-right mr-2">{t('payroll.payDate')}:</span>
+                {isEditing ? (
+                  <input 
+                    type="date" 
+                    value={editFields.paymentDate}
+                    onChange={e => setEditFields(prev => ({ ...prev, paymentDate: e.target.value }))}
+                    className="px-2 py-1 border border-slate-300 rounded text-sm bg-white text-slate-800"
+                  />
+                ) : (
+                  <span className="font-semibold">{record.paymentDate ? formatPayday(record.paymentDate) : '2026/05/25'}</span>
+                )}
+              </div>
+              {isEditing && (
+                <div className="flex md:justify-end items-center mt-2">
+                  <span className="w-28 font-medium text-slate-500 mr-2 text-left md:text-right">ステータス:</span>
+                  <select
+                    value={editFields.status}
+                    onChange={e => setEditFields(prev => ({ ...prev, status: e.target.value }))}
+                    className="px-2 py-1 border border-slate-300 rounded text-sm bg-white text-slate-800"
+                  >
+                    <option value="PENDING">未処理</option>
+                    <option value="CALCULATED">計算済み</option>
+                    <option value="APPROVED">承認済み</option>
+                    <option value="PAID">支払い済み</option>
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
@@ -273,7 +408,7 @@ function PayslipModal({ record, employee, companyInfo, onClose }: {
             
             {/* Earnings (支給) */}
             <div>
-              <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【{t('payroll.earnings')}】</h3>
+              <h3 className="text-sm font-bold text-slate-800 bg-slate-100 bg-opacity-100 px-3 py-1.5 mb-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【{t('payroll.earnings')}】</h3>
               <table className="w-full text-xs border-collapse border border-slate-300 print:border-black">
                 <thead>
                   <tr className="bg-slate-50 print:bg-slate-100">
@@ -282,20 +417,76 @@ function PayslipModal({ record, employee, companyInfo, onClose }: {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 print:divide-black">
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.baseSalarySubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold print:border-black">{formatCurrency(record.baseSalary)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.overtimeSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-green-600 print:text-black print:border-black">+{formatCurrency(record.overtimePay)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.transportSubject')}</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(transAllow)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.housingSubject')}</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(houseAllow)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.mealSubject')}</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(mealAllow)}</td></tr>
-                  {otherAllow > 0 && <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.otherSubject')}</td><td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(otherAllow)}</td></tr>}
-                  <tr className="bg-blue-50/50 font-bold print:bg-slate-100"><td className="border border-slate-300 p-3 text-slate-800 print:text-black print:border-black">{t('payroll.totalEarnings')}</td><td className="border border-slate-300 p-3 text-right text-blue-700 print:text-black print:border-black">{formatCurrency(record.totalGross)}</td></tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.baseSalarySubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold print:border-black">
+                      {isEditing ? (
+                        <input 
+                          type="number" 
+                          value={editFields.baseSalary}
+                          onChange={e => setEditFields(prev => ({ ...prev, baseSalary: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        formatCurrency(record.baseSalary)
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.overtimeSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-green-650 print:text-black print:border-black">
+                      {isEditing ? (
+                        <input 
+                          type="number" 
+                          value={editFields.overtimePay}
+                          onChange={e => setEditFields(prev => ({ ...prev, overtimePay: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        `+${formatCurrency(record.overtimePay)}`
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.transportSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(transAllow)}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-305 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.housingSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(houseAllow)}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.mealSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(mealAllow)}</td>
+                  </tr>
+                  
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">その他手当・調整等 (手当合計)</td>
+                    <td className="border border-slate-300 p-2.5 text-right print:border-black">
+                      {isEditing ? (
+                        <input 
+                          type="number" 
+                          value={editFields.allowances}
+                          onChange={e => setEditFields(prev => ({ ...prev, allowances: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        `+${formatCurrency(currentOtherAllow)}`
+                      )}
+                    </td>
+                  </tr>
+
+                  <tr className="bg-blue-50/50 font-bold print:bg-slate-100">
+                    <td className="border border-slate-300 p-3 text-slate-800 print:text-black print:border-black">{t('payroll.totalEarnings')}</td>
+                    <td className="border border-slate-300 p-3 text-right text-blue-700 print:text-black print:border-black">{formatCurrency(currentTotalGross)}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
 
             {/* Deductions (控除) */}
             <div>
-              <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【{t('payroll.deductions')}】</h3>
+              <h3 className="text-sm font-bold text-slate-800 bg-slate-100 bg-opacity-100 px-3 py-1.5 mb-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【{t('payroll.deductions')}】</h3>
               <table className="w-full text-xs border-collapse border border-slate-300 print:border-black">
                 <thead>
                   <tr className="bg-slate-50 print:bg-slate-100">
@@ -304,14 +495,77 @@ function PayslipModal({ record, employee, companyInfo, onClose }: {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 print:divide-black">
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.healthInsSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.healthInsurance)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.pensionSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.pension)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.employmentInsSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.employmentInsurance)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.workersCompSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.workersComp)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.absentDeductionSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.totalDeductions - record.healthInsurance - record.pension - record.employmentInsurance - record.workersComp - record.incomeTax - record.residentTax > 0 ? record.totalDeductions - record.healthInsurance - record.pension - record.employmentInsurance - record.workersComp - record.incomeTax - record.residentTax : 0)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.incomeTaxSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.incomeTax)}</td></tr>
-                  <tr><td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.residentTaxSubject')}</td><td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.residentTax)}</td></tr>
-                  <tr className="bg-red-50/50 font-bold print:bg-slate-100"><td className="border border-slate-300 p-3 text-slate-800 print:text-black print:border-black">{t('payroll.totalDeductions')}</td><td className="border border-slate-300 p-3 text-right text-red-700 print:text-black print:border-black">-{formatCurrency(record.totalDeductions)}</td></tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.healthInsSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.healthInsurance)}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.pensionSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.pension)}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.employmentInsSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.employmentInsurance)}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.workersCompSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.workersComp)}</td>
+                  </tr>
+                  
+                  {isEditing && (
+                    <tr className="bg-slate-50">
+                      <td className="border border-slate-300 p-2.5 text-slate-705 font-medium">社会保険料 (手動調整用)</td>
+                      <td className="border border-slate-300 p-2.5 text-right">
+                        <input 
+                          type="number" 
+                          value={editFields.insurance}
+                          onChange={e => setEditFields(prev => ({ ...prev, insurance: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      </td>
+                    </tr>
+                  )}
+
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">欠勤控除・その他控除</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-505 print:text-black print:border-black">
+                      {isEditing ? (
+                        <input 
+                          type="number" 
+                          value={editFields.deductions}
+                          onChange={e => setEditFields(prev => ({ ...prev, deductions: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        `-${formatCurrency(currentDeductions)}`
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.incomeTaxSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-505 print:text-black print:border-black">
+                      {isEditing ? (
+                        <input 
+                          type="number" 
+                          value={editFields.tax}
+                          onChange={e => setEditFields(prev => ({ ...prev, tax: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        `-${formatCurrency(currentTax)}`
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.residentTaxSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">
+                      -{formatCurrency(record.residentTax)}
+                    </td>
+                  </tr>
+                  <tr className="bg-red-50/50 font-bold print:bg-slate-100">
+                    <td className="border border-slate-300 p-3 text-slate-800 print:text-black print:border-black">{t('payroll.totalDeductions')}</td>
+                    <td className="border border-slate-300 p-3 text-right text-red-700 print:text-black print:border-black">-{formatCurrency(currentTotalDeductions)}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -325,7 +579,7 @@ function PayslipModal({ record, employee, companyInfo, onClose }: {
               <p className="text-xs text-slate-400 print:text-black">Gross Pay minus Deductions</p>
             </div>
             <div className="text-right">
-              <span className="text-3xl font-black text-blue-600 print:text-black tracking-wide">{formatCurrency(record.netSalary)}</span>
+              <span className="text-3xl font-black text-blue-600 print:text-black tracking-wide">{formatCurrency(currentNetSalary)}</span>
             </div>
           </div>
 
@@ -374,6 +628,76 @@ export default function PayrollClient({
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
   const [selectedPayslip, setSelectedPayslip] = useState<PayrollRecord | null>(null);
   const [calculating, setCalculating] = useState(false);
+  const [selectedAttendanceCheck, setSelectedAttendanceCheck] = useState<{ employeeId: string; month: string; employeeName: string } | null>(null);
+
+  const handleUpdateStatus = async (recordId: string, status: string) => {
+    try {
+      const res = await fetch('/api/payroll', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: recordId, status })
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update status');
+      }
+      const updatedRes = await res.json();
+      const updated = updatedRes.data || updatedRes;
+      
+      setRecords(prev => prev.map(r => r.id === recordId ? { 
+        ...r, 
+        status: updated.status, 
+        paymentDate: updated.paymentDate 
+      } : r));
+    } catch (e: any) {
+      alert('Error updating status: ' + e.message);
+    }
+  };
+
+  const handleBatchUpdateStatus = async (status: string) => {
+    const targets = monthRecords.filter(r => {
+      if (status === 'APPROVED') {
+        return r.status === 'PENDING' || r.status === 'CALCULATED';
+      }
+      if (status === 'PAID') {
+        return r.status === 'APPROVED';
+      }
+      return false;
+    });
+
+    if (targets.length === 0) {
+      alert('対象となるデータがありません。');
+      return;
+    }
+
+    const confirmMsg = status === 'APPROVED' 
+      ? `選択された月内の ${targets.length} 件の給与明細を一括で「承認」しますか？`
+      : `選択された月内の ${targets.length} 件の給与明細を一括で「支払い済み」にしますか？`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const ids = targets.map(t => t.id);
+      const res = await fetch('/api/payroll', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status })
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update batch status');
+      }
+      
+      const today = new Date();
+      setRecords(prev => prev.map(r => ids.includes(r.id) ? { 
+        ...r, 
+        status, 
+        paymentDate: status === 'PAID' ? today.toISOString() : r.paymentDate 
+      } : r));
+      
+      alert(status === 'APPROVED' ? '一括承認が完了しました。' : '一括支払処理が完了しました。');
+    } catch (e: any) {
+      alert('Error batch updating status: ' + e.message);
+    }
+  };
 
   const handleColumnFilter = (key: string, values: string[]) => {
     setColumnFilters(prev => ({ ...prev, [key]: values }));
@@ -569,10 +893,22 @@ export default function PayrollClient({
                   <input type="month" value={endMonth} onChange={e => { setEndMonth(e.target.value); setCurrentPage(1); }}
                     className="px-3 py-2 border border-slate-300 dark:border-slate-750 dark:bg-slate-800 dark:text-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 cursor-pointer" />
                 </div>
-                <button onClick={handleCalculate} disabled={calculating}
-                  className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 cursor-pointer">
-                  {calculating ? t('payroll.calculating') : t('payroll.calculateBtn')}
-                </button>
+                <div className="flex gap-2 flex-wrap items-center">
+                  <button onClick={handleCalculate} disabled={calculating}
+                    className="px-4 py-2 bg-blue-650 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold disabled:opacity-50 cursor-pointer shadow-sm">
+                    {calculating ? t('payroll.calculating') : t('payroll.calculateBtn')}
+                  </button>
+                  <button onClick={() => handleBatchUpdateStatus('APPROVED')}
+                    className="px-4 py-2 bg-yellow-550 text-white rounded-lg hover:bg-yellow-600 transition-colors text-xs font-semibold cursor-pointer shadow-sm flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    全承認 (Approve All)
+                  </button>
+                  <button onClick={() => handleBatchUpdateStatus('PAID')}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-semibold cursor-pointer shadow-sm flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    全支払 (Pay All)
+                  </button>
+                </div>
               </>
             ) : (
               <div className="flex flex-wrap gap-4 items-center w-full justify-between">
@@ -787,15 +1123,15 @@ export default function PayrollClient({
         <div className="overflow-x-auto">
           <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '1150px' }}>
             <colgroup>
-              <col style={{ width: '200px' }} />
-              <col style={{ width: '160px' }} />
-              <col style={{ width: '120px' }} />
+              <col style={{ width: '190px' }} />
+              <col style={{ width: '130px' }} />
               <col style={{ width: '110px' }} />
+              <col style={{ width: '100px' }} />
+              <col style={{ width: '100px' }} />
               <col style={{ width: '110px' }} />
-              <col style={{ width: '120px' }} />
-              <col style={{ width: '125px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '90px' }} />
+              <col style={{ width: '115px' }} />
+              <col style={{ width: '100px' }} />
+              <col style={{ width: !isEmployeeMode ? '210px' : '90px' }} />
             </colgroup>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
@@ -811,7 +1147,7 @@ export default function PayrollClient({
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colDeduction')}</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colNet')}</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colStatus')}</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.detailBtn')}</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{!isEmployeeMode ? '操作' : t('payroll.detailBtn')}</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
@@ -854,8 +1190,47 @@ export default function PayrollClient({
                       record.status === 'PENDING' ? t('payroll.statusPending') : record.status
                     }</span></td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
-                      {emp && <button onClick={() => setSelectedPayslip(record)}
-                        className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors whitespace-nowrap">{t('payroll.detailBtn')}</button>}
+                      <div className="flex gap-1.5 justify-center items-center">
+                        {emp && (
+                          <button onClick={() => setSelectedPayslip(record)}
+                            className="px-2.5 py-1 text-xs bg-blue-50 text-blue-650 rounded hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap font-medium"
+                            title={t('payroll.detailBtn')}
+                          >
+                            明細
+                          </button>
+                        )}
+                        {!isEmployeeMode && emp && (
+                          <>
+                            <button 
+                              onClick={() => setSelectedAttendanceCheck({ 
+                                employeeId: record.employeeId, 
+                                month: record.month, 
+                                employeeName: `${emp.lastName} ${emp.firstName}` 
+                              })}
+                              className="px-2 py-1 text-xs bg-slate-100 text-slate-650 hover:bg-slate-200 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                              title="勤怠実績確認"
+                            >
+                              勤怠
+                            </button>
+                            {(record.status === 'PENDING' || record.status === 'CALCULATED') && (
+                              <button 
+                                onClick={() => handleUpdateStatus(record.id, 'APPROVED')}
+                                className="px-2 py-1 text-xs bg-yellow-50 text-yellow-750 hover:bg-yellow-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                              >
+                                承認
+                              </button>
+                            )}
+                            {record.status === 'APPROVED' && (
+                              <button 
+                                onClick={() => handleUpdateStatus(record.id, 'PAID')}
+                                className="px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                              >
+                                支払
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -890,9 +1265,178 @@ export default function PayrollClient({
       {/* Payslip Modal */}
       {selectedPayslip && (() => {
         const emp = employees.find(e => e.id === selectedPayslip.employeeId);
-        return emp ? <PayslipModal record={selectedPayslip} employee={emp} companyInfo={companyInfo} onClose={() => setSelectedPayslip(null)} /> : null;
+        return emp ? (
+          <PayslipModal 
+            record={selectedPayslip} 
+            employee={emp} 
+            companyInfo={companyInfo} 
+            isAdmin={!isEmployeeMode}
+            onSave={(updated) => {
+              setRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
+              setSelectedPayslip(updated);
+            }}
+            onClose={() => setSelectedPayslip(null)} 
+          />
+        ) : null;
       })()}
+
+      {/* Attendance Check Modal */}
+      {selectedAttendanceCheck && (
+        <AttendanceCheckModal
+          employeeId={selectedAttendanceCheck.employeeId}
+          month={selectedAttendanceCheck.month}
+          employeeName={selectedAttendanceCheck.employeeName}
+          onClose={() => setSelectedAttendanceCheck(null)}
+        />
+      )}
     </>
+  );
+}
+
+function AttendanceCheckModal({ 
+  employeeId, 
+  month, 
+  employeeName, 
+  onClose 
+}: { 
+  employeeId: string; 
+  month: string; 
+  employeeName: string; 
+  onClose: () => void 
+}) {
+  const [loading, setLoading] = useState(true);
+  const [attendance, setAttendance] = useState<any[]>([]);
+  const { t, locale } = useI18n();
+
+  useEffect(() => {
+    const fetchAttendance = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/attendance?employeeId=${employeeId}&month=${month}`);
+        if (res.ok) {
+          const json = await res.json();
+          setAttendance(json.data || json || []);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAttendance();
+  }, [employeeId, month]);
+
+  const stats = useMemo(() => {
+    const totalDays = attendance.length;
+    const presentDays = attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
+    const absentDays = attendance.filter(a => a.status === 'ABSENT').length;
+    const leaveDays = attendance.filter(a => a.status === 'LEAVE').length;
+    const totalOT = attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0);
+    return { totalDays, presentDays, absentDays, leaveDays, totalOT };
+  }, [attendance]);
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'PRESENT':
+        return <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">出勤</span>;
+      case 'LATE':
+        return <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded font-medium">遅刻</span>;
+      case 'EARLY_LEAVE':
+        return <span className="px-2 py-0.5 text-xs bg-orange-100 text-orange-850 rounded font-medium">早退</span>;
+      case 'ABSENT':
+        return <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded font-bold animate-pulse">欠勤</span>;
+      case 'LEAVE':
+        return <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">休暇</span>;
+      default:
+        return <span className="px-2 py-0.5 text-xs bg-slate-100 text-slate-800 rounded">{status}</span>;
+    }
+  };
+
+  const formatTime = (timeStr: string | null) => {
+    if (!timeStr) return '-';
+    try {
+      const d = new Date(timeStr);
+      return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch {
+      return timeStr;
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      return `${d.getMonth() + 1}/${d.getDate()}`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
+          <div>
+            <h3 className="text-lg font-bold text-slate-850">勤怠実績確認 (対照)</h3>
+            <p className="text-xs text-slate-500">{employeeName} - {month}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div className="p-4 bg-blue-50/50 border-b border-blue-100 grid grid-cols-4 gap-2 text-center text-sm">
+          <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
+            <p className="text-xs text-slate-500 font-medium">出勤日数</p>
+            <p className="text-base font-bold text-slate-850">{stats.presentDays} 日</p>
+          </div>
+          <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
+            <p className="text-xs text-slate-500 font-medium">欠勤日数</p>
+            <p className="text-base font-bold text-red-650">{stats.absentDays} 日</p>
+          </div>
+          <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
+            <p className="text-xs text-slate-500 font-medium">有給・休暇</p>
+            <p className="text-base font-bold text-blue-700">{stats.leaveDays} 日</p>
+          </div>
+          <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
+            <p className="text-xs text-slate-500 font-medium">総残業時間</p>
+            <p className="text-base font-bold text-orange-600">{stats.totalOT} 時間</p>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {loading ? (
+            <div className="py-12 text-center text-slate-400">読み込み中...</div>
+          ) : attendance.length === 0 ? (
+            <div className="py-12 text-center text-slate-400">この月の勤怠データはありません。</div>
+          ) : (
+            <table className="w-full text-sm border-collapse text-slate-700">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs font-semibold uppercase text-center">
+                  <th className="p-2">日付</th>
+                  <th className="p-2">出勤</th>
+                  <th className="p-2">退勤</th>
+                  <th className="p-2">残業 (h)</th>
+                  <th className="p-2">区分</th>
+                  <th className="p-2 text-left">備考</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {attendance.map((a: any) => (
+                  <tr key={a.id} className="hover:bg-slate-50 text-center">
+                    <td className="p-2.5 font-medium font-mono">{formatDate(a.date)}</td>
+                    <td className="p-2.5 font-mono">{formatTime(a.checkIn)}</td>
+                    <td className="p-2.5 font-mono">{formatTime(a.checkOut)}</td>
+                    <td className="p-2.5 font-bold text-orange-600">{a.overtimeHours || '-'}</td>
+                    <td className="p-2.5">{getStatusBadge(a.status)}</td>
+                    <td className="p-2.5 text-left text-xs text-slate-500 max-w-[200px] truncate" title={a.notes}>{a.notes || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
