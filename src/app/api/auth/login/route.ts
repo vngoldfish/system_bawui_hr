@@ -17,10 +17,16 @@ export async function POST(request: NextRequest) {
       return errorResponse('メールアドレスとパスワードを入力してください。', 400);
     }
 
+    console.log('[LOGIN DEBUG] Request email:', email, 'password:', password);
     // Lookup employee in the database
     const employee = await prisma.employee.findUnique({
       where: { email: email.trim().toLowerCase() },
     });
+
+    console.log('[LOGIN DEBUG] Found employee:', employee ? employee.email : 'not found');
+    if (employee) {
+      console.log('[LOGIN DEBUG] Verification result:', verifyPassword(password, employee.password));
+    }
 
     if (!employee) {
       return errorResponse('メールアドレスまたはパスワードが正しくありません。', 401);

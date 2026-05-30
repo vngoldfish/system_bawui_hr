@@ -6,6 +6,28 @@ import PayrollClient from '@/components/payroll/PayrollClient';
 
 export const dynamic = 'force-dynamic';
 
+const mergeBenefits = (benefits: any) => {
+  const defaults = {
+    healthInsurance: true,
+    pension: true,
+    employmentInsurance: true,
+    workersComp: true,
+    transportation: 15000,
+    housing: 30000,
+    meal: 10000
+  };
+  if (!benefits || typeof benefits !== 'object') return defaults;
+  return {
+    healthInsurance: benefits.healthInsurance ?? defaults.healthInsurance,
+    pension: benefits.pension ?? defaults.pension,
+    employmentInsurance: benefits.employmentInsurance ?? defaults.employmentInsurance,
+    workersComp: benefits.workersComp ?? defaults.workersComp,
+    transportation: benefits.transportation ?? defaults.transportation,
+    housing: benefits.housing ?? defaults.housing,
+    meal: benefits.meal ?? defaults.meal,
+  };
+};
+
 export default async function PayrollPage() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
@@ -185,7 +207,7 @@ export default async function PayrollPage() {
       hourlyRate: dbUser.hourlyRate || 0,
       dailyRate: dbUser.dailyRate || 0,
       contractType: '正社員',
-      benefits: dbUser.benefits as any || { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 30000, meal: 10000 },
+      benefits: mergeBenefits(dbUser.benefits),
     }];
 
     return (
@@ -228,7 +250,7 @@ export default async function PayrollPage() {
       hourlyRate: emp.hourlyRate || 0,
       dailyRate: emp.dailyRate || 0,
       contractType: emp.employeeContracts?.[0]?.contractType?.name || '正社員',
-      benefits: emp.benefits as any || { healthInsurance: true, pension: true, employmentInsurance: true, workersComp: true, transportation: 15000, housing: 30000, meal: 10000 },
+      benefits: mergeBenefits(emp.benefits),
     }));
 
     // Fetch existing database records for Admin view

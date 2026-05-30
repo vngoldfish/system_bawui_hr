@@ -392,13 +392,13 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
         const hourlyEquiv = emp.salaryType === '時給' ? emp.hourlyRate : baseSalary / workHours;
         const overtimePay = Math.round(hourlyEquiv * 1.25 * overtimeHours);
 
-        const allowances = emp.benefits.transportation + emp.benefits.housing + emp.benefits.meal;
+        const allowances = (emp.benefits?.transportation || 0) + (emp.benefits?.housing || 0) + (emp.benefits?.meal || 0);
         const totalGross = baseSalary + overtimePay + allowances;
 
-        const healthInsurance = emp.benefits.healthInsurance ? Math.round(totalGross * 0.05) : 0;
-        const pension = emp.benefits.pension ? Math.round(totalGross * 0.09) : 0;
-        const employmentInsurance = emp.benefits.employmentInsurance ? Math.round(totalGross * 0.006) : 0;
-        const workersComp = emp.benefits.workersComp ? Math.round(totalGross * 0.003) : 0;
+        const healthInsurance = emp.benefits?.healthInsurance ? Math.round(totalGross * 0.05) : 0;
+        const pension = emp.benefits?.pension ? Math.round(totalGross * 0.09) : 0;
+        const employmentInsurance = emp.benefits?.employmentInsurance ? Math.round(totalGross * 0.006) : 0;
+        const workersComp = emp.benefits?.workersComp ? Math.round(totalGross * 0.003) : 0;
         const incomeTax = Math.round(totalGross * 0.05);
         const residentTax = Math.round(totalGross * 0.1);
 
@@ -811,13 +811,13 @@ export default function PayrollClient({ employees, initialRecords, payrollSettin
             </p>
             <div className="flex gap-1">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">{t('staff.client.prev')}</button>
+                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">{t('client.prev')}</button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                 <button key={page} onClick={() => setCurrentPage(page)}
                   className={`px-3 py-1.5 text-sm rounded-lg ${page === currentPage ? 'bg-blue-600 text-white' : 'border border-slate-300 hover:bg-slate-50'}`}>{page}</button>
               ))}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">{t('staff.client.next')}</button>
+                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40">{t('client.next')}</button>
             </div>
           </div>
         )}
