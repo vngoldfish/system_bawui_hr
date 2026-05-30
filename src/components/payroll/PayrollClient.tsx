@@ -622,18 +622,12 @@ export default function PayrollClient({
   }, [selectedYear, selectedMonth]);
 
   const startMonth = useMemo(() => {
-    if (isEmployeeMode || viewType === 'employee') {
-      return `${selectedYear}-01`;
-    }
     return targetMonthStr;
-  }, [selectedYear, targetMonthStr, isEmployeeMode, viewType]);
+  }, [targetMonthStr]);
 
   const endMonth = useMemo(() => {
-    if (isEmployeeMode || viewType === 'employee') {
-      return `${selectedYear}-12`;
-    }
     return targetMonthStr;
-  }, [selectedYear, targetMonthStr, isEmployeeMode, viewType]);
+  }, [targetMonthStr]);
 
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear();
