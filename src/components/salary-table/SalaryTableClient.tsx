@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
+import BulkSalaryUpdate from './BulkSalaryUpdate';
 
 interface RateItem {
   id: string; name: string; nameKana: string;
@@ -606,6 +607,7 @@ function EditModal({ item, onSave, onClose }: {
 // ─── Main Component ───────────────────────────────────────────────
 export default function SalaryTableClient() {
   const { t, locale } = useI18n();
+  const [activeTab, setActiveTab] = useState<'regulations' | 'bulk_update'>('regulations');
   const [rates, setRates] = useState<RateItem[]>(defaultRates);
   const [health, setHealth] = useState<HealthInsuranceSettings>(defaultHealth);
   const [pension, setPension] = useState<PensionSettings>(defaultPension);
@@ -641,7 +643,35 @@ export default function SalaryTableClient() {
 
   return (
     <>
-      {saved && (
+      {/* Tab Switcher */}
+      <div className="flex border-b border-slate-200 mb-6">
+        <button
+          onClick={() => setActiveTab('regulations')}
+          className={`py-3 px-6 font-bold text-sm border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === 'regulations'
+              ? 'border-blue-600 text-blue-600 font-extrabold'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <span>⚙️</span>
+          <span>{t('salaryTable.regulationsTab')}</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('bulk_update')}
+          className={`py-3 px-6 font-bold text-sm border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === 'bulk_update'
+              ? 'border-blue-600 text-blue-600 font-extrabold'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <span>📈</span>
+          <span>{t('salaryTable.bulkSalaryTab')}</span>
+        </button>
+      </div>
+
+      {activeTab === 'regulations' ? (
+        <>
+          {saved && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
           <span className="text-green-600 text-lg">&#10003;</span>
           <span className="text-sm font-medium text-green-800">{t('salaryTable.savedSuccess')}</span>
@@ -808,7 +838,11 @@ export default function SalaryTableClient() {
         </div>
       )}
 
-      {editingItem && <EditModal item={editingItem} onSave={handleSaveRate} onClose={() => setEditingItem(null)} />}
+          {editingItem && <EditModal item={editingItem} onSave={handleSaveRate} onClose={() => setEditingItem(null)} />}
+        </>
+      ) : (
+        <BulkSalaryUpdate />
+      )}
     </>
   );
 }
