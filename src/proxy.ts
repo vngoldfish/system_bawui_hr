@@ -10,7 +10,8 @@ export function proxy(request: NextRequest) {
     pathname.startsWith('/static') ||
     pathname.startsWith('/favicon.ico') ||
     pathname === '/login' ||
-    pathname === '/api/auth/login'
+    pathname === '/api/auth/login' ||
+    (pathname === '/api/company' && request.method === 'GET')
   ) {
     return NextResponse.next();
   }
