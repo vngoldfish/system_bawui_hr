@@ -113,10 +113,10 @@ export default async function PayrollPage() {
         }
       });
 
-      const workDays = attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
-      const absentDays = attendance.filter(a => a.status === 'ABSENT').length;
-      const overtimeHours = attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0);
-      const workHours = workDays * 8;
+      const workDays = r.workDays !== null && r.workDays !== undefined ? r.workDays : (attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length || 22);
+      const absentDays = r.absentDays !== null && r.absentDays !== undefined ? r.absentDays : (attendance.filter(a => a.status === 'ABSENT').length || 0);
+      const overtimeHours = r.overtimeHours !== null && r.overtimeHours !== undefined ? r.overtimeHours : (attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0) || 0);
+      const workHours = r.workHours !== null && r.workHours !== undefined ? r.workHours : (workDays * 8);
 
       return {
         id: r.id,
@@ -135,10 +135,10 @@ export default async function PayrollPage() {
         totalDeductions,
         netSalary: r.netSalary,
         salaryType: dbUser.salaryType || '月給',
-        workDays: workDays || 22,
-        workHours: workHours || 176,
-        overtimeHours: Math.round(overtimeHours * 10) / 10 || 0,
-        absentDays: absentDays || 0,
+        workDays,
+        workHours,
+        overtimeHours: Math.round(overtimeHours * 10) / 10,
+        absentDays,
         status: r.status,
         paymentDate: r.paymentDate ? r.paymentDate.toISOString() : undefined,
       };
@@ -250,10 +250,10 @@ export default async function PayrollPage() {
         }
       });
 
-      const workDays = attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
-      const absentDays = attendance.filter(a => a.status === 'ABSENT').length;
-      const overtimeHours = attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0);
-      const workHours = workDays * 8;
+      const workDays = r.workDays !== null && r.workDays !== undefined ? r.workDays : (attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length || 22);
+      const absentDays = r.absentDays !== null && r.absentDays !== undefined ? r.absentDays : (attendance.filter(a => a.status === 'ABSENT').length || 0);
+      const overtimeHours = r.overtimeHours !== null && r.overtimeHours !== undefined ? r.overtimeHours : (attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0) || 0);
+      const workHours = r.workHours !== null && r.workHours !== undefined ? r.workHours : (workDays * 8);
 
       return {
         id: r.id,
@@ -272,10 +272,10 @@ export default async function PayrollPage() {
         totalDeductions,
         netSalary: r.netSalary,
         salaryType: emp?.salaryType || '月給',
-        workDays: workDays || 22,
-        workHours: workHours || 176,
-        overtimeHours: Math.round(overtimeHours * 10) / 10 || 0,
-        absentDays: absentDays || 0,
+        workDays,
+        workHours,
+        overtimeHours: Math.round(overtimeHours * 10) / 10,
+        absentDays,
         status: r.status,
         paymentDate: r.paymentDate ? r.paymentDate.toISOString() : undefined,
       };

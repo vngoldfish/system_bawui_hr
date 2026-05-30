@@ -135,6 +135,11 @@ export async function POST(request: NextRequest) {
         const insurance = parseFloat(data.insurance) || 0;
         const calculatedNet = baseSalary + overtimePay + allowances - (deductions + tax + insurance);
 
+        const workDays = data.workDays !== undefined && data.workDays !== null ? parseFloat(data.workDays) : null;
+        const workHours = data.workHours !== undefined && data.workHours !== null ? parseFloat(data.workHours) : null;
+        const overtimeHours = data.overtimeHours !== undefined && data.overtimeHours !== null ? parseFloat(data.overtimeHours) : null;
+        const absentDays = data.absentDays !== undefined && data.absentDays !== null ? parseFloat(data.absentDays) : null;
+
         return prisma.payrollRecord.upsert({
           where: {
             employeeId_month: {
@@ -152,6 +157,10 @@ export async function POST(request: NextRequest) {
             netSalary: calculatedNet,
             paymentDate: new Date(data.paymentDate || `${data.month}-25`),
             status: data.status || 'PENDING',
+            workDays,
+            workHours,
+            overtimeHours,
+            absentDays,
           },
           create: {
             employeeId: data.employeeId,
@@ -165,6 +174,10 @@ export async function POST(request: NextRequest) {
             netSalary: calculatedNet,
             paymentDate: new Date(data.paymentDate || `${data.month}-25`),
             status: data.status || 'PENDING',
+            workDays,
+            workHours,
+            overtimeHours,
+            absentDays,
           },
         });
       })
@@ -265,6 +278,11 @@ export async function PUT(request: NextRequest) {
     const status = body.status || existing.status;
     const paymentDate = body.paymentDate ? new Date(body.paymentDate) : existing.paymentDate;
 
+    const workDays = body.workDays !== undefined ? (body.workDays !== null ? parseFloat(body.workDays) : null) : existing.workDays;
+    const workHours = body.workHours !== undefined ? (body.workHours !== null ? parseFloat(body.workHours) : null) : existing.workHours;
+    const overtimeHours = body.overtimeHours !== undefined ? (body.overtimeHours !== null ? parseFloat(body.overtimeHours) : null) : existing.overtimeHours;
+    const absentDays = body.absentDays !== undefined ? (body.absentDays !== null ? parseFloat(body.absentDays) : null) : existing.absentDays;
+
     if (baseSalary < 0 || overtimePay < 0 || allowances < 0 || deductions < 0 || tax < 0 || insurance < 0) {
       return errorResponse('Payroll values cannot be negative', 400);
     }
@@ -284,6 +302,10 @@ export async function PUT(request: NextRequest) {
         netSalary: calculatedNet,
         status,
         paymentDate,
+        workDays,
+        workHours,
+        overtimeHours,
+        absentDays,
       },
     });
 

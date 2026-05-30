@@ -255,21 +255,25 @@ model AttendanceRecord {
 
 // Payroll Record model
 model PayrollRecord {
-  id          String        @id @default(cuid())
-  employeeId  String
-  employee    Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  month       String // YYYY-MM format
-  baseSalary  Float
-  overtimePay Float         @default(0)
-  bonus       Float         @default(0)
-  deductions  Float         @default(0)
-  tax         Float         @default(0)
-  insurance   Float         @default(0)
-  netSalary   Float
-  paymentDate DateTime
-  status      PayrollStatus @default(PENDING)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id            String        @id @default(cuid())
+  employeeId    String
+  employee      Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  month         String // YYYY-MM format
+  baseSalary    Float
+  overtimePay   Float         @default(0)
+  bonus         Float         @default(0)
+  deductions    Float         @default(0)
+  tax           Float         @default(0)
+  insurance     Float         @default(0)
+  netSalary     Float
+  paymentDate   DateTime
+  status        PayrollStatus @default(PENDING)
+  workDays      Float?
+  workHours     Float?
+  overtimeHours Float?
+  absentDays    Float?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@unique([employeeId, month])
   @@map("payroll_records")

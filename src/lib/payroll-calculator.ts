@@ -166,7 +166,9 @@ export function calculatePayrollDetails({
   benefits,
   birthDate,
   month = '2026-05',
-  dependentsCount = 0
+  dependentsCount = 0,
+  customAllowances,
+  customBonus
 }: {
   baseSalary: number;
   salaryType: string;
@@ -178,6 +180,8 @@ export function calculatePayrollDetails({
   birthDate?: string | null;
   month?: string;
   dependentsCount?: number;
+  customAllowances?: number;
+  customBonus?: number;
 }) {
   const defaults = {
     healthInsurance: true,
@@ -218,8 +222,10 @@ export function calculatePayrollDetails({
   const hourlyEquiv = salaryType === '時給' ? hourlyRate : (workHours > 0 ? calculatedBase / workHours : 0);
   const overtimePay = Math.round(hourlyEquiv * 1.25 * overtimeHours);
 
-  const allowances = b.transportation + b.housing + b.meal;
-  const totalGross = calculatedBase + overtimePay + allowances;
+  const baseAllowances = b.transportation + b.housing + b.meal;
+  const allowances = customAllowances !== undefined && customAllowances !== null ? customAllowances : baseAllowances;
+  const bonus = customBonus !== undefined && customBonus !== null ? customBonus : 0;
+  const totalGross = calculatedBase + overtimePay + allowances + bonus;
 
   // --- LUẬT BẢO HIỂM XÃ HỘI VÀ THUẾ CHUẨN NHẬT BẢN ---
 
@@ -255,7 +261,6 @@ export function calculatePayrollDetails({
   const totalSocialInsurance = healthInsurance + nursingCarePremium + pension + employmentInsurance;
 
   // 6. Income Tax (所得税): Tính trên Gross trừ trợ cấp đi lại miễn thuế và trừ tổng bảo hiểm xã hội
-  const taxableCommuterAllowance = 0; // Mặc định trợ cấp đi lại được miễn thuế ở Nhật lên đến 150,000 JPY
   const taxableIncome = Math.max(0, totalGross - b.transportation - totalSocialInsurance);
   const incomeTax = estimateIncomeTaxGetsugakuhyo(taxableIncome, dependentsCount);
 
@@ -269,6 +274,7 @@ export function calculatePayrollDetails({
     baseSalary: calculatedBase,
     overtimePay,
     allowances,
+    bonus,
     healthInsurance: healthInsurance + nursingCarePremium, // Y tế gộp cả chăm sóc dài hạn để khớp UI cũ
     pension,
     employmentInsurance,
