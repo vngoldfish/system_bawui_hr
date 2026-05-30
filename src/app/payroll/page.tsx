@@ -146,6 +146,15 @@ export default async function PayrollPage() {
       while (current <= now) {
         const monthStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
         
+        // Calculate payment date for this month's salary (25th of the following month)
+        const paymentDate = new Date(current.getFullYear(), current.getMonth() + 1, 25);
+        
+        // Only include if the payment date has already passed compared to the current date
+        if (paymentDate > now) {
+          current.setMonth(current.getMonth() + 1);
+          continue;
+        }
+
         const baseSalary = dbUser.salary || 450000;
         const overtimeHours = (dbUser.firstName.length + current.getFullYear() + (current.getMonth() + 1)) % 15;
         const hourlyEquiv = baseSalary / 176;
@@ -184,7 +193,7 @@ export default async function PayrollPage() {
           overtimeHours,
           absentDays: 0,
           status: 'PAID',
-          paymentDate: `${monthStr}-25`,
+          paymentDate: `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-25`,
         });
         
         current.setMonth(current.getMonth() + 1);
