@@ -88,51 +88,78 @@ export async function POST(request: NextRequest) {
     });
 
     if (record) {
-      // Update existing record
-      const updateData: any = {};
-      if (action === 'checkIn') {
-        updateData.checkIn = now;
-        updateData.status = 'PRESENT';
-      } else if (action === 'breakStart') {
-        updateData.breakStart = now;
-      } else if (action === 'breakEnd') {
-        updateData.breakEnd = now;
-      } else if (action === 'checkOut') {
-        updateData.checkOut = now;
-        
-        // Calculate work hours & overtime hours if both checkIn and checkOut exist
-        const checkInTime = record.checkIn || now;
-        const breakStart = record.breakStart;
-        const breakEnd = record.breakEnd;
-        
-        let workMins = (now.getTime() - checkInTime.getTime()) / (1000 * 60);
-        if (breakStart && breakEnd) {
-          workMins -= (breakEnd.getTime() - breakStart.getTime()) / (1000 * 60);
+      if (action === 'checkOut') {
+        record = await prisma.$transaction(async (tx) => {
+          const latestRecord = await tx.attendanceRecord.findUniqueOrThrow({
+            where: { id: record!.id }
+          });
+
+          const updateData: any = {};
+          updateData.checkOut = now;
+
+          // Calculate work hours & overtime hours if both checkIn and checkOut exist
+          const checkInTime = latestRecord.checkIn || now;
+          const breakStart = latestRecord.breakStart;
+          const breakEnd = latestRecord.breakEnd;
+
+          let workMins = (now.getTime() - checkInTime.getTime()) / (1000 * 60);
+          if (breakStart && breakEnd) {
+            workMins -= (breakEnd.getTime() - breakStart.getTime()) / (1000 * 60);
+          }
+
+          const workHours = Math.max(0, workMins / 60);
+          // Overtime is any work past 8 hours
+          const overtimeHours = Math.max(0, Math.round((workHours - 8) * 10) / 10);
+          updateData.overtimeHours = overtimeHours;
+
+          return tx.attendanceRecord.update({
+            where: { id: latestRecord.id },
+            data: updateData,
+          });
+        });
+
+        logDatabaseChange({
+          request,
+          action: 'UPDATE',
+          model: 'AttendanceRecord',
+          recordId: record.id,
+          details: {
+            employeeId: record.employeeId,
+            date: record.date,
+            action,
+            updateData: { checkOut: now, overtimeHours: record.overtimeHours },
+          },
+        });
+      } else {
+        // Update existing record
+        const updateData: any = {};
+        if (action === 'checkIn') {
+          updateData.checkIn = now;
+          updateData.status = 'PRESENT';
+        } else if (action === 'breakStart') {
+          updateData.breakStart = now;
+        } else if (action === 'breakEnd') {
+          updateData.breakEnd = now;
         }
-        
-        const workHours = Math.max(0, workMins / 60);
-        // Overtime is any work past 8 hours
-        const overtimeHours = Math.max(0, Math.round((workHours - 8) * 10) / 10);
-        updateData.overtimeHours = overtimeHours;
+
+        record = await prisma.attendanceRecord.update({
+          where: { id: record.id },
+          data: updateData,
+        });
+
+        logDatabaseChange({
+          request,
+          action: 'UPDATE',
+          model: 'AttendanceRecord',
+          recordId: record.id,
+          details: {
+            employeeId: record.employeeId,
+            date: record.date,
+            action,
+            updateData,
+          },
+        });
       }
-
-      record = await prisma.attendanceRecord.update({
-        where: { id: record.id },
-        data: updateData,
-      });
-
-      logDatabaseChange({
-        request,
-        action: 'UPDATE',
-        model: 'AttendanceRecord',
-        recordId: record.id,
-        details: {
-          employeeId: record.employeeId,
-          date: record.date,
-          action,
-          updateData,
-        },
-      });
     } else {
       // Create new record for today
       const createData: any = {

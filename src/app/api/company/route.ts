@@ -31,7 +31,7 @@ const updateCompanySchema = z.object({
 });
 
 // GET company info (Public)
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     let company = await prisma.company.findFirst();
     if (!company) {

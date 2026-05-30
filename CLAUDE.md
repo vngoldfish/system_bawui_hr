@@ -1,57 +1,77 @@
 # CLAUDE.md
 
-**This file is the SINGLE SOURCE OF TRUTH** for how you should behave in this repository.
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-## Project Overview
-- **Tên dự án**: bawuiweb
-- **Mô tả**: Hệ thống quản lý nhân sự (HR Management System) dành cho công ty Nhật Bản.
-- **Ngôn ngữ chính**: Giao diện tiếng Nhật, hỗ trợ đa ngôn ngữ cho nhân viên nước ngoài.
-- **Phiên bản**: Next.js **16.2.6** (App Router + React 19)
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-## Technology Stack
-- Next.js 16.2.6 (App Router)
-- React 19 + TypeScript (strict)
-- Tailwind CSS 4
-- Prisma + PostgreSQL
-- Zod (validation)
-- Geist font
+## 1. Think Before Coding
 
-## Multi-Language Support (i18n) – RẤT QUAN TRỌNG
-Hệ thống **phải hỗ trợ 4 ngôn ngữ**:
-- **ja** (Japanese) – ngôn ngữ mặc định
-- **en** (English)
-- **vi** (Vietnamese)
-- **zh** (Chinese – Simplified)
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-### Quy tắc khi làm việc với đa ngôn ngữ:
-1. Mỗi trang/component phải hỗ trợ translation keys (không hardcode text).
-2. Ngôn ngữ của user được lưu trong **user profile** (cột `preferredLanguage` trong bảng users/employees).
-3. Default language = **ja** (Japanese).
-4. Language detection: theo `preferredLanguage` của user → fallback về `ja`.
-5. Khi render UI, luôn dùng hook hoặc function i18n hiện tại của dự án.
-6. Khi thêm text mới, phải thêm translation cho **cả 4 ngôn ngữ**.
-7. Hỗ trợ nhân viên nước ngoài chọn ngôn ngữ cá nhân (trong trang profile/settings).
-8. Cho đến khi có login thật, lấy `preferredLanguage` từ `getCurrentUser()` trong `src/lib/auth-mock.ts` → fallback về `ja`.
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
 
-## Important Rules (PHẢI TUÂN THỦ TUYỆT ĐỐI)
-1. **Timezone**: Luôn dùng `Asia/Tokyo` khi xử lý ngày giờ.
-2. **Date Handling**: Prisma `Date` → client phải convert sang ISO string.
-3. **API Response**: Luôn dùng helper trong `src/lib/api-utils.ts`.
-4. **Client/Server**: Server components fetch data → pass data đã serialize xuống Client components (`*Client.tsx`).
-5. **Mock Auth**: Cho đến khi tích hợp login/session thật, mọi kiểm tra user/role/permission phải dùng `src/lib/auth-mock.ts` (`getCurrentUser`, `hasRole`, `hasPermission`, `requirePermission`). Không tự tạo auth helper khác song song.
-6. Không thay đổi cấu trúc thư mục trừ khi thực sự cần thiết.
-7. Luôn kiểm tra `prisma/schema.prisma` trước khi thêm/sửa field.
+## 2. Simplicity First
 
-## Commands
+**Minimum code that solves the problem. Nothing speculative.**
 
-```bash
-npm run dev          # Development
-npm run build        # Production build
-npm run start        # Start production server
-npm run lint         # ESLint
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
 
-# Prisma
-npx prisma generate
-npx prisma migrate dev
-npx prisma db seed
-npx prisma studio
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+## 5. Delegation to Sub-Agent (Phân công cho Sub-Agent)
+
+**Main agent KHÔNG được viết code. Chỉ phân tích, lập kế hoạch, rồi giao cho sub-agent thực thi.**
+
+Quy trình:
+1. Khi nhận task, main agent **chỉ** thực hiện phân tích yêu cầu, lên plan kỹ thuật, xác định scope và các bước cần làm.
+2. Viết plan chi tiết (bao gồm file cần sửa, logic cần implement, edge cases).
+3. Dùng `Agent` tool để giao task cho sub-agent (coder) thực thi việc viết code.
+4. Sau khi sub-agent hoàn thành, main agent review kết quả và verify.
+
+Lý do: Tách biệt trách nhiệm giữa phân tích và thực thi giúp giảm lỗi, tăng chất lượng code, và dễ review hơn.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

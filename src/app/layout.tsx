@@ -40,7 +40,7 @@ export default async function RootLayout({
       if (parsed && parsed.language) {
         initialLocale = parsed.language;
       }
-    } catch (e) {
+    } catch (_e) {
       // Ignore
     }
   }

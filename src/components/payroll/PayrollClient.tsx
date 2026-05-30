@@ -398,8 +398,9 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                   </>
                 ) : (
                   <>
-                    {(record.status === 'APPROVED' || record.status === 'PAID') ? (
-                      <button 
+                    {/* Always show the revert button for APPROVED, PAID, or PENDING states */}
+                    {record.status === 'APPROVED' || record.status === 'PAID' || record.status === 'PENDING' ? (
+                      <button
                         onClick={async () => {
                           if (confirm('この給与明細を未確定に戻しますか？勤怠や明細の修正が可能になります。(Bạn có muốn hủy chốt bảng lương này không? Sẽ có thể sửa lại chấm công và chi tiết lương.)')) {
                             setSaving(true);
@@ -420,17 +421,19 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                                 }
                                 alert('未確定に戻しました。 (Đã hủy chốt bảng lương.)');
                               } else {
-                                alert('Failed to change status');
+                                const err = await res.json();
+                                alert('Failed to change status: ' + (err.error || res.statusText));
                               }
                             } catch (e) {
                               console.error(e);
+                              alert('Error updating status: ' + (e instanceof Error ? e.message : String(e)));
                             } finally {
                               setSaving(false);
                             }
                           }
                         }}
                         disabled={saving}
-                        className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                        className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
                         未確定に戻す
@@ -1654,7 +1657,7 @@ function AttendanceCheckModal({
 }) {
   const [loading, setLoading] = useState(true);
   const [attendance, setAttendance] = useState<any[]>([]);
-  const { t, locale } = useI18n();
+  const { t: _t, locale: _locale } = useI18n();
 
   useEffect(() => {
     const fetchAttendance = async () => {

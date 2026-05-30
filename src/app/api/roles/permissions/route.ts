@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { successResponse, handleApiError } from '@/lib/api-utils';
 
 // GET all role permissions
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const rolePermissions = await prisma.rolePermission.findMany({
       orderBy: { role: 'asc' },

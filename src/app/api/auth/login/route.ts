@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { successResponse, errorResponse, handleApiError } from '@/lib/api-utils';
+import { errorResponse, handleApiError } from '@/lib/api-utils';
 import { verifyPassword } from '@/lib/crypto';
 import { setSessionCookies } from '@/lib/session';
 import { isRateLimited } from '@/lib/rate-limiter';

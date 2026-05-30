@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { successResponse, handleApiError, errorResponse } from '@/lib/api-utils';
 
 // GET all permissions
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const permissions = await prisma.permission.findMany({
       orderBy: [

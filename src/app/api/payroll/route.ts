@@ -66,6 +66,8 @@ export async function GET(request: NextRequest) {
         employee: true,
       },
       orderBy: { month: 'desc' },
+      take: parseInt(searchParams.get('limit') || '50', 10),
+      skip: parseInt(searchParams.get('skip') || '0', 10),
     });
 
     return successResponse(records);
@@ -289,6 +291,10 @@ export async function PUT(request: NextRequest) {
 
     // Mathematical net salary validation overrides client inputs
     const calculatedNet = baseSalary + overtimePay + allowances - (deductions + tax + insurance);
+
+    if (calculatedNet < 0) {
+      return errorResponse('Net salary cannot be negative', 400);
+    }
 
     const updatedRecord = await prisma.payrollRecord.update({
       where: { id: body.id },

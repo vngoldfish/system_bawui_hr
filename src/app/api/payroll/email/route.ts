@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, successResponse, handleApiError } from '@/lib/api-utils';
+import { getSessionUser } from '@/lib/session';
 
 export async function POST(request: NextRequest) {
   try {
-    const cookie = request.cookies.get('session_user');
-    if (!cookie) {
+    const user = await getSessionUser(request);
+    if (!user) {
       return errorResponse('Unauthorized', 401);
     }
 
-    const user = JSON.parse(decodeURIComponent(cookie.value));
     const body = await request.json();
     const { payrollRecordId } = body;
 

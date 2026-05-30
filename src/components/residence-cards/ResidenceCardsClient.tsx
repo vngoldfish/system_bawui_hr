@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Image from 'next/image';
 import Card from '@/components/common/Card';
 import EmployeeFormModal from '@/components/employees/EmployeeFormModal';
 import { formatDate } from '@/lib/utils';
@@ -112,8 +113,8 @@ const getVisaStatusLabel = (status: string, t: any) => {
 };
 
 export default function ResidenceCardsClient({ initialEmployees }: { initialEmployees: Employee[] }) {
-  const { t, locale } = useI18n();
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
+  const { t, locale: _locale } = useI18n();
+  const [employees, _setEmployees] = useState<Employee[]>(initialEmployees);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | ExpiryLevel>('ALL');
   const [nationalityFilter, setNationalityFilter] = useState<string>('ALL');
@@ -191,7 +192,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
     setModalOpen(true);
   };
 
-  const [loading, setLoading] = useState(false);
+  const [_loading, setLoading] = useState(false);
 
   const handleSave = async (data: Omit<Employee, 'id'>, id?: string) => {
     if (!id) return;
@@ -315,7 +316,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
                       <td className="px-5 py-4 w-[180px] min-w-[180px]">
                         <div className="flex items-center gap-3 min-w-0">
                           {emp.avatar ? (
-                            <img src={emp.avatar} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm" />
+                            <Image src={emp.avatar} alt="" width={36} height={36} className="rounded-full object-cover border border-slate-200 shadow-sm" />
                           ) : (
                             <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-sm font-bold text-slate-600 border border-slate-200">
                               {emp.firstNameKana?.charAt(0).toUpperCase()}
@@ -343,7 +344,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
                               className="p-0.5 border border-slate-200 rounded hover:border-blue-400 bg-slate-50 transition-all cursor-pointer shrink-0"
                               title={t('residenceCards.previewCardImage')}
                             >
-                              <img src={emp.residenceCardImage} alt="card" className="w-6 h-4 object-cover rounded-xs" />
+                              <Image src={emp.residenceCardImage} alt="card" width={24} height={16} className="object-cover rounded-xs" />
                             </button>
                           )}
                         </div>
@@ -482,7 +483,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
                                 className="p-0.5 border border-slate-200 rounded-lg hover:border-blue-400 bg-white transition-all max-w-[120px] block cursor-pointer"
                                 title={t('residenceCards.previewCardImage')}
                               >
-                                <img src={h.residenceCardImage} alt="expired card" className="w-24 h-16 object-cover rounded" />
+                                <Image src={h.residenceCardImage} alt="expired card" width={96} height={64} className="object-cover rounded" />
                               </button>
                             </div>
                           )}
@@ -521,7 +522,9 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
               >
                 &times;
               </button>
-              <img src={previewImageUrl} alt="Residence Card Preview" className="w-full h-auto rounded-lg max-h-[80vh] object-contain mx-auto" />
+              <div className="relative w-full h-[80vh]">
+                <Image src={previewImageUrl} alt="Residence Card Preview" fill className="rounded-lg object-contain" />
+              </div>
             </div>
           </div>
         </Portal>

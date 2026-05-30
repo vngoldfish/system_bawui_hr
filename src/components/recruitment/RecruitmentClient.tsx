@@ -112,7 +112,7 @@ const getMockTranslation = (text: string, t: any) => {
 };
 
 export default function RecruitmentClient() {
-  const { t, locale } = useI18n();
+  const { t, locale: _locale } = useI18n();
   const [postings, setPostings] = useState<JobPosting[]>([
     { id: 'j1', title: 'フロントエンドエンジニア', department: '開発部', type: '正社員', salary: '月給30万~50万', description: 'React/Next.jsを使用したWebアプリケーション開発', requirements: ['React経験3年以上', 'TypeScript必須', 'チーム開発経験'], status: 'open', postedDate: '2026-05-01', deadline: '2026-06-30' },
     { id: 'j2', title: '営業担当', department: '営業部', type: '正社員', salary: '月給25万~40万', description: '法人営業・新規開拓', requirements: ['営業経験2年以上', '普通自動車免許'], status: 'open', postedDate: '2026-05-10', deadline: '2026-06-15' },

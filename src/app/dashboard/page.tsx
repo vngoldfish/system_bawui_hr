@@ -18,7 +18,7 @@ export default async function DashboardPage() {
   let user;
   try {
     user = JSON.parse(decodeURIComponent(sessionUserCookie.value));
-  } catch (e) {
+  } catch (_e) {
     redirect('/login');
   }
 

@@ -34,7 +34,7 @@ export default async function EvaluationPage() {
   let user;
   try {
     user = JSON.parse(decodeURIComponent(sessionUserCookie.value));
-  } catch (e) {
+  } catch (_e) {
     redirect('/login');
   }
 

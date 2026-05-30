@@ -28,18 +28,18 @@ async function main() {
 
   // Create departments
   const kanri = await prisma.department.create({ data: { name: '管理部', nameKana: 'かんりぶ', description: '管理業務全般' } });
-  const eigyo = await prisma.department.create({ data: { name: '営業部', nameKana: 'えいぎょうぶ', description: '営業・販売を担当' } });
-  const kaihatsu = await prisma.department.create({ data: { name: '開発部', nameKana: 'かいはつぶ', description: 'システム開発を担当' } });
-  const jinji = await prisma.department.create({ data: { name: '人事部', nameKana: 'じんじぶ', description: '人事・労務を担当' } });
-  const keiri = await prisma.department.create({ data: { name: '経理部', nameKana: 'けいりぶ', description: '経理・財務を担当' } });
+  await prisma.department.create({ data: { name: '営業部', nameKana: 'えいぎょうぶ', description: '営業・販売を担当' } });
+  await prisma.department.create({ data: { name: '開発部', nameKana: 'かいはつぶ', description: 'システム開発を担当' } });
+  await prisma.department.create({ data: { name: '人事部', nameKana: 'じんじぶ', description: '人事・労務を担当' } });
+  await prisma.department.create({ data: { name: '経理部', nameKana: 'けいりぶ', description: '経理・財務を担当' } });
 
   console.log('Created 4 departments');
 
   // Create positions
   const posBucho = await prisma.position.create({ data: { name: '部長', nameKana: 'ぶちょう', description: '部門の最高責任者' } });
-  const posKacho = await prisma.position.create({ data: { name: '課長', nameKana: 'かちょう', description: '課の責任者' } });
-  const posKakaricho = await prisma.position.create({ data: { name: '係長', nameKana: 'かかりちょう', description: '係の責任者' } });
-  const posShunin = await prisma.position.create({ data: { name: '主任', nameKana: 'しゅにん', description: '中堅社員' } });
+  await prisma.position.create({ data: { name: '課長', nameKana: 'かちょう', description: '課の責任者' } });
+  await prisma.position.create({ data: { name: '係長', nameKana: 'かかりちょう', description: '係の責任者' } });
+  await prisma.position.create({ data: { name: '主任', nameKana: 'しゅにん', description: '中堅社員' } });
   const posLeadEng = await prisma.position.create({ data: { name: 'リードエンジニア', nameKana: 'リードエンジニア', description: '開発チームリーダー' } });
   const posSeniorEng = await prisma.position.create({ data: { name: 'シニアエンジニア', nameKana: 'シニアエンジニア', description: '上級エンジニア' } });
   const posEng = await prisma.position.create({ data: { name: 'エンジニア', nameKana: 'エンジニア', description: 'エンジニア' } });
@@ -51,11 +51,11 @@ async function main() {
 
   // Create contract types
   const ctSeishain = await prisma.contractType.create({ data: { name: '正社員', nameKana: 'せいしゃいん', description: '正規雇用', defaultEndDateType: 'none', defaultSalaryType: '月給' } });
-  const ctKeiyaku = await prisma.contractType.create({ data: { name: '契約社員', nameKana: 'けいやくしゃいん', description: '期間限定雇用', defaultEndDateType: 'fixed', defaultSalaryType: '月給' } });
-  const ctPart = await prisma.contractType.create({ data: { name: 'パート', nameKana: 'パート', description: 'パートタイム', defaultEndDateType: 'fixed', defaultSalaryType: '日給' } });
-  const ctArubaito = await prisma.contractType.create({ data: { name: 'アルバイト', nameKana: 'アルバイト', description: 'アルバイト', defaultEndDateType: 'fixed', defaultSalaryType: '時給' } });
-  const ctHaken = await prisma.contractType.create({ data: { name: '派遣社員', nameKana: 'はけんしゃいん', description: '派遣労働', defaultEndDateType: 'fixed', defaultSalaryType: '月給' } });
-  const ctShokutaku = await prisma.contractType.create({ data: { name: '嘱託社員', nameKana: 'しょくたくしゃいん', description: '嘱託雇用', defaultEndDateType: 'fixed', defaultSalaryType: '月給' } });
+  await prisma.contractType.create({ data: { name: '契約社員', nameKana: 'けいやくしゃいん', description: '期間限定雇用', defaultEndDateType: 'fixed', defaultSalaryType: '月給' } });
+  await prisma.contractType.create({ data: { name: 'パート', nameKana: 'パート', description: 'パートタイム', defaultEndDateType: 'fixed', defaultSalaryType: '日給' } });
+  await prisma.contractType.create({ data: { name: 'アルバイト', nameKana: 'アルバイト', description: 'アルバイト', defaultEndDateType: 'fixed', defaultSalaryType: '時給' } });
+  await prisma.contractType.create({ data: { name: '派遣社員', nameKana: 'はけんしゃいん', description: '派遣労働', defaultEndDateType: 'fixed', defaultSalaryType: '月給' } });
+  await prisma.contractType.create({ data: { name: '嘱託社員', nameKana: 'しょくたくしゃいん', description: '嘱託雇用', defaultEndDateType: 'fixed', defaultSalaryType: '月給' } });
 
   console.log('Created 6 contract types');
 
