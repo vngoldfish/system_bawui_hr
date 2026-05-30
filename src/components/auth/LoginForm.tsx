@@ -138,7 +138,7 @@ export default function LoginForm({ companyName }: { companyName: string }) {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="taro.yamada@company.jp"
-                className="w-full px-4 py-3 border border-slate-250 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium text-slate-800"
+                className="w-full px-4 py-3 border border-slate-250 rounded-xl text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium text-slate-800"
               />
             </div>
 
@@ -153,7 +153,7 @@ export default function LoginForm({ companyName }: { companyName: string }) {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-4 pr-10 py-3 border border-slate-250 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-slate-800"
+                  className="w-full pl-4 pr-10 py-3 border border-slate-250 rounded-xl text-base md:text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-slate-800"
                 />
                 <button
                   type="button"
