@@ -76,16 +76,18 @@ async function main() {
     process.exit(1);
   }
 
-  // Count existing employees with 'NV' prefix to generate next code
-  const existingNVs = await prisma.employee.findMany({
+  // Clear existing custom employees (NV...) for a clean import
+  console.log('Clearing existing custom employees (NV...) for a clean import...');
+  await prisma.employee.deleteMany({
     where: {
       employeeCode: {
         startsWith: 'NV'
       }
     }
   });
+  console.log('Cleaned up previous custom employees.');
   
-  let currentNum = existingNVs.length;
+  let currentNum = 0;
 
   for (const emp of customEmployees) {
     if (!emp.lastName || !emp.firstName) {
