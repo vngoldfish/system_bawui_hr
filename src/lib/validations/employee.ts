@@ -30,6 +30,9 @@ const benefitsSchema = z.object({
   transportation: z.number().default(0),
   housing: z.number().default(0),
   meal: z.number().default(0),
+  familyAllowance: z.number().default(0),
+  overtimeAllowance: z.number().default(0),
+  dependents: z.number().default(0),
 }).optional().nullable();
 
 export const createEmployeeSchema = z.object({

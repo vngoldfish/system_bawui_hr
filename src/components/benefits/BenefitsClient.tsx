@@ -8,6 +8,7 @@ interface Employee {
   id: string; firstName: string; lastName: string; firstNameKana: string;
   department: string; position: string; salary: number; salaryType: string;
   age?: number;
+  benefits?: any;
 }
 
 interface Benefit {
@@ -53,38 +54,84 @@ const getAllowanceTranslation = (key: string, t: any) => {
 export default function BenefitsClient({ employees }: { employees: Employee[] }) {
   const { t, locale } = useI18n();
   const [benefits, setBenefits] = useState<Benefit[]>(() =>
-    employees.map(e => ({
-      id: `b-${e.id}`,
-      employeeId: e.id,
-      healthInsurance: true,
-      pension: true,
-      employmentInsurance: true,
-      workersComp: true,
-      familyAllowance: 0,
-      housingAllowance: 15000,
-      commutingAllowance: 10000,
-      mealAllowance: 10000,
-      overtimeAllowance: 0,
-      dependents: 0,
-    }))
+    employees.map(e => {
+      const b = e.benefits || {};
+      return {
+        id: `b-${e.id}`,
+        employeeId: e.id,
+        healthInsurance: b.healthInsurance ?? true,
+        pension: b.pension ?? true,
+        employmentInsurance: b.employmentInsurance ?? true,
+        workersComp: b.workersComp ?? true,
+        familyAllowance: b.familyAllowance ?? 0,
+        housingAllowance: b.housing ?? 15000,
+        commutingAllowance: b.transportation ?? 10000,
+        mealAllowance: b.meal ?? 10000,
+        overtimeAllowance: b.overtimeAllowance ?? 0,
+        dependents: b.dependents ?? 0,
+      };
+    })
   );
 
   const [editingEmp, setEditingEmp] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<Benefit>>({});
   const [search, setSearch] = useState('');
   const [saved, setSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleEdit = (empId: string) => {
     const b = benefits.find(b => b.employeeId === empId);
-    if (b) { setDraft({ ...b }); setEditingEmp(empId); }
+    if (b) {
+      setDraft({ ...b });
+      setEditingEmp(empId);
+      setErrorMessage(null);
+    }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editingEmp) return;
-    setBenefits(prev => prev.map(b => b.employeeId === editingEmp ? { ...b, ...draft } as Benefit : b));
-    setEditingEmp(null);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    setIsSaving(true);
+    setErrorMessage(null);
+    try {
+      const payload = {
+        benefits: {
+          healthInsurance: draft.healthInsurance ?? true,
+          pension: draft.pension ?? true,
+          employmentInsurance: draft.employmentInsurance ?? true,
+          workersComp: draft.workersComp ?? true,
+          transportation: draft.commutingAllowance ?? 0,
+          housing: draft.housingAllowance ?? 0,
+          meal: draft.mealAllowance ?? 0,
+          familyAllowance: draft.familyAllowance ?? 0,
+          overtimeAllowance: draft.overtimeAllowance ?? 0,
+          dependents: draft.dependents ?? 0,
+        }
+      };
+
+      const res = await fetch(`/api/employees/${editingEmp}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || 'Failed to save benefits data');
+      }
+
+      setBenefits(prev => prev.map(b => b.employeeId === editingEmp ? { ...b, ...draft } as Benefit : b));
+      setEditingEmp(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(err.message || 'Error occurred');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -253,6 +300,11 @@ export default function BenefitsClient({ employees }: { employees: Employee[] })
                 const emp = employees.find(e => e.id === editingEmp);
                 return emp ? <p className="text-sm text-slate-600 mb-4">{emp.lastName} {emp.firstName} ({emp.department})</p> : null;
               })()}
+              {errorMessage && (
+                <div className="mb-4 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-lg">
+                  {errorMessage}
+                </div>
+              )}
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-slate-600 mb-2 block">{t('benefits.socialInsHeader')}</label>
@@ -298,8 +350,10 @@ export default function BenefitsClient({ employees }: { employees: Employee[] })
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
-                <button onClick={() => setEditingEmp(null)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 text-sm">{t('benefits.cancelBtn')}</button>
-                <button onClick={handleSave} className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">{t('benefits.saveBtn')}</button>
+                <button onClick={() => setEditingEmp(null)} disabled={isSaving} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 text-sm disabled:opacity-50">{t('benefits.cancelBtn')}</button>
+                <button onClick={handleSave} disabled={isSaving} className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50">
+                  {isSaving ? '...' : t('benefits.saveBtn')}
+                </button>
               </div>
             </div>
           </div>

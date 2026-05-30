@@ -1,24 +1,51 @@
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import TrainingClient from '@/components/training/TrainingClient';
 
-const employees = [
-  { id: '1', firstName: '太郎', lastName: '山田', firstNameKana: 'タロウ', department: '営業部', position: '部長' },
-  { id: '2', firstName: '花子', lastName: '佐藤', firstNameKana: 'ハナコ', department: '開発部', position: '主任' },
-  { id: '3', firstName: '一郎', lastName: '鈴木', firstNameKana: 'イチロウ', department: '営業部', position: '係長' },
-  { id: '4', firstName: '美咲', lastName: '田中', firstNameKana: 'ミサキ', department: '人事部', position: '課長' },
-  { id: '5', firstName: '健二', lastName: '高橋', firstNameKana: 'ケンジ', department: '開発部', position: '一般' },
-  { id: '6', firstName: '由美', lastName: '渡辺', firstNameKana: 'ユミ', department: '経理部', position: '主任' },
-  { id: '7', firstName: '大輔', lastName: '伊藤', firstNameKana: 'ダイスケ', department: '開発部', position: '一般' },
-  { id: '8', firstName: 'さくら', lastName: '山本', firstNameKana: 'サクラ', department: '営業部', position: '一般' },
-  { id: '9', firstName: '隆', lastName: '中村', firstNameKana: 'タカシ', department: '開発部', position: '部長' },
-  { id: '10', firstName: '愛', lastName: '小林', firstNameKana: 'アイ', department: '人事部', position: '一般' },
-  { id: '11', firstName: 'ミン', lastName: 'グエン', firstNameKana: 'ミン', department: '開発部', position: '一般' },
-  { id: '12', firstName: 'ウェイ', lastName: 'リー', firstNameKana: 'ウェイ', department: '営業部', position: '一般' },
-  { id: '13', firstName: 'ラビ', lastName: 'シャルマ', firstNameKana: 'ラビ', department: '開発部', position: '主任' },
-  { id: '14', firstName: '恵子', lastName: '加藤', firstNameKana: 'ケイコ', department: '経理部', position: '課長' },
-];
+export const dynamic = 'force-dynamic';
 
-export default function TrainingPage() {
+export default async function TrainingPage() {
+  const cookieStore = await cookies();
+  const sessionUserCookie = cookieStore.get('session_user');
+  
+  if (!sessionUserCookie) {
+    redirect('/login');
+  }
+  
+  const user = JSON.parse(decodeURIComponent(sessionUserCookie.value));
+  
+  const dbUser = await prisma.employee.findUnique({
+    where: { id: user.id },
+  });
+
+  if (!dbUser) {
+    redirect('/login');
+  }
+
+  // Fetch all employees with their department and position
+  const dbEmployees = await prisma.employee.findMany({
+    include: {
+      department: true,
+      position: true,
+    },
+    orderBy: [
+      { lastName: 'asc' },
+      { firstName: 'asc' }
+    ]
+  });
+
+  // Map to the format needed by TrainingClient
+  const employees = dbEmployees.map(emp => ({
+    id: emp.id,
+    firstName: emp.firstName,
+    lastName: emp.lastName,
+    firstNameKana: emp.firstNameKana || '',
+    department: emp.department?.name || '未所属',
+    position: emp.position?.name || '一般社員',
+  }));
+
   return (
     <DashboardLayout title="研修管理" subtitle="研修プログラム・受講管理・修了証">
       <div className="space-y-6">
