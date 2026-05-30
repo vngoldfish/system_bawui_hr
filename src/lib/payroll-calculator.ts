@@ -1,3 +1,161 @@
+export function getHealthInsuranceSMR(income: number): number {
+  const brackets = [
+    { max: 63000, smr: 58000 },
+    { max: 73000, smr: 68000 },
+    { max: 83000, smr: 78000 },
+    { max: 93000, smr: 88000 },
+    { max: 101000, smr: 98000 },
+    { max: 107000, smr: 104000 },
+    { max: 114000, smr: 110000 },
+    { max: 122000, smr: 118000 },
+    { max: 130000, smr: 126000 },
+    { max: 138000, smr: 134000 },
+    { max: 146000, smr: 142000 },
+    { max: 155000, smr: 150000 },
+    { max: 165000, smr: 160000 },
+    { max: 175000, smr: 170000 },
+    { max: 185000, smr: 180000 },
+    { max: 195000, smr: 190000 },
+    { max: 210000, smr: 200000 },
+    { max: 230000, smr: 220000 },
+    { max: 250000, smr: 240000 },
+    { max: 270000, smr: 260000 },
+    { max: 290000, smr: 280000 },
+    { max: 310000, smr: 300000 },
+    { max: 330000, smr: 320000 },
+    { max: 350000, smr: 340000 },
+    { max: 370000, smr: 360000 },
+    { max: 395000, smr: 380000 },
+    { max: 425000, smr: 410000 },
+    { max: 455000, smr: 440000 },
+    { max: 485000, smr: 470000 },
+    { max: 515000, smr: 500000 },
+    { max: 545000, smr: 530000 },
+    { max: 575000, smr: 560000 },
+    { max: 605000, smr: 590000 },
+    { max: 635000, smr: 620000 },
+    { max: 665000, smr: 650000 },
+    { max: 695000, smr: 680000 },
+    { max: 730000, smr: 710000 },
+    { max: 770000, smr: 750000 },
+    { max: 810000, smr: 790000 },
+    { max: 855000, smr: 830000 },
+    { max: 905000, smr: 880000 },
+    { max: 955000, smr: 930000 },
+    { max: 1005000, smr: 980000 },
+    { max: 1055000, smr: 1030000 },
+    { max: 1115000, smr: 1090000 },
+    { max: 1175000, smr: 1150000 },
+    { max: 1235000, smr: 1210000 },
+    { max: 1295000, smr: 1270000 },
+    { max: 1355000, smr: 1330000 },
+  ];
+  for (const b of brackets) {
+    if (income < b.max) return b.smr;
+  }
+  return 1390000;
+}
+
+export function getPensionSMR(income: number): number {
+  const brackets = [
+    { max: 93000, smr: 88000 },
+    { max: 101000, smr: 98000 },
+    { max: 107000, smr: 104000 },
+    { max: 114000, smr: 110000 },
+    { max: 122000, smr: 118000 },
+    { max: 126000, smr: 122000 },
+    { max: 134000, smr: 130000 },
+    { max: 142000, smr: 138000 },
+    { max: 150000, smr: 146000 },
+    { max: 158000, smr: 150000 },
+    { max: 168000, smr: 160000 },
+    { max: 178000, smr: 170000 },
+    { max: 188000, smr: 180000 },
+    { max: 198000, smr: 190000 },
+    { max: 210000, smr: 200000 },
+    { max: 230000, smr: 220000 },
+    { max: 250000, smr: 240000 },
+    { max: 270000, smr: 260000 },
+    { max: 290000, smr: 280000 },
+    { max: 310000, smr: 300000 },
+    { max: 330000, smr: 320000 },
+    { max: 350000, smr: 340000 },
+    { max: 370000, smr: 360000 },
+    { max: 395000, smr: 380000 },
+    { max: 425000, smr: 410000 },
+    { max: 455000, smr: 440000 },
+    { max: 485000, smr: 470000 },
+    { max: 515000, smr: 500000 },
+    { max: 545000, smr: 530000 },
+    { max: 575000, smr: 560000 },
+    { max: 605000, smr: 590000 },
+    { max: 635000, smr: 620000 },
+  ];
+  for (const b of brackets) {
+    if (income < b.max) return b.smr;
+  }
+  return 650000;
+}
+
+export function isNursingCareApplicable(birthDateStr: string | null | undefined, targetMonthStr: string): boolean {
+  if (!birthDateStr) return false;
+  const birthDate = new Date(birthDateStr);
+  if (isNaN(birthDate.getTime())) return false;
+
+  const [year, month] = targetMonthStr.split('-').map(Number);
+  const targetDate = new Date(year, month - 1, 1);
+
+  // Ngày trước sinh nhật thứ 40
+  const dayBefore40th = new Date(birthDate);
+  dayBefore40th.setFullYear(birthDate.getFullYear() + 40);
+  dayBefore40th.setDate(dayBefore40th.getDate() - 1);
+
+  // Ngày trước sinh nhật thứ 65
+  const dayBefore65th = new Date(birthDate);
+  dayBefore65th.setFullYear(birthDate.getFullYear() + 65);
+  dayBefore65th.setDate(dayBefore65th.getDate() - 1);
+
+  // Trả về true nếu targetDate nằm trong khoảng từ tháng chứa dayBefore40th đến tháng chứa dayBefore65th
+  const targetVal = targetDate.getFullYear() * 12 + targetDate.getMonth();
+  const startVal = dayBefore40th.getFullYear() * 12 + dayBefore40th.getMonth();
+  const endVal = dayBefore65th.getFullYear() * 12 + dayBefore65th.getMonth();
+
+  return targetVal >= startVal && targetVal < endVal;
+}
+
+export function apply50SenRounding(totalPremium: number): number {
+  const half = totalPremium / 2;
+  const decimal = half - Math.floor(half);
+  if (decimal === 0.5) {
+    return Math.floor(half); // Làm tròn xuống cho phần nhân viên gánh
+  }
+  return Math.round(half); // Làm tròn thông thường
+}
+
+// Bảng tra cứu thuế thu nhập nguyệt ngạch (Getsugakuhyō) ước tính theo biểu thuế Cục Thuế quốc gia Nhật Bản (cột Ko)
+export function estimateIncomeTaxGetsugakuhyo(taxableIncome: number, dependentsCount: number): number {
+  if (taxableIncome < 88000) return 0;
+
+  // Giảm trừ thêm cho người phụ thuộc (quy đổi ra tháng)
+  const dependentAllowance = dependentsCount * 31667;
+  const adjustedIncome = Math.max(0, taxableIncome - dependentAllowance);
+
+  if (adjustedIncome < 88000) return 0;
+
+  // Lũy tiến nhanh tương đối chính xác với cột Ko nguyệt ngạch
+  if (adjustedIncome < 150000) {
+    return Math.round((adjustedIncome - 88000) * 0.05 + 1400);
+  } else if (adjustedIncome < 250000) {
+    return Math.round((adjustedIncome - 150000) * 0.07 + 4500);
+  } else if (adjustedIncome < 400000) {
+    return Math.round((adjustedIncome - 250000) * 0.10 + 11500);
+  } else if (adjustedIncome < 700000) {
+    return Math.round((adjustedIncome - 400000) * 0.15 + 26500);
+  } else {
+    return Math.round((adjustedIncome - 700000) * 0.20 + 71500);
+  }
+}
+
 export function calculatePayrollDetails({
   baseSalary,
   salaryType,
@@ -5,7 +163,10 @@ export function calculatePayrollDetails({
   hourlyRate,
   dailyRate,
   overtimeHours,
-  benefits
+  benefits,
+  birthDate,
+  month = '2026-05',
+  dependentsCount = 0
 }: {
   baseSalary: number;
   salaryType: string;
@@ -14,6 +175,9 @@ export function calculatePayrollDetails({
   dailyRate: number;
   overtimeHours: number;
   benefits: any;
+  birthDate?: string | null;
+  month?: string;
+  dependentsCount?: number;
 }) {
   const defaults = {
     healthInsurance: true,
@@ -57,23 +221,55 @@ export function calculatePayrollDetails({
   const allowances = b.transportation + b.housing + b.meal;
   const totalGross = calculatedBase + overtimePay + allowances;
 
-  // Employee deductions based on standard burden rates
-  const healthInsurance = b.healthInsurance ? Math.round(totalGross * 0.05) : 0;
-  const pension = b.pension ? Math.round(totalGross * 0.09) : 0;
-  const employmentInsurance = b.employmentInsurance ? Math.round(totalGross * 0.003) : 0;
-  const workersComp = 0; // Paid entirely by the company, employee pays 0%
+  // --- LUẬT BẢO HIỂM XÃ HỘI VÀ THUẾ CHUẨN NHẬT BẢN ---
+
+  // 1. Tính toán Standard Monthly Remuneration (SMR)
+  // Lương tiêu chuẩn dùng để đóng bảo hiểm y tế và hưu trí
+  const smrIncome = calculatedBase + overtimePay + allowances;
+  const healthSMR = getHealthInsuranceSMR(smrIncome);
+  const pensionSMR = getPensionSMR(smrIncome);
+
+  // 2. Health Insurance (健康保険): Tỷ lệ trung bình ở Tokyo là khoảng 9.98% (chia đôi -> nhân viên gánh 4.99%)
+  const healthInsuranceRate = 0.0998;
+  const totalHealthPremium = b.healthInsurance ? (healthSMR * healthInsuranceRate) : 0;
+  const healthInsurance = apply50SenRounding(totalHealthPremium);
+
+  // 3. Nursing Care Insurance (介護保険): Chỉ áp dụng từ 40-64 tuổi. Tỷ lệ trung bình khoảng 1.6% (chia đôi -> nhân viên gánh 0.8%)
+  const hasNursingCare = isNursingCareApplicable(birthDate, month);
+  const nursingCareRate = 0.016;
+  const totalNursingPremium = (b.healthInsurance && hasNursingCare) ? (healthSMR * nursingCareRate) : 0;
+  const nursingCarePremium = apply50SenRounding(totalNursingPremium);
+
+  // 4. Welfare Pension (厚生年金): Tỷ lệ cố định 18.3% (chia đôi -> nhân viên gánh 9.15%)
+  const pensionRate = 0.183;
+  const totalPensionPremium = b.pension ? (pensionSMR * pensionRate) : 0;
+  const pension = apply50SenRounding(totalPensionPremium);
+
+  // 5. Employment Insurance (雇用保険): Tính trên tổng thu nhập thực tế phát sinh (Gross). Tỷ lệ đóng cho nhân viên ngành phổ thông là 0.6%
+  const employmentInsuranceRate = 0.006;
+  const employmentInsurance = b.employmentInsurance ? Math.round(totalGross * employmentInsuranceRate) : 0;
   
-  const incomeTax = Math.round(totalGross * 0.02);
+  const workersComp = 0; // Công ty đóng 100%, nhân viên đóng 0%
+
+  // Tổng bảo hiểm xã hội khấu trừ từ lương nhân viên
+  const totalSocialInsurance = healthInsurance + nursingCarePremium + pension + employmentInsurance;
+
+  // 6. Income Tax (所得税): Tính trên Gross trừ trợ cấp đi lại miễn thuế và trừ tổng bảo hiểm xã hội
+  const taxableCommuterAllowance = 0; // Mặc định trợ cấp đi lại được miễn thuế ở Nhật lên đến 150,000 JPY
+  const taxableIncome = Math.max(0, totalGross - b.transportation - totalSocialInsurance);
+  const incomeTax = estimateIncomeTaxGetsugakuhyo(taxableIncome, dependentsCount);
+
+  // 7. Resident Tax (住民税): 4% tổng thu nhập hoặc do Master nhập tĩnh (được tính trung bình 4% cho mock, thực tế nhập tĩnh ở PayslipModal)
   const residentTax = Math.round(totalGross * 0.04);
 
-  const totalDeductions = healthInsurance + pension + employmentInsurance + workersComp + incomeTax + residentTax;
+  const totalDeductions = totalSocialInsurance + incomeTax + residentTax;
   const netSalary = totalGross - totalDeductions;
 
   return {
     baseSalary: calculatedBase,
     overtimePay,
     allowances,
-    healthInsurance,
+    healthInsurance: healthInsurance + nursingCarePremium, // Y tế gộp cả chăm sóc dài hạn để khớp UI cũ
     pension,
     employmentInsurance,
     workersComp,

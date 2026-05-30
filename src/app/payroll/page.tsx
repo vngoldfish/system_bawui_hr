@@ -45,6 +45,7 @@ export default async function PayrollPage() {
     include: {
       department: true,
       position: true,
+      dependents: true,
     }
   });
 
@@ -160,6 +161,8 @@ export default async function PayrollPage() {
       dailyRate: dbUser.dailyRate || 0,
       contractType: '正社員',
       benefits: mergeBenefits(dbUser.benefits),
+      birthDate: dbUser.birthDate ? dbUser.birthDate.toISOString() : null,
+      dependentsCount: dbUser.dependents ? dbUser.dependents.length : 0,
     }];
 
     return (
@@ -184,6 +187,7 @@ export default async function PayrollPage() {
       include: {
         department: true,
         position: true,
+        dependents: true,
         employeeContracts: {
           include: {
             contractType: true
@@ -207,6 +211,8 @@ export default async function PayrollPage() {
       dailyRate: emp.dailyRate || 0,
       contractType: emp.employeeContracts?.[0]?.contractType?.name || '正社員',
       benefits: mergeBenefits(emp.benefits),
+      birthDate: emp.birthDate ? emp.birthDate.toISOString() : null,
+      dependentsCount: emp.dependents ? emp.dependents.length : 0,
     }));
 
     // Fetch existing database records for Admin view

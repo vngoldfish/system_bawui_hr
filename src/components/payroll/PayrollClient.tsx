@@ -16,6 +16,8 @@ interface Employee {
     healthInsurance: boolean; pension: boolean; employmentInsurance: boolean; workersComp: boolean;
     transportation: number; housing: number; meal: number;
   };
+  birthDate?: string | null;
+  dependentsCount?: number;
 }
 
 interface PayrollRecord {
@@ -756,7 +758,10 @@ export default function PayrollClient({
             hourlyRate: emp.hourlyRate || 0,
             dailyRate: emp.dailyRate || 0,
             overtimeHours,
-            benefits: emp.benefits
+            benefits: emp.benefits,
+            birthDate: emp.birthDate,
+            month: endMonth,
+            dependentsCount: emp.dependentsCount
           });
 
           return {
