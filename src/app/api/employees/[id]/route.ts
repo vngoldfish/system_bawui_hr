@@ -96,6 +96,7 @@ export async function PUT(
     if (employeeData.positionId !== undefined) updateData.position = { connect: { id: employeeData.positionId } };
     if (employeeData.hireDate !== undefined) updateData.hireDate = new Date(employeeData.hireDate);
     if (employeeData.salary !== undefined) updateData.salary = employeeData.salary;
+    if (employeeData.insuranceSalary !== undefined) updateData.insuranceSalary = employeeData.insuranceSalary;
     if (employeeData.status !== undefined) updateData.status = employeeData.status;
     if (employeeData.residenceCardImage !== undefined) updateData.residenceCardImage = employeeData.residenceCardImage;
     if (shitenIds !== undefined) {

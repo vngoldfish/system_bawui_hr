@@ -21,6 +21,7 @@ interface EmployeeFormData {
   birthDate: string;
   avatar: string;
   salary: string;
+  insuranceSalary: string;
   status: string;
   nationality: string;
   residenceStatus: string;
@@ -75,6 +76,7 @@ const emptyForm: EmployeeFormData = {
   birthDate: '',
   avatar: '',
   salary: '',
+  insuranceSalary: '',
   status: 'ACTIVE',
   nationality: '日本',
   residenceStatus: '',
@@ -171,6 +173,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
         birthDate: toDateInputValue(employee.birthDate),
         avatar: toInputValue(employee.avatar),
         salary: toInputValue(employee.salary),
+        insuranceSalary: employee.insuranceSalary ? employee.insuranceSalary.toString() : '',
         status: toInputValue(employee.status) || 'ACTIVE',
         nationality: toInputValue(employee.nationality) || '\u65e5\u672c',
         residenceStatus: toInputValue(employee.residenceStatus),
@@ -364,6 +367,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
         birthDate: formData.birthDate || null,
         avatar: formData.avatar || null,
         salary: parseFloat(formData.salary) || 0,
+        insuranceSalary: formData.insuranceSalary ? parseFloat(formData.insuranceSalary) : null,
         status: formData.status as any,
         nationality: formData.nationality,
         residenceStatus: isForeign ? formData.residenceStatus : null,
@@ -593,6 +597,10 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                 {formData.salaryType === '\u6642\u7d66' && (
                   <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.hourlyRate')}</label><input type="number" name="hourlyRate" value={formData.hourlyRate} onChange={handleChange} placeholder="1500" className={inputCls} required /></div>
                 )}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">{t('form.insuranceSalaryLabel')}</label>
+                  <input type="number" name="insuranceSalary" value={formData.insuranceSalary} onChange={handleChange} placeholder={t('form.insuranceSalaryPlaceholder')} className={inputCls} />
+                </div>
               </div>
               <div className="mt-4">
                 <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">{t('form.socialInsurance')}</h4>

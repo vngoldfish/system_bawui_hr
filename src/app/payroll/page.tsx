@@ -117,7 +117,7 @@ export default async function PayrollPage() {
         ? r.residentTax
         : Math.max(0, r.tax - incomeTax);
 
-      const totalDeductions = r.deductions + r.insurance + r.tax;
+      const totalDeductions = r.deductions + healthInsurance + pension + employmentInsurance + incomeTax + residentTax;
 
       // Query attendance records for the working month (previous month) to get real days/hours
       const [year, monthVal] = r.month.split('-').map(Number);
@@ -292,7 +292,7 @@ export default async function PayrollPage() {
         ? r.residentTax
         : Math.max(0, r.tax - incomeTax);
 
-      const totalDeductions = r.deductions + r.insurance + r.tax;
+      const totalDeductions = r.deductions + healthInsurance + pension + employmentInsurance + incomeTax + residentTax;
 
       const emp = dbEmployees.find(e => e.id === r.employeeId);
 

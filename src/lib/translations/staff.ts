@@ -92,6 +92,8 @@ export const staffTranslations = {
       salaryTypeHourly: '時給',
       residentTax: '住民税の特別徴収',
       residentTaxAmount: '住民税月額（円）',
+      insuranceSalaryLabel: '健保・厚生年金 申告報酬月額',
+      insuranceSalaryPlaceholder: '例: 360000 (空欄の場合は基本給+固定手当で自動計算)',
     },
     client: {
       alertTitle: '在留カード期限アラート ({count}件)',
@@ -360,6 +362,8 @@ export const staffTranslations = {
       salaryTypeHourly: 'Hourly',
       residentTax: 'Special Collection of Resident Tax',
       residentTaxAmount: 'Monthly Resident Tax (JPY)',
+      insuranceSalaryLabel: 'Declared Remuneration for Social Insurance',
+      insuranceSalaryPlaceholder: 'Example: 360000 (Leave blank to auto-calculate)',
     },
     client: {
       alertTitle: 'Residence Card Expiry Alert ({count})',
@@ -628,6 +632,8 @@ export const staffTranslations = {
       salaryTypeHourly: 'Lương giờ',
       residentTax: 'Thu hộ thuế cư trú (Đặc biệt trưng thu)',
       residentTaxAmount: 'Thuế cư trú hằng tháng (Yên)',
+      insuranceSalaryLabel: 'Lương khai báo Nên-kin/Bảo hiểm',
+      insuranceSalaryPlaceholder: 'Ví dụ: 360000 (Để trống sẽ tự động tính)',
     },
     client: {
       alertTitle: 'Cảnh báo thẻ ngoại kiều hết hạn ({count} người)',
@@ -892,6 +898,8 @@ export const staffTranslations = {
       salaryTypeHourly: '时薪',
       residentTax: '居民税特别征收',
       residentTaxAmount: '每月居民税（日元）',
+      insuranceSalaryLabel: '社保・年金申报月薪',
+      insuranceSalaryPlaceholder: '例：360000 (留空时将自动计算)',
     },
     client: {
       alertTitle: '在留卡到期警告 ({count}件)',
@@ -1156,6 +1164,8 @@ export const staffTranslations = {
       salaryTypeHourly: 'ค่าจ้างรายชั่วโมง',
       residentTax: 'หักภาษีผู้อยู่อาศัย (การจัดเก็บพิเศษ)',
       residentTaxAmount: 'ภาษีผู้อยู่อาศัยรายเดือน (เยน)',
+      insuranceSalaryLabel: 'ค่าจ้างที่แจ้งเพื่อประกันสังคม/กองทุนสำรองเลี้ยงชีพ',
+      insuranceSalaryPlaceholder: 'ตัวอย่าง: 360000 (เว้นว่างไว้เพื่อคำนวณอัตโนมัติ)',
     },
     client: {
       alertTitle: 'แจ้งเตือนบัตรผู้พำนักหมดอายุ ({count} รายการ)',

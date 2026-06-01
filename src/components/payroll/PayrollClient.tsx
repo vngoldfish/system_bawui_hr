@@ -345,6 +345,10 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
           // Recalculated values for client UI consistency
           totalGross: updated.baseSalary + updated.overtimePay + updated.bonus,
           totalDeductions: updated.deductions + updated.tax + updated.insurance,
+          healthInsurance: updated.healthInsuranceEmployee + (updated.nursingCareInsurance || 0),
+          pension: updated.pensionEmployee,
+          employmentInsurance: updated.employmentInsuranceEmployee,
+          workersComp: 0,
           // Copy all 11 detailed breakdown columns from DB
           healthInsuranceCompany: updated.healthInsuranceCompany,
           pensionCompany: updated.pensionCompany,
@@ -1137,6 +1141,13 @@ export default function PayrollClient({
           id: matchingDb?.id || `payroll-${record.employeeId}-${record.month}`,
           status: matchingDb?.status || record.status,
           ...(matchingDb || {}),
+          allowances: (matchingDb && matchingDb.bonus !== undefined && matchingDb.bonus !== null) ? matchingDb.bonus : record.allowances,
+          healthInsurance: matchingDb ? (matchingDb.healthInsuranceEmployee + (matchingDb.nursingCareInsurance || 0)) : record.healthInsurance,
+          pension: matchingDb ? matchingDb.pensionEmployee : record.pension,
+          employmentInsurance: matchingDb ? matchingDb.employmentInsuranceEmployee : record.employmentInsurance,
+          workersComp: matchingDb ? matchingDb.workersCompCompany : record.workersComp,
+          incomeTax: matchingDb ? matchingDb.incomeTax : record.incomeTax,
+          residentTax: matchingDb ? matchingDb.residentTax : record.residentTax,
         };
       });
 
@@ -1149,31 +1160,6 @@ export default function PayrollClient({
       alert('Error calculating payroll: ' + (err.message || String(err)));
     } finally {
       setCalculating(false);
-    }
-  };
-
-  const handleCalculatePayroll = async () => {
-    if (!confirm('今月の給与を計算しますか？')) return;
-
-    try {
-      const res = await fetch('/api/payroll', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(employees.map(emp => ({
-          employeeId: emp.id,
-          month: targetMonthStr,
-          workDays: 20,
-          overtimeHours: 0
-        })))
-      });
-      if (res.ok) {
-        alert('給与計算完了');
-        window.location.reload();
-      } else {
-        alert('エラーが発生しました');
-      }
-    } catch (e) {
-      alert('通信エラー');
     }
   };
 

@@ -152,6 +152,7 @@ export interface Employee {
   hourlyRate: number;
   dailyRate: number;
   benefits: EmployeeBenefits | null;
+  insuranceSalary?: number | null;
   employeeContracts?: EmployeeContract[];
   dependents: Dependent[];
   education: Education[];

@@ -67,6 +67,7 @@ export const createEmployeeSchema = z.object({
   hourlyRate: z.number().default(0),
   dailyRate: z.number().default(0),
   benefits: benefitsSchema,
+  insuranceSalary: z.number().optional().nullable(),
   dependents: z.array(dependentSchema).optional().default([]),
   education: z.array(educationSchema).optional().default([]),
   certifications: z.array(certificationSchema).optional().default([]),

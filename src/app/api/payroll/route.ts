@@ -153,6 +153,7 @@ export async function POST(request: NextRequest) {
             benefits: true,
             birthDate: true,
             dependents: true,
+            insuranceSalary: true,
           },
         });
         if (employee) {
@@ -168,12 +169,13 @@ export async function POST(request: NextRequest) {
             month: data.month,
             dependentsCount: employee.dependents.length,
             dependents: employee.dependents,
-            customAllowances: (data.allowances !== undefined && data.allowances !== null)
+            insuranceSalary: employee.insuranceSalary,
+            customAllowances: (data.allowances !== undefined && data.allowances !== null && data.allowances !== '')
               ? parseFloat(data.allowances)
-              : (data.bonus !== undefined && data.bonus !== null)
+              : (data.bonus !== undefined && data.bonus !== null && data.bonus !== '')
                 ? parseFloat(data.bonus)
                 : undefined,
-            customBonus: (data.bonus !== undefined && data.bonus !== null) ? parseFloat(data.bonus) : undefined,
+            customBonus: (data.bonus !== undefined && data.bonus !== null && data.bonus !== '') ? parseFloat(data.bonus) : undefined,
           });
 
           // Map all 11 detailed fields
@@ -190,22 +192,22 @@ export async function POST(request: NextRequest) {
           data.totalCompanyCost = details.totalCompanyCost;
 
           // Populate missing fields in data from details before saving
-          if (data.baseSalary === undefined || data.baseSalary === null) {
+          if (data.baseSalary === undefined || data.baseSalary === null || data.baseSalary === '') {
             data.baseSalary = details.baseSalary;
           }
-          if (data.overtimePay === undefined || data.overtimePay === null) {
+          if (data.overtimePay === undefined || data.overtimePay === null || data.overtimePay === '') {
             data.overtimePay = details.overtimePay;
           }
-          if (data.allowances === undefined || data.allowances === null) {
+          if (data.allowances === undefined || data.allowances === null || data.allowances === '') {
             data.allowances = details.allowances;
           }
-          if (data.tax === undefined || data.tax === null) {
+          if (data.tax === undefined || data.tax === null || data.tax === '') {
             data.tax = details.incomeTax + details.residentTax;
           }
-          if (data.insurance === undefined || data.insurance === null) {
+          if (data.insurance === undefined || data.insurance === null || data.insurance === '') {
             data.insurance = details.healthInsurance + details.pension + details.employmentInsurance;
           }
-          if (data.netSalary === undefined || data.netSalary === null) {
+          if (data.netSalary === undefined || data.netSalary === null || data.netSalary === '') {
             data.netSalary = details.netSalary;
           }
         }
@@ -214,13 +216,16 @@ export async function POST(request: NextRequest) {
 
     const results = await prisma.$transaction(
       recordsData.map((data: any) => {
-        const baseSalary = parseFloat(data.baseSalary) || 0;
-        const overtimePay = parseFloat(data.overtimePay) || 0;
-        const allowances = parseFloat(data.allowances || data.bonus) || 0;
-        const deductions = parseFloat(data.deductions) || 0;
-        const tax = parseFloat(data.tax) || 0;
-        const insurance = parseFloat(data.insurance) || 0;
+        const baseSalary = (data.baseSalary !== undefined && data.baseSalary !== null && data.baseSalary !== '') ? parseFloat(data.baseSalary) : 0;
+        const overtimePay = (data.overtimePay !== undefined && data.overtimePay !== null && data.overtimePay !== '') ? parseFloat(data.overtimePay) : 0;
+        const allowances = (data.allowances !== undefined && data.allowances !== null && data.allowances !== '') 
+          ? parseFloat(data.allowances) 
+          : ((data.bonus !== undefined && data.bonus !== null && data.bonus !== '') ? parseFloat(data.bonus) : 0);
+        const deductions = (data.deductions !== undefined && data.deductions !== null && data.deductions !== '') ? parseFloat(data.deductions) : 0;
+        const tax = (data.tax !== undefined && data.tax !== null && data.tax !== '') ? parseFloat(data.tax) : 0;
+        const insurance = (data.insurance !== undefined && data.insurance !== null && data.insurance !== '') ? parseFloat(data.insurance) : 0;
         const calculatedNet = baseSalary + overtimePay + allowances - (deductions + tax + insurance);
+        const netSalary = (data.netSalary !== undefined && data.netSalary !== null && data.netSalary !== '') ? parseFloat(data.netSalary) : calculatedNet;
 
         const workDays = data.workDays !== undefined && data.workDays !== null ? parseFloat(data.workDays) : null;
         const workHours = data.workHours !== undefined && data.workHours !== null ? parseFloat(data.workHours) : null;
@@ -241,7 +246,7 @@ export async function POST(request: NextRequest) {
             deductions,
             tax,
             insurance,
-            netSalary: calculatedNet,
+            netSalary,
             paymentDate: new Date(data.paymentDate || `${data.month}-25`),
             status: data.status || 'PENDING',
             workDays,
@@ -269,7 +274,7 @@ export async function POST(request: NextRequest) {
             deductions,
             tax,
             insurance,
-            netSalary: calculatedNet,
+            netSalary,
             paymentDate: new Date(data.paymentDate || `${data.month}-25`),
             status: data.status || 'PENDING',
             workDays,
@@ -382,8 +387,6 @@ export async function PUT(request: NextRequest) {
     const overtimePay = body.overtimePay !== undefined ? parseFloat(body.overtimePay) : existing.overtimePay;
     const allowances = body.allowances !== undefined ? parseFloat(body.allowances) : (body.bonus !== undefined ? parseFloat(body.bonus) : existing.bonus);
     const deductions = body.deductions !== undefined ? parseFloat(body.deductions) : existing.deductions;
-    const tax = body.tax !== undefined ? parseFloat(body.tax) : existing.tax;
-    const insurance = body.insurance !== undefined ? parseFloat(body.insurance) : existing.insurance;
     const status = body.status || existing.status;
     const paymentDate = body.paymentDate ? new Date(body.paymentDate) : existing.paymentDate;
 
@@ -392,15 +395,8 @@ export async function PUT(request: NextRequest) {
     const overtimeHours = body.overtimeHours !== undefined ? (body.overtimeHours !== null ? parseFloat(body.overtimeHours) : null) : existing.overtimeHours;
     const absentDays = body.absentDays !== undefined ? (body.absentDays !== null ? parseFloat(body.absentDays) : null) : existing.absentDays;
 
-    if (baseSalary < 0 || overtimePay < 0 || allowances < 0 || deductions < 0 || tax < 0 || insurance < 0) {
+    if (baseSalary < 0 || overtimePay < 0 || allowances < 0 || deductions < 0) {
       return errorResponse('Payroll values cannot be negative', 400);
-    }
-
-    // Mathematical net salary validation overrides client inputs
-    const calculatedNet = baseSalary + overtimePay + allowances - (deductions + tax + insurance);
-
-    if (calculatedNet < 0) {
-      return errorResponse('Net salary cannot be negative', 400);
     }
 
     const employee = await prisma.employee.findUnique({
@@ -413,6 +409,7 @@ export async function PUT(request: NextRequest) {
         benefits: true,
         birthDate: true,
         dependents: true,
+        insuranceSalary: true,
       },
     });
 
@@ -441,6 +438,7 @@ export async function PUT(request: NextRequest) {
         month: existing.month,
         dependentsCount: employee.dependents.length,
         dependents: employee.dependents,
+        insuranceSalary: employee.insuranceSalary,
         customAllowances: allowances,
         customBonus: undefined,
       });
@@ -456,6 +454,16 @@ export async function PUT(request: NextRequest) {
       incomeTax = details.incomeTax;
       nursingCareInsurance = details.nursingCareInsurance;
       totalCompanyCost = details.totalCompanyCost;
+    }
+
+    const tax = employee ? (incomeTax + residentTax) : (body.tax !== undefined ? parseFloat(body.tax) : existing.tax);
+    const insurance = employee ? (healthInsuranceEmployee + pensionEmployee + employmentInsuranceEmployee + nursingCareInsurance) : (body.insurance !== undefined ? parseFloat(body.insurance) : existing.insurance);
+
+    // Mathematical net salary validation overrides client inputs
+    const calculatedNet = baseSalary + overtimePay + allowances - (deductions + tax + insurance);
+
+    if (calculatedNet < 0) {
+      return errorResponse('Net salary cannot be negative', 400);
     }
 
     const updatedRecord = await prisma.payrollRecord.update({

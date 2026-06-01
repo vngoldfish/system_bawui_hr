@@ -157,38 +157,40 @@
 	}
 
 	export function calculatePayrollDetails({
-	  baseSalary,
-	  salaryType,
-	  workDays,
-	  hourlyRate,
-	  dailyRate,
-	  overtimeHours,
-	  benefits,
-	  birthDate,
-	  month = '2026-05',
-	  dependentsCount = 0,
-	  dependents,
-	  customAllowances,
-	  customBonus,
-	  prisma,
-	  employeeId,
-	}: {
-	  baseSalary: number;
-	  salaryType: string;
-	  workDays: number;
-	  hourlyRate: number;
-	  dailyRate: number;
-	  overtimeHours: number;
-	  benefits: any;
-	  birthDate?: string | null;
-	  month?: string;
-	  dependentsCount?: number;
-	  dependents?: any[];
-	  customAllowances?: number;
-	  customBonus?: number;
-	  prisma?: any;
-	  employeeId?: string;
-	}) {
+  baseSalary,
+  salaryType,
+  workDays,
+  hourlyRate,
+  dailyRate,
+  overtimeHours,
+  benefits,
+  birthDate,
+  month = '2026-05',
+  dependentsCount = 0,
+  dependents,
+  customAllowances,
+  customBonus,
+  prisma,
+  employeeId,
+  insuranceSalary,
+}: {
+  baseSalary: number;
+  salaryType: string;
+  workDays: number;
+  hourlyRate: number;
+  dailyRate: number;
+  overtimeHours: number;
+  benefits: any;
+  birthDate?: string | null;
+  month?: string;
+  dependentsCount?: number;
+  dependents?: any[];
+  customAllowances?: number;
+  customBonus?: number;
+  prisma?: any;
+  employeeId?: string;
+  insuranceSalary?: number | null;
+}) {
 	  // Override salary from SalaryAdjustment if prisma + employeeId provided
 	  if (prisma && employeeId) {
 	    // Note: This is async but function is sync - caller should pre-fetch or refactor to async
@@ -247,7 +249,9 @@
 
 	  // 1. Tính toán Standard Monthly Remuneration (SMR)
 	  // Lương tiêu chuẩn dùng để đóng bảo hiểm y tế và hưu trí
-	  const smrIncome = calculatedBase + overtimePay + allowances;
+	  const smrIncome = (insuranceSalary && insuranceSalary > 0)
+	    ? insuranceSalary
+	    : (calculatedBase + overtimePay + allowances);
 	  const healthSMR = getHealthInsuranceSMR(smrIncome);
 	  const pensionSMR = getPensionSMR(smrIncome);
 
