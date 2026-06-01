@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { employeeId, effectiveFrom, baseSalary, hourlyRate, dailyRate, reason } = body;
+    const { employeeId, effectiveFrom, newBaseSalary, newHourlyRate, newDailyRate, reason } = body;
 
     if (!employeeId || !effectiveFrom) {
       return errorResponse('employeeId and effectiveFrom are required', 400);
@@ -68,11 +68,14 @@ export async function POST(request: NextRequest) {
       data: {
         employeeId,
         effectiveFrom,
-        baseSalary: baseSalary !== undefined ? parseFloat(baseSalary) : null,
-        hourlyRate: hourlyRate !== undefined ? parseFloat(hourlyRate) : null,
-        dailyRate: dailyRate !== undefined ? parseFloat(dailyRate) : null,
-        reason: reason || null,
-        createdBy: user.id,
+        oldBaseSalary: employee.salary,
+        newBaseSalary: newBaseSalary !== undefined ? parseFloat(newBaseSalary) : employee.salary,
+        oldHourlyRate: employee.hourlyRate || 0,
+        newHourlyRate: newHourlyRate !== undefined ? parseFloat(newHourlyRate) : employee.hourlyRate || 0,
+        oldDailyRate: employee.dailyRate || 0,
+        newDailyRate: newDailyRate !== undefined ? parseFloat(newDailyRate) : employee.dailyRate || 0,
+        reason: reason || '',
+        adjustedBy: user.id,
       }
     });
 
@@ -81,9 +84,9 @@ export async function POST(request: NextRequest) {
       await prisma.employee.update({
         where: { id: employeeId },
         data: {
-          ...(baseSalary !== undefined && { salary: parseFloat(baseSalary) }),
-          ...(hourlyRate !== undefined && { hourlyRate: parseFloat(hourlyRate) }),
-          ...(dailyRate !== undefined && { dailyRate: parseFloat(dailyRate) }),
+          ...(newBaseSalary !== undefined && { salary: parseFloat(newBaseSalary) }),
+          ...(newHourlyRate !== undefined && { hourlyRate: parseFloat(newHourlyRate) }),
+          ...(newDailyRate !== undefined && { dailyRate: parseFloat(newDailyRate) }),
         }
       });
     }
