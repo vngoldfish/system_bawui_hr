@@ -213,7 +213,7 @@ export default async function PayrollPage() {
               payday: company?.payday || '25' 
             }} 
             isEmployeeMode={true}
-            companyInfo={company ? { name: company.name, address: company.address } : undefined}
+            companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
           />
         </div>
       </DashboardLayout>
@@ -362,7 +362,7 @@ export default async function PayrollPage() {
               payday: company?.payday || '25' 
             }} 
             isEmployeeMode={false}
-            companyInfo={company ? { name: company.name, address: company.address } : undefined}
+            companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
           />
         </div>
       </DashboardLayout>

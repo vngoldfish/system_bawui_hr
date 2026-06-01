@@ -139,7 +139,7 @@ function FilterTh({ label, filterKey, options, activeFilter, columnFilters, onFi
 function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, onClose }: { 
   record: PayrollRecord; 
   employee: Employee; 
-  companyInfo?: { name: string; address: string };
+  companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null };
   isAdmin?: boolean;
   onSave?: (updated: PayrollRecord) => void;
   onClose: () => void 
@@ -230,6 +230,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
       dependents: employee.dependents,
       customAllowances: fixedAllowances + editFields.allowances,
       customBonus: editFields.bonus,
+      companyRate: companyInfo?.healthInsuranceRate,
     });
 
     setEditFields(prev => ({
@@ -927,7 +928,7 @@ export default function PayrollClient({
   initialRecords: PayrollRecord[]; 
   payrollSettings?: PayrollSettings; 
   isEmployeeMode?: boolean;
-  companyInfo?: { name: string; address: string };
+  companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null };
 }) {
   const { t, locale } = useI18n();
   const [records, setRecords] = useState(initialRecords);
@@ -1085,7 +1086,8 @@ export default function PayrollClient({
             benefits: emp.benefits,
             birthDate: emp.birthDate,
             month: endMonth,
-            dependents: emp.dependents
+            dependents: emp.dependents,
+            companyRate: companyInfo?.healthInsuranceRate,
           });
 
           return {
