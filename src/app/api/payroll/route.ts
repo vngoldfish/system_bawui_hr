@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
             dailyRate: parseFloat(data.dailyRate) || employee.dailyRate || 0,
             overtimeHours: parseFloat(data.overtimeHours) || 0,
             benefits: employee.benefits,
-            birthDate: employee.birthDate,
+            birthDate: employee.birthDate ? employee.birthDate.toISOString() : null,
             month: data.month,
             dependentsCount: 0,
             dependents: [],
