@@ -1900,42 +1900,45 @@ const I18nContext = createContext<I18nContextProps>({
 });
 
 export function I18nProvider({ children, initialLocale = 'ja' }: { children: React.ReactNode; initialLocale?: string }) {
-  const [locale, setLocaleState] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      // 1. Check local storage
-      const localLang = window.localStorage.getItem('app_lang');
-      if (localLang && ['ja', 'en', 'vi', 'zh', 'th'].includes(localLang)) {
-        return localLang;
+  const [locale, setLocaleState] = useState<string>(initialLocale);
+
+  useEffect(() => {
+    // Sync with localStorage or cookie on mount (client-side only)
+    const localLang = window.localStorage.getItem('app_lang');
+    if (localLang && ['ja', 'en', 'vi', 'zh', 'th'].includes(localLang)) {
+      if (localLang !== initialLocale) {
+        setLocaleState(localLang);
       }
-      // 2. Check session_user cookie
-      const cookieValue = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('session_user='))
-        ?.split('=')[1];
-      if (cookieValue) {
-        try {
-          const parsed = JSON.parse(decodeURIComponent(cookieValue));
-          if (parsed?.language && ['ja', 'en', 'vi', 'zh', 'th'].includes(parsed.language)) {
-            window.localStorage.setItem('app_lang', parsed.language);
-            return parsed.language;
+      return;
+    }
+    const cookieValue = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('session_user='))
+      ?.split('=')[1];
+    if (cookieValue) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(cookieValue));
+        if (parsed?.language && ['ja', 'en', 'vi', 'zh', 'th'].includes(parsed.language)) {
+          window.localStorage.setItem('app_lang', parsed.language);
+          if (parsed.language !== initialLocale) {
+            setLocaleState(parsed.language);
           }
-        } catch (_) {
-          // ignore parsing errors
         }
+      } catch (_) {
+        // ignore
       }
     }
-    return initialLocale;
-  });
+  }, [initialLocale]);
 
   const setLocale = (newLocale: string) => {
-  if (!['ja', 'en', 'vi', 'zh', 'th'].includes(newLocale)) return;
-  setLocaleState(newLocale);
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem('app_lang', newLocale);
-    // Dispatch a custom event so other components know language changed
-    window.dispatchEvent(new Event('languageChange'));
-  }
-};
+    if (!['ja', 'en', 'vi', 'zh', 'th'].includes(newLocale)) return;
+    setLocaleState(newLocale);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('app_lang', newLocale);
+      // Dispatch a custom event so other components know language changed
+      window.dispatchEvent(new Event('languageChange'));
+    }
+  };
 
   const t = (path: string): string => {
     const keys = path.split('.');
