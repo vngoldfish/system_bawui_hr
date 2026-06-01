@@ -119,10 +119,10 @@ export default async function PayrollPage() {
 
       const totalDeductions = r.deductions + r.insurance + r.tax;
 
-      // Query attendance records for this month to get real days/hours
-      const startOfMonth = new Date(`${r.month}-01T00:00:00Z`);
+      // Query attendance records for the working month (previous month) to get real days/hours
       const [year, monthVal] = r.month.split('-').map(Number);
-      const endOfMonth = new Date(year, monthVal, 0, 23, 59, 59, 999);
+      const startOfMonth = new Date(year, monthVal - 2, 1);
+      const endOfMonth = new Date(year, monthVal - 1, 0, 23, 59, 59, 999);
 
       const attendance = await prisma.attendanceRecord.findMany({
         where: {
@@ -296,10 +296,10 @@ export default async function PayrollPage() {
 
       const emp = dbEmployees.find(e => e.id === r.employeeId);
 
-      // Query attendance records for this month to get real days/hours
-      const startOfMonth = new Date(`${r.month}-01T00:00:00Z`);
+      // Query attendance records for the working month (previous month) to get real days/hours
       const [year, monthVal] = r.month.split('-').map(Number);
-      const endOfMonth = new Date(year, monthVal, 0, 23, 59, 59, 999);
+      const startOfMonth = new Date(year, monthVal - 2, 1);
+      const endOfMonth = new Date(year, monthVal - 1, 0, 23, 59, 59, 999);
 
       const attendance = await prisma.attendanceRecord.findMany({
         where: {

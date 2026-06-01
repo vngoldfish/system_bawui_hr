@@ -937,6 +937,12 @@ export default function PayrollClient({
     return `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   }, [selectedYear, selectedMonth]);
 
+  const workingMonthStr = useMemo(() => {
+    const [year, month] = targetMonthStr.split('-').map(Number);
+    const prevDate = new Date(year, month - 2, 1);
+    return `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+  }, [targetMonthStr]);
+
   const startMonth = useMemo(() => {
     return targetMonthStr;
   }, [targetMonthStr]);
@@ -1035,8 +1041,8 @@ export default function PayrollClient({
   const handleCalculate = async () => {
     setCalculating(true);
     try {
-      // Fetch actual attendance records for the selected endMonth
-      const res = await fetch(`/api/attendance?month=${endMonth}`);
+      // Fetch actual attendance records for the selected workingMonthStr
+      const res = await fetch(`/api/attendance?month=${workingMonthStr}`);
       if (!res.ok) {
         throw new Error('Failed to fetch attendance data');
       }
@@ -1887,7 +1893,7 @@ function PayrollSchedule({ cutoffDay, payday, year, month }: { cutoffDay: string
     const today = new Date();
     const todayDate = today.getDate();
     const currentYear = year;
-    const currentMonth = month - 1; // 0-indexed for JS Date
+    const currentMonth = month - 2; // 0-indexed for JS Date
 
     const cutoff = cutoffDay === '末日' ? new Date(currentYear, currentMonth + 1, 0).getDate() : Number(cutoffDay);
     const pay = Number(payday);
