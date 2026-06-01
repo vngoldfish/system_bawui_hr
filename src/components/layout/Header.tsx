@@ -82,9 +82,10 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
   };
 
   const handleLogout = async () => {
-    if (confirm(t('common.logoutConfirm'))) {
-      await logoutClient();
-    }
+    console.log('handleLogout invoked');
+    // Directly log out without confirmation
+    await logoutClient();
+    console.log('logoutClient resolved');
   };
 
 

@@ -69,10 +69,10 @@ export function setSessionCookies(response: NextResponse, user: SessionUser) {
 export function clearSessionCookies(response: NextResponse) {
   response.headers.append(
     'Set-Cookie',
-    'session_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly'
+    'session_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax'
   );
   response.headers.append(
     'Set-Cookie',
-    'session_user=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    'session_user=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
   );
 }

@@ -789,7 +789,20 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEmployee || !selectedDate) return;
+    if (!selectedEmployee) return;
+    if (!formDate && !selectedDate) {
+      alert('日付を入力してください');
+      return;
+    }
+
+    let attendanceDate: Date;
+    try {
+      attendanceDate = new Date(formDate ? `${formDate}T00:00:00.000Z` : `${selectedDate}T00:00:00.000Z`);
+      if (isNaN(attendanceDate.getTime())) throw new Error('Invalid date');
+    } catch (e) {
+      alert('日付が無効です');
+      return;
+    }
 
     const checkOut = (formCheckOutDate && formCheckOutTime) ? `${formCheckOutDate}T${formCheckOutTime}:00` : null;
     const checkIn = (formDate && formCheckIn) ? `${formDate}T${formCheckIn}:00` : null;

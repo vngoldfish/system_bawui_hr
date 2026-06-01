@@ -42,6 +42,15 @@ interface PayrollRecord {
   deductions?: number;
   tax?: number;
   insurance?: number;
+  healthInsuranceCompany?: number;
+  pensionCompany?: number;
+  employmentInsuranceCompany?: number;
+  workersCompCompany?: number;
+  healthInsuranceEmployee?: number;
+  pensionEmployee?: number;
+  employmentInsuranceEmployee?: number;
+  nursingCareInsurance?: number;
+  totalCompanyCost?: number;
 }
 
 const getDisplayMonth = (monthStr: string, loc: string) => {
@@ -138,12 +147,28 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
   const [emailing, setEmailing] = useState(false);
   const [emailStatus, setEmailStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   
   const transAllow = employee.benefits?.transportation || 0;
   const houseAllow = employee.benefits?.housing || 0;
   const mealAllow = employee.benefits?.meal || 0;
   const fixedAllowances = transAllow + houseAllow + mealAllow;
   const displayBonus = Math.max(0, record.allowances - fixedAllowances);
+
+  // Company contributions display
+  const companyHealthIns = record.healthInsuranceCompany || 0;
+  const companyPension = record.pensionCompany || 0;
+  const companyEmpIns = record.employmentInsuranceCompany || 0;
+  const companyWorkersComp = record.workersCompCompany || 0;
+  const totalCompanyCost = record.totalCompanyCost || 0;
+
+  // Employee contributions detailed
+  const empHealthIns = record.healthInsuranceEmployee || 0;
+  const empPension = record.pensionEmployee || 0;
+  const empEmpIns = record.employmentInsuranceEmployee || 0;
+  const nursingCare = record.nursingCareInsurance || 0;
+  const resTax = record.residentTax || 0;
+  const incTax = record.incomeTax || record.tax || 0;
 
   const [editFields, setEditFields] = useState({
     baseSalary: record.baseSalary,
@@ -159,7 +184,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
     absentDays: record.absentDays || 0,
     overtimeHours: record.overtimeHours || 0,
   });
-  const [saving, setSaving] = useState(false);
+
 
   // Sync edits if record changes
   useEffect(() => {
@@ -398,8 +423,8 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                   </>
                 ) : (
                   <>
-                    {/* Always show the revert button for APPROVED, PAID, or PENDING states */}
-                    {record.status === 'APPROVED' || record.status === 'PAID' || record.status === 'PENDING' ? (
+                    {/* Show revert button only for APPROVED, PAID, or PENDING states */}
+                    {['APPROVED', 'PAID', 'PENDING'].includes(record.status) ? (
                       <button
                         onClick={async () => {
                           if (confirm('この給与明細を未確定に戻しますか？勤怠や明細の修正が可能になります。(Bạn có muốn hủy chốt bảng lương này không? Sẽ có thể sửa lại chấm công và chi tiết lương.)')) {
@@ -433,7 +458,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                           }
                         }}
                         disabled={saving}
-                        className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5"
+                        className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 cursor-pointer"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
                         未確定に戻す
@@ -759,6 +784,34 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
               </table>
             </div>
 
+            {/* 【会社負担分】 */}
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="text-sm font-semibold text-slate-700 mb-2">【会社負担分】</div>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-slate-600">健康保険 会社負担</span><span>¥{companyHealthIns.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">厚生年金 会社負担</span><span>¥{companyPension.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">雇用保険 会社負担</span><span>¥{companyEmpIns.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">労災保険 会社負担</span><span>¥{companyWorkersComp.toLocaleString()}</span></div>
+                <div className="flex justify-between pt-2 border-t font-semibold text-blue-700">
+                  <span>総額 会社負担</span>
+                  <span>¥{totalCompanyCost.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 【従業員負担分】 */}
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="text-sm font-semibold text-slate-700 mb-2">【従業員負担分】</div>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-slate-600">健康保険 従業員負担</span><span>¥{empHealthIns.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">厚生年金 従業員負担</span><span>¥{empPension.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">雇用保険 従業員負担</span><span>¥{empEmpIns.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">介護保険</span><span>¥{nursingCare.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">住民税</span><span>¥{resTax.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">所得税</span><span>¥{incTax.toLocaleString()}</span></div>
+              </div>
+            </div>
+
           </div>
 
           {/* Net pay summary box */}
@@ -1079,6 +1132,31 @@ export default function PayrollClient({
     }
   };
 
+  const handleCalculatePayroll = async () => {
+    if (!confirm('今月の給与を計算しますか？')) return;
+
+    try {
+      const res = await fetch('/api/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(employees.map(emp => ({
+          employeeId: emp.id,
+          month: targetMonthStr,
+          workDays: 20,
+          overtimeHours: 0
+        })))
+      });
+      if (res.ok) {
+        alert('給与計算完了');
+        window.location.reload();
+      } else {
+        alert('エラーが発生しました');
+      }
+    } catch (e) {
+      alert('通信エラー');
+    }
+  };
+
   const monthRecords = useMemo(() => {
     if (isEmployeeMode) {
       return records.filter(r => r.month >= startMonth && r.month <= endMonth);
@@ -1185,6 +1263,14 @@ export default function PayrollClient({
 
               {viewType === 'month' && (
                 <div className="flex gap-2 flex-wrap items-center">
+                  {!isEmployeeMode && (
+                    <button
+                      onClick={handleCalculatePayroll}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      給与計算
+                    </button>
+                  )}
                   <button onClick={handleCalculate} disabled={calculating}
                     className="px-4 py-2 bg-blue-650 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold disabled:opacity-50 cursor-pointer shadow-sm">
                     {calculating ? t('payroll.calculating') : t('payroll.calculateBtn')}
@@ -1445,18 +1531,7 @@ export default function PayrollClient({
 
         <div className="overflow-x-auto">
           <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '1150px' }}>
-            <colgroup>
-              <col style={{ width: '170px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '100px' }} /> {/* 賞与 */}
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '115px' }} />
-              <col style={{ width: '95px' }} />
-              <col style={{ width: !isEmployeeMode ? '210px' : '90px' }} />
-            </colgroup>
+            <colgroup><col style={{ width: '170px' }} /><col style={{ width: '110px' }} /><col style={{ width: '110px' }} /><col style={{ width: '100px' }} /><col style={{ width: '100px' }} /><col style={{ width: '100px' }} /><col style={{ width: '110px' }} /><col style={{ width: '115px' }} /><col style={{ width: '95px' }} /><col style={{ width: !isEmployeeMode ? '210px' : '90px' }} /></colgroup>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 {(isEmployeeMode || viewType === 'employee') ? (
@@ -1471,6 +1546,7 @@ export default function PayrollClient({
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">賞与</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colDeduction')}</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colNet')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">会社負担</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colStatus')}</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{!isEmployeeMode ? '操作' : t('payroll.detailBtn')}</th>
               </tr>
@@ -1522,6 +1598,7 @@ export default function PayrollClient({
                     })()}
                     <td className="px-4 py-3 text-sm text-right text-red-600 whitespace-nowrap">{formatCurrency(record.totalDeductions)}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-slate-800 whitespace-nowrap">{formatCurrency(record.netSalary)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-blue-700 whitespace-nowrap">¥{(record as any).totalCompanyCost?.toLocaleString() || '-'}</td>
                     <td className="px-4 py-3 text-center whitespace-nowrap"><span className={`px-2 py-0.5 text-xs rounded ${statusColor(record.status)}`}>{
                       record.status === 'PAID' ? t('payroll.statusPaid') :
                       record.status === 'APPROVED' ? t('payroll.statusApproved') :
@@ -1587,6 +1664,13 @@ export default function PayrollClient({
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr className="bg-slate-100 font-semibold">
+                <td colSpan={8} className="px-4 py-2 text-right text-xs text-slate-600">会社負担 合計</td>
+                <td className="px-4 py-2 text-right text-sm text-blue-700">¥{filtered.reduce((sum, r) => sum + ((r as any).totalCompanyCost || 0), 0).toLocaleString()}</td>
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
 
@@ -1707,7 +1791,7 @@ function AttendanceCheckModal({
     if (!timeStr) return '-';
     try {
       const d = new Date(timeStr);
-      return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
+      return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
     } catch {
       return timeStr;
     }
@@ -1869,6 +1953,76 @@ function PayrollSchedule({ cutoffDay, payday }: { cutoffDay: string; payday: str
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function SalaryAdjustmentModal({ record, employee, onClose, onSave }: {
+  record: PayrollRecord;
+  employee: Employee;
+  onClose: () => void;
+  onSave: (updated: PayrollRecord) => void;
+}) {
+  const [adjustment, setAdjustment] = useState(0);
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        id: record.id,
+        allowances: (record.allowances || 0) + adjustment,
+      };
+      const res = await fetch('/api/payroll', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Failed to save adjustment');
+      const updatedRes = await res.json();
+      const updated = updatedRes.data || updatedRes;
+      onSave({ ...record, allowances: updated.allowances || updated.bonus });
+      onClose();
+    } catch (e: any) {
+      alert('Error: ' + (e.message || e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-bold mb-4">給与調整</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">調整額 (円)</label>
+            <input
+              type="number"
+              value={adjustment}
+              onChange={e => setAdjustment(parseInt(e.target.value) || 0)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">理由</label>
+            <input
+              type="text"
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2"
+              placeholder="調整理由を入力"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg">キャンセル</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50">
+            {saving ? '保存中...' : '保存'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

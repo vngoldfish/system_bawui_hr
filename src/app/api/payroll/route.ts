@@ -4,6 +4,7 @@ import { createdResponse, errorResponse, handleApiError, successResponse } from 
 import { hasPermission } from '@/lib/auth-mock';
 import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
+import { getEffectiveSalary, calculatePayrollDetails } from '@/lib/payroll-calculator';
 
 // GET payroll records
 export async function GET(request: NextRequest) {
@@ -127,6 +128,65 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fetch effective salary from SalaryAdjustment if applicable
+    for (const data of recordsData) {
+      if (data.employeeId && data.month) {
+        const effective = await getEffectiveSalary(data.employeeId, data.month, prisma);
+        if (effective) {
+          data.baseSalary = effective.baseSalary;
+          data.hourlyRate = effective.hourlyRate;
+          data.dailyRate = effective.dailyRate;
+        }
+      }
+    }
+
+    // Calculate detailed payroll breakdown for each record
+    for (const data of recordsData) {
+      if (data.employeeId) {
+        const employee = await prisma.employee.findUnique({
+          where: { id: data.employeeId },
+          select: {
+            salary: true,
+            salaryType: true,
+            hourlyRate: true,
+            dailyRate: true,
+            benefits: true,
+            birthDate: true,
+          },
+        });
+        if (employee) {
+          const details = calculatePayrollDetails({
+            baseSalary: parseFloat(data.baseSalary) || employee.salary || 0,
+            salaryType: employee.salaryType || '月給',
+            workDays: parseFloat(data.workDays) || 20,
+            hourlyRate: parseFloat(data.hourlyRate) || employee.hourlyRate || 0,
+            dailyRate: parseFloat(data.dailyRate) || employee.dailyRate || 0,
+            overtimeHours: parseFloat(data.overtimeHours) || 0,
+            benefits: employee.benefits,
+            birthDate: employee.birthDate,
+            month: data.month,
+            dependentsCount: 0,
+            dependents: [],
+            customAllowances: parseFloat(data.allowances || data.bonus) || 0,
+            customBonus: 0,
+          });
+
+          // Map all 11 detailed fields
+          data.healthInsuranceCompany = details.healthInsuranceCompany;
+          data.pensionCompany = details.pensionCompany;
+          data.employmentInsuranceCompany = details.employmentInsuranceCompany;
+          data.workersCompCompany = details.workersCompCompany;
+          data.healthInsuranceEmployee = details.healthInsuranceEmployee;
+          data.pensionEmployee = details.pensionEmployee;
+          data.employmentInsuranceEmployee = details.employmentInsuranceEmployee;
+          data.residentTax = details.residentTax;
+          data.incomeTax = details.incomeTax;
+          data.nursingCareInsurance = details.nursingCareInsurance;
+          data.totalCompanyCost = details.totalCompanyCost;
+        }
+      }
+    }
+
     const results = await prisma.$transaction(
       recordsData.map((data: any) => {
         const baseSalary = parseFloat(data.baseSalary) || 0;
@@ -163,6 +223,17 @@ export async function POST(request: NextRequest) {
             workHours,
             overtimeHours,
             absentDays,
+            healthInsuranceCompany: data.healthInsuranceCompany || 0,
+            pensionCompany: data.pensionCompany || 0,
+            employmentInsuranceCompany: data.employmentInsuranceCompany || 0,
+            workersCompCompany: data.workersCompCompany || 0,
+            healthInsuranceEmployee: data.healthInsuranceEmployee || 0,
+            pensionEmployee: data.pensionEmployee || 0,
+            employmentInsuranceEmployee: data.employmentInsuranceEmployee || 0,
+            residentTax: data.residentTax || 0,
+            incomeTax: data.incomeTax || 0,
+            nursingCareInsurance: data.nursingCareInsurance || 0,
+            totalCompanyCost: data.totalCompanyCost || 0,
           },
           create: {
             employeeId: data.employeeId,
@@ -180,6 +251,17 @@ export async function POST(request: NextRequest) {
             workHours,
             overtimeHours,
             absentDays,
+            healthInsuranceCompany: data.healthInsuranceCompany || 0,
+            pensionCompany: data.pensionCompany || 0,
+            employmentInsuranceCompany: data.employmentInsuranceCompany || 0,
+            workersCompCompany: data.workersCompCompany || 0,
+            healthInsuranceEmployee: data.healthInsuranceEmployee || 0,
+            pensionEmployee: data.pensionEmployee || 0,
+            employmentInsuranceEmployee: data.employmentInsuranceEmployee || 0,
+            residentTax: data.residentTax || 0,
+            incomeTax: data.incomeTax || 0,
+            nursingCareInsurance: data.nursingCareInsurance || 0,
+            totalCompanyCost: data.totalCompanyCost || 0,
           },
         });
       })
@@ -329,6 +411,42 @@ export async function PUT(request: NextRequest) {
     });
 
     return successResponse(updatedRecord);
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+// DELETE - Xóa payroll records (admin only)
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = getSessionUser(request);
+    if (!user) return errorResponse('Unauthorized', 401);
+
+    if (!hasPermission('payroll:delete', user as any)) {
+      return errorResponse('Forbidden', 403);
+    }
+
+    const { searchParams } = new URL(request.url);
+    const month = searchParams.get('month'); // Optional: xóa theo tháng
+    const employeeId = searchParams.get('employeeId'); // Optional: xóa theo employee
+
+    const where: any = {};
+    if (month) where.month = month;
+    if (employeeId) where.employeeId = employeeId;
+
+    const deleted = await prisma.payrollRecord.deleteMany({ where });
+
+    logDatabaseChange({
+      user: user.userId,
+      action: 'DELETE',
+      model: 'PayrollRecord',
+      details: { count: deleted.count, where }
+    });
+
+    return successResponse({
+      message: `Deleted ${deleted.count} payroll records`,
+      count: deleted.count
+    });
   } catch (error) {
     return handleApiError(error);
   }

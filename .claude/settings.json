@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Agent",
+      "Bash(psql -U postgres -d hr_management -f prisma/migrations/manual_add_salary_adjustments/migration.sql)"
+    ]
+  },
+  "tools": {
+    "Agent": {
+      "enabled": true,
+      "description": "Launch a new agent to handle complex, multi-step tasks"
+    }
+  }
+}

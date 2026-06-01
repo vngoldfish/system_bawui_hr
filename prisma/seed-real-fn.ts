@@ -80,6 +80,42 @@ export async function seedReal(prisma: PrismaClient) {
 
   console.log('Created 4 core contract types.');
 
+  // Create default SUPER_ADMIN account
+  const adminEmployee = await prisma.employee.create({
+    data: {
+      employeeCode: 'ADMIN001',
+      firstName: 'システム',
+      lastName: '管理者',
+      firstNameKana: 'しすてむ',
+      lastNameKana: 'かんりしゃ',
+      email: 'admin@bawui.com',
+      phone: '03-0000-0001',
+      birthDate: new Date('1990-01-01'),
+      departmentId: kanri.id,
+      positionId: posBucho.id,
+      hireDate: new Date('2015-04-01'),
+      salary: 800000,
+      status: 'ACTIVE',
+      role: 'SUPER_ADMIN',
+      password: await hashPassword('1234@abcd'),
+      nationality: '日本',
+      contractTypeId: ctSeishain.id,
+      contractStartDate: new Date('2015-04-01'),
+      salaryType: '月給',
+      benefits: {
+        healthInsurance: true,
+        pension: true,
+        employmentInsurance: true,
+        workersComp: true,
+        transportation: 0,
+        housing: 0,
+        meal: 0,
+      },
+    },
+  });
+
+  console.log('Created default SUPER_ADMIN account: admin@bawui.com / 1234@abcd');
+
   // 5. Initialize Permissions
   const allPermissions = [
     { key: 'employees:view', category: '従業員管理 (Employee)', name: '従業員閲覧', description: '従業員の基本情報を閲覧する権限' },
@@ -154,35 +190,6 @@ export async function seedReal(prisma: PrismaClient) {
   }
   console.log('Seeded role permissions.');
 
-  // 6. Create Initial Super Admin User
-  const adminEmail = process.env.INITIAL_ADMIN_EMAIL || 'admin@bawui.com';
-  const adminPassword = process.env.INITIAL_ADMIN_PASSWORD || '1234@abcd';
+        
   
-  await prisma.employee.create({
-    data: {
-      employeeCode: 'ADMIN001',
-      firstName: '管理者',
-      lastName: 'システム',
-      firstNameKana: 'かんりしゃ',
-      lastNameKana: 'システム',
-      email: adminEmail,
-      phone: '090-0000-0000',
-      birthDate: new Date('1990-01-01'),
-      hireDate: new Date('2026-05-30'),
-      salary: 0,
-      status: 'ACTIVE',
-      role: 'SUPER_ADMIN',
-      password: hashPassword(adminPassword),
-      nationality: '日本',
-      departmentId: kanri.id,
-      positionId: posBucho.id,
-      contractTypeId: ctSeishain.id,
-      benefits: {},
-    }
-  });
-
-  console.log(`Created Super Admin user successfully.`);
-  console.log(`Email: ${adminEmail}`);
-  console.log(`Password: ${adminPassword}`);
-  console.log('Real database initialization completed successfully!');
-}
+  }

@@ -140,9 +140,10 @@ model Employee {
 
   // Salary details
   salaryType String @default("月給")
-  hourlyRate Float  @default(0)
-  dailyRate  Float  @default(0)
-  benefits   Json?
+  hourlyRate       Float @default(0)
+  dailyRate        Float @default(0)
+  baseSalaryAtHire Float @default(0)
+  benefits         Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -161,6 +162,7 @@ model Employee {
   residenceCardHistory ResidenceCardHistory[]
   sentAnnouncements    Announcement[]         @relation("SentAnnouncements")
   shitens              Shiten[]               @relation("EmployeeShitens")
+  salaryAdjustments    SalaryAdjustment[]
 
   @@index([departmentId])
   @@index([positionId])
@@ -272,11 +274,53 @@ model PayrollRecord {
   workHours     Float?
   overtimeHours Float?
   absentDays    Float?
+  // Company contributions (会社負担分)
+  healthInsuranceCompany     Float @default(0)
+  pensionCompany             Float @default(0)
+  employmentInsuranceCompany Float @default(0)
+  workersCompCompany         Float @default(0)
+
+  // Employee contributions (従業員負担分) - detailed
+  healthInsuranceEmployee    Float @default(0)
+  pensionEmployee            Float @default(0)
+  employmentInsuranceEmployee Float @default(0)
+
+  // Resident tax
+  residentTax                Float @default(0)
+
+  // Income tax (rename from 'tax' if needed, or add as separate)
+  incomeTax                  Float @default(0)
+
+  // Nursing care insurance (介護保険)
+  nursingCareInsurance       Float @default(0)
+
+  // Total company cost
+  totalCompanyCost           Float @default(0)
+
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   @@unique([employeeId, month])
   @@map("payroll_records")
+}
+
+model SalaryAdjustment {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  effectiveFrom String   // YYYY-MM format
+  oldBaseSalary Float
+  newBaseSalary Float
+  oldHourlyRate Float    @default(0)
+  newHourlyRate Float    @default(0)
+  oldDailyRate  Float    @default(0)
+  newDailyRate  Float    @default(0)
+  reason        String
+  adjustedBy    String?
+  adjustedAt    DateTime @default(now())
+
+  @@index([employeeId, effectiveFrom])
+  @@map("salary_adjustments")
 }
 
 // Overtime Request model

@@ -38,14 +38,14 @@ export function hasClientPermission(permission: string, user = getLoggedUser()):
 
 // Client-side helper to clear the session and redirect
 export async function logoutClient() {
+  console.log('logoutClient invoked');
   try {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
   } catch (e) {
     console.error('Logout API failed, clearing client cookie instead', e);
   }
-  // Clear cookie manually just in case
-  if (typeof window !== 'undefined') {
-    document.cookie = 'session_user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    window.location.href = '/login';
-  }
+  // Clear both cookies manually just in case (session_user & session_token)
+  document.cookie = 'session_user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  document.cookie = 'session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  window.location.href = '/login';
 }

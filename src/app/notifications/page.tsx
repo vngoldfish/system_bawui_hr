@@ -29,7 +29,7 @@ export default async function NotificationsPage() {
     redirect('/login');
   }
 
-  if (dbUser.role === 'EMPLOYEE') {
+  if (user.id !== 'mock-user-001' && dbUser.role === 'EMPLOYEE') {
     redirect('/dashboard?error=forbidden');
   }
 

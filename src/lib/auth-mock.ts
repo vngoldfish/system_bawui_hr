@@ -10,6 +10,7 @@ export type Permission =
   | 'payroll:edit'
   | 'attendance:view'
   | 'attendance:edit'
+  | 'attendance:view_all_departments'
   | 'leave:view'
   | 'leave:create'
   | 'leave:approve'
@@ -39,6 +40,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'payroll:edit',
     'attendance:view',
     'attendance:edit',
+    'attendance:view_all_departments',
     'leave:view',
     'leave:create',
     'leave:approve',
@@ -95,7 +97,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 
 // Mock auth tạm thời: thay hàm này bằng session thật khi tích hợp NextAuth/Clerk.
 export function getCurrentUser(): CurrentUser {
-  const role: Role = 'HR_MANAGER';
+  const role: Role = 'SUPER_ADMIN';
 
   return {
     id: 'mock-user-001',
@@ -115,6 +117,7 @@ export function hasPermission(
   permission: Permission,
   user: Pick<CurrentUser, 'permissions'> = getCurrentUser()
 ): boolean {
+  if ((user as any).role === 'SUPER_ADMIN') return true;
   return user.permissions.includes(permission);
 }
 
