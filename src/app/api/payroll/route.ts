@@ -490,7 +490,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const updatedRecord = await prisma.payrollRecord.update({
-      where: { id: body.id },
+      where: { id: existing.id },
       data: {
         baseSalary,
         overtimePay,

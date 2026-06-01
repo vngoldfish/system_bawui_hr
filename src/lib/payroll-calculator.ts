@@ -316,12 +316,14 @@
 	  // Company contributions
 	  const companyContribs = calculateCompanyContributions({
 	    healthInsurance,
+	    nursingCarePremium,
 	    pension,
-	    employmentInsurance,
-	    workersComp,
+	    totalGross,
+	    employmentInsuranceEnabled: !!b.employmentInsurance,
+	    workersCompEnabled: !!b.workersComp,
 	  });
 
-	  const nursingCareInsurance = calculateNursingCarePremium(smrIncome, birthDate, month);
+	  const nursingCareInsurance = nursingCarePremium;
 	  const totalCompanyCost = totalGross + companyContribs.totalCompanyCost;
 
 	  return {
@@ -390,42 +392,52 @@
 	  };
 	}
 
-	export function calculateCompanyContributions(premiums: {
-	  healthInsurance: number;
-	  pension: number;
-	  employmentInsurance: number;
-	  workersComp: number;
-	}): {
-	  healthInsuranceCompany: number;
-	  pensionCompany: number;
-	  employmentInsuranceCompany: number;
-	  workersCompCompany: number;
-	  totalCompanyCost: number;
-	} {
-	  const healthInsuranceCompany = premiums.healthInsurance;
-	  const pensionCompany = premiums.pension;
-	  const employmentInsuranceCompany = Math.round(premiums.employmentInsurance * (0.85 / 0.55));
-	  const workersCompCompany = premiums.workersComp;
+	export function calculateCompanyContributions({
+  healthInsurance,
+  nursingCarePremium,
+  pension,
+  totalGross,
+  employmentInsuranceEnabled,
+  workersCompEnabled,
+}: {
+  healthInsurance: number;
+  nursingCarePremium: number;
+  pension: number;
+  totalGross: number;
+  employmentInsuranceEnabled: boolean;
+  workersCompEnabled: boolean;
+}): {
+  healthInsuranceCompany: number;
+  pensionCompany: number;
+  employmentInsuranceCompany: number;
+  workersCompCompany: number;
+  totalCompanyCost: number;
+} {
+  const healthInsuranceCompany = healthInsurance + nursingCarePremium;
+  const pensionCompany = pension;
+  const employmentInsuranceCompany = employmentInsuranceEnabled ? Math.round(totalGross * 0.0095) : 0;
+  const workersCompCompany = workersCompEnabled ? Math.round(totalGross * 0.003) : 0;
 
-	  const totalCompanyCost =
-	    healthInsuranceCompany + pensionCompany + employmentInsuranceCompany + workersCompCompany;
+  const totalCompanyCost =
+    healthInsuranceCompany + pensionCompany + employmentInsuranceCompany + workersCompCompany;
 
-	  return {
-	    healthInsuranceCompany,
-	    pensionCompany,
-	    employmentInsuranceCompany,
-	    workersCompCompany,
-	    totalCompanyCost,
-	  };
-	}
+  return {
+    healthInsuranceCompany,
+    pensionCompany,
+    employmentInsuranceCompany,
+    workersCompCompany,
+    totalCompanyCost,
+  };
+}
 
-	export function calculateNursingCarePremium(
-	  income: number,
-	  birthDate: string | null | undefined,
-	  month: string
-	): number {
-	  if (!isNursingCareApplicable(birthDate, month)) return 0;
-	  const rate = 0.0182;
-	  const totalPremium = income * rate;
-	  return apply50SenRounding(totalPremium);
-	}
+export function calculateNursingCarePremium(
+  income: number,
+  birthDate: string | null | undefined,
+  month: string
+): number {
+  if (!isNursingCareApplicable(birthDate, month)) return 0;
+  const smr = getHealthInsuranceSMR(income);
+  const rate = 0.016;
+  const totalPremium = smr * rate;
+  return apply50SenRounding(totalPremium);
+}

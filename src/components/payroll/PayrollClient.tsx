@@ -1147,7 +1147,7 @@ export default function PayrollClient({
           healthInsurance: matchingDb ? (matchingDb.healthInsuranceEmployee + (matchingDb.nursingCareInsurance || 0)) : record.healthInsurance,
           pension: matchingDb ? matchingDb.pensionEmployee : record.pension,
           employmentInsurance: matchingDb ? matchingDb.employmentInsuranceEmployee : record.employmentInsurance,
-          workersComp: matchingDb ? matchingDb.workersCompCompany : record.workersComp,
+          workersComp: 0,
           incomeTax: matchingDb ? matchingDb.incomeTax : record.incomeTax,
           residentTax: matchingDb ? matchingDb.residentTax : record.residentTax,
         };

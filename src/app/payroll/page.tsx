@@ -105,9 +105,7 @@ export default async function PayrollPage() {
         ? r.employmentInsuranceEmployee
         : Math.round(r.insurance * 0.3 / 14.3);
 
-      const workersComp = (r.workersCompCompany !== null && r.workersCompCompany !== 0)
-        ? r.workersCompCompany
-        : 0;
+      const workersComp = 0;
       
       const incomeTax = (r.incomeTax !== null && r.incomeTax !== 0)
         ? r.incomeTax
@@ -280,9 +278,7 @@ export default async function PayrollPage() {
         ? r.employmentInsuranceEmployee
         : Math.round(r.insurance * 0.3 / 14.3);
 
-      const workersComp = (r.workersCompCompany !== null && r.workersCompCompany !== 0)
-        ? r.workersCompCompany
-        : 0;
+      const workersComp = 0;
       
       const incomeTax = (r.incomeTax !== null && r.incomeTax !== 0)
         ? r.incomeTax
