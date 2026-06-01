@@ -132,28 +132,32 @@
 	  return Math.round(half); // Làm tròn thông thường
 	}
 
-	// Bảng tra cứu thuế thu nhập nguyệt ngạch (Getsugakuhyō) ước tính theo biểu thuế Cục Thuế quốc gia Nhật Bản (cột Ko)
+	// Bảng tra cứu thuế thu nhập nguyệt ngạch (Getsugakuhyō) ước tính theo biểu thuế Cục Thuế quốc gia Nhật Bản (cột Ko) cho năm Reiwa 8 (2026)
 	export function estimateIncomeTaxGetsugakuhyo(taxableIncome: number, dependentsCount: number): number {
-	  if (taxableIncome < 88000) return 0;
+	  if (taxableIncome < 103000) return 0;
 
-	  // Giảm trừ thêm cho người phụ thuộc (quy đổi ra tháng)
-	  const dependentAllowance = dependentsCount * 31667;
-	  const adjustedIncome = Math.max(0, taxableIncome - dependentAllowance);
-
-	  if (adjustedIncome < 88000) return 0;
-
-	  // Lũy tiến nhanh tương đối chính xác với cột Ko nguyệt ngạch
-	  if (adjustedIncome < 150000) {
-	    return Math.round((adjustedIncome - 88000) * 0.05 + 1400);
-	  } else if (adjustedIncome < 250000) {
-	    return Math.round((adjustedIncome - 150000) * 0.07 + 4500);
-	  } else if (adjustedIncome < 400000) {
-	    return Math.round((adjustedIncome - 250000) * 0.10 + 11500);
-	  } else if (adjustedIncome < 700000) {
-	    return Math.round((adjustedIncome - 400000) * 0.15 + 26500);
+	  let tax0 = 0;
+	  if (taxableIncome < 110000) {
+	    tax0 = (taxableIncome - 103000) * (380 - 0) / (110000 - 103000);
+	  } else if (taxableIncome < 120000) {
+	    tax0 = 380 + (taxableIncome - 110000) * (890 - 380) / (120000 - 110000);
+	  } else if (taxableIncome < 151500) {
+	    tax0 = 890 + (taxableIncome - 120000) * (2250 - 890) / (151500 - 120000);
+	  } else if (taxableIncome < 171000) {
+	    tax0 = 2250 + (taxableIncome - 151500) * (3350 - 2250) / (171000 - 151500);
+	  } else if (taxableIncome < 200000) {
+	    tax0 = 3350 + (taxableIncome - 171000) * (4480 - 3350) / (200000 - 171000);
+	  } else if (taxableIncome < 300000) {
+	    tax0 = 4480 + (taxableIncome - 200000) * (8550 - 4480) / (300000 - 200000);
+	  } else if (taxableIncome < 500000) {
+	    tax0 = 8550 + (taxableIncome - 300000) * (27700 - 8550) / (500000 - 300000);
 	  } else {
-	    return Math.round((adjustedIncome - 700000) * 0.20 + 71500);
+	    tax0 = 27700 + (taxableIncome - 500000) * 0.156;
 	  }
+
+	  // Giảm trừ 1,620 JPY thuế cho mỗi người phụ thuộc theo biểu thuế nguyệt ngạch
+	  const taxWithDependents = tax0 - (dependentsCount * 1620);
+	  return Math.max(0, Math.round(taxWithDependents));
 	}
 
 	export function calculatePayrollDetails({
