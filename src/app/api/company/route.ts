@@ -28,6 +28,7 @@ const updateCompanySchema = z.object({
   roundingPolicy: z.string().default('exact'),
   salaryCutoffDay: z.string().default('末日'),
   payday: z.string().default('25'),
+  healthInsuranceRate: z.number().optional().nullable(),
 });
 
 // GET company info (Public)
@@ -60,6 +61,7 @@ export async function GET(_request: NextRequest) {
           salaryCutoffDay: '末日',
           payday: '25',
           roundingPolicy: 'exact',
+          healthInsuranceRate: 9.98,
         },
       });
     }

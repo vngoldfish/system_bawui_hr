@@ -140,6 +140,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fetch company-wide health insurance rate
+    const company = await prisma.company.findFirst({ select: { healthInsuranceRate: true } });
+    const companyRate = company?.healthInsuranceRate;
+
     // Calculate detailed payroll breakdown for each record
     for (const data of recordsData) {
       if (data.employeeId) {
@@ -170,6 +174,7 @@ export async function POST(request: NextRequest) {
             dependentsCount: employee.dependents.length,
             dependents: employee.dependents,
             insuranceSalary: employee.insuranceSalary,
+            companyRate,
             customAllowances: (data.allowances !== undefined && data.allowances !== null && data.allowances !== '')
               ? parseFloat(data.allowances)
               : (data.bonus !== undefined && data.bonus !== null && data.bonus !== '')
@@ -425,6 +430,9 @@ export async function PUT(request: NextRequest) {
     let nursingCareInsurance = existing.nursingCareInsurance;
     let totalCompanyCost = existing.totalCompanyCost;
 
+    const company = await prisma.company.findFirst({ select: { healthInsuranceRate: true } });
+    const companyRate = company?.healthInsuranceRate;
+
     if (employee) {
       const details = calculatePayrollDetails({
         baseSalary,
@@ -439,6 +447,7 @@ export async function PUT(request: NextRequest) {
         dependentsCount: employee.dependents.length,
         dependents: employee.dependents,
         insuranceSalary: employee.insuranceSalary,
+        companyRate,
         customAllowances: allowances,
         customBonus: undefined,
       });

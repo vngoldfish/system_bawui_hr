@@ -49,6 +49,7 @@ export async function seedReal(prisma: PrismaClient) {
       salaryCutoffDay: '末日',
       payday: '25',
       roundingPolicy: 'exact',
+      healthInsuranceRate: 9.98,
     }
   });
 

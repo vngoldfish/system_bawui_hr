@@ -27,6 +27,7 @@ interface CompanyInfo {
   salaryCutoffDay: string;
   payday: string;
   roundingPolicy: string; // 'exact' | '15min' | '30min'
+  healthInsuranceRate: string;
 }
 
 const defaultCompany: CompanyInfo = {
@@ -49,9 +50,10 @@ const defaultCompany: CompanyInfo = {
   accountType: '\u666e\u901a',
   accountNumber: '1234567',
   accountHolder: '\u30ab\u30d6\u30b7\u30ad\u30ac\u30a4\u30b7\u30e3\u30ed\u30f3\u30b0',
-  salaryCutoffDay: '\u672b\u65e5',
+  salaryCutoffDay: '末日',
   payday: '25',
   roundingPolicy: 'exact',
+  healthInsuranceRate: '9.98',
 };
 
 const getAccountTypeLabel = (type: string, t: any) => {
@@ -98,7 +100,12 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
         const res = await fetch('/api/company');
         if (res.ok) {
           const data = await res.json();
-          const loaded = { ...defaultCompany, ...data, ...initialData };
+          const loaded = {
+            ...defaultCompany,
+            ...data,
+            healthInsuranceRate: data.healthInsuranceRate != null ? String(data.healthInsuranceRate) : '9.98',
+            ...initialData,
+          };
           setCompany(loaded);
           setDraft(loaded);
         }
@@ -125,17 +132,25 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
     setSaving(true);
     setError(null);
     try {
+      const payload = {
+        ...draft,
+        healthInsuranceRate: draft.healthInsuranceRate ? parseFloat(draft.healthInsuranceRate) : null,
+      };
       const res = await fetch('/api/company', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(draft),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         const data = await res.json();
-        const updated = { ...defaultCompany, ...data };
+        const updated = {
+          ...defaultCompany,
+          ...data,
+          healthInsuranceRate: data.healthInsuranceRate != null ? String(data.healthInsuranceRate) : '9.98',
+        };
         setCompany(updated);
         setDraft(updated);
         if (typeof window !== 'undefined') {
@@ -289,6 +304,8 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
               )}
             </div>
 
+            <Field label={t('company.labelHealthInsuranceRate')} value={data.healthInsuranceRate} editing={editing} onChange={v => handleChange('healthInsuranceRate', v)} />
+
             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
               <label className="text-xs font-bold text-slate-500 uppercase sm:w-32 flex-shrink-0">{t('company.labelPaymentMethod')}</label>
               <p className="flex-1 text-sm text-slate-800 font-bold">{t('company.labelBankTransfer')}</p>
@@ -322,6 +339,7 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
                 data.roundingPolicy === 'exact' ? t('company.previewRoundingExact') :
                 data.roundingPolicy === '15min' ? t('company.previewRounding15') : t('company.previewRounding30')
               } />
+              <Row label={t('company.labelHealthInsuranceRate')} value={`${data.healthInsuranceRate}%`} />
             </div>
           </div>
         </Card>

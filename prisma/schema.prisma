@@ -482,6 +482,7 @@ model Company {
   roundingPolicy      String
   salaryCutoffDay     String
   payday              String
+  healthInsuranceRate Float?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

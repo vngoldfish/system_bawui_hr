@@ -177,6 +177,7 @@
   prisma,
   employeeId,
   insuranceSalary,
+  companyRate,
 }: {
   baseSalary: number;
   salaryType: string;
@@ -194,6 +195,7 @@
   prisma?: any;
   employeeId?: string;
   insuranceSalary?: number | null;
+  companyRate?: number | null;
 }) {
 	  // Override salary from SalaryAdjustment if prisma + employeeId provided
 	  if (prisma && employeeId) {
@@ -259,8 +261,8 @@
 	  const healthSMR = getHealthInsuranceSMR(smrIncome);
 	  const pensionSMR = getPensionSMR(smrIncome);
 
-	  // 2. Health Insurance (健康保険): Tỷ lệ trung bình ở Tokyo là khoảng 9.98% (chia đôi -> nhân viên gánh 4.99%)
-	  const healthInsuranceRate = 0.0998;
+	  // 2. Health Insurance (健康保険): Tỷ lệ bảo hiểm y tế cấu hình từ công ty (mặc định Tokyo là 9.98%)
+	  const healthInsuranceRate = (companyRate && companyRate > 0) ? (companyRate / 100) : 0.0998;
 	  const totalHealthPremium = b.healthInsurance ? (healthSMR * healthInsuranceRate) : 0;
 	  const healthInsurance = apply50SenRounding(totalHealthPremium);
 
