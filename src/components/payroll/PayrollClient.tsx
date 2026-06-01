@@ -1389,7 +1389,7 @@ export default function PayrollClient({
       )}
 
       {/* Payroll Schedule */}
-      {payrollSettings && <PayrollSchedule cutoffDay={payrollSettings.cutoffDay} payday={payrollSettings.payday} />}
+      {payrollSettings && <PayrollSchedule cutoffDay={payrollSettings.cutoffDay} payday={payrollSettings.payday} year={selectedYear} month={selectedMonth} />}
 
       {/* Stats */}
       {!isEmployeeMode && (
@@ -1881,13 +1881,13 @@ function AttendanceCheckModal({
   );
 }
 
-function PayrollSchedule({ cutoffDay, payday }: { cutoffDay: string; payday: string }) {
+function PayrollSchedule({ cutoffDay, payday, year, month }: { cutoffDay: string; payday: string; year: number; month: number }) {
   const { t } = useI18n();
   const info = useMemo(() => {
     const today = new Date();
     const todayDate = today.getDate();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+    const currentYear = year;
+    const currentMonth = month - 1; // 0-indexed for JS Date
 
     const cutoff = cutoffDay === '末日' ? new Date(currentYear, currentMonth + 1, 0).getDate() : Number(cutoffDay);
     const pay = Number(payday);
@@ -1895,12 +1895,12 @@ function PayrollSchedule({ cutoffDay, payday }: { cutoffDay: string; payday: str
     // Current period
     let periodStart: Date;
     let periodEnd: Date;
-    if (todayDate <= cutoff) {
+    if (cutoffDay === '末日') {
+      periodStart = new Date(currentYear, currentMonth, 1);
+      periodEnd = new Date(currentYear, currentMonth + 1, 0);
+    } else {
       periodStart = new Date(currentYear, currentMonth - 1, cutoff + 1);
       periodEnd = new Date(currentYear, currentMonth, cutoff);
-    } else {
-      periodStart = new Date(currentYear, currentMonth, cutoff + 1);
-      periodEnd = new Date(currentYear, currentMonth + 1, cutoff);
     }
 
     // Payday for current period
@@ -1920,7 +1920,7 @@ function PayrollSchedule({ cutoffDay, payday }: { cutoffDay: string; payday: str
       daysUntilCutoff, daysUntilPay,
       isPayday, isCutoffDay, isPayWeek,
     };
-  }, [cutoffDay, payday]);
+  }, [cutoffDay, payday, year, month]);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4">
