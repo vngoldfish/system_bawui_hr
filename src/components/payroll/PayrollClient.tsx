@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/preserve-manual-memoization */
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import Card from '@/components/common/Card';
@@ -344,6 +345,18 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
           // Recalculated values for client UI consistency
           totalGross: updated.baseSalary + updated.overtimePay + updated.bonus,
           totalDeductions: updated.deductions + updated.tax + updated.insurance,
+          // Copy all 11 detailed breakdown columns from DB
+          healthInsuranceCompany: updated.healthInsuranceCompany,
+          pensionCompany: updated.pensionCompany,
+          employmentInsuranceCompany: updated.employmentInsuranceCompany,
+          workersCompCompany: updated.workersCompCompany,
+          healthInsuranceEmployee: updated.healthInsuranceEmployee,
+          pensionEmployee: updated.pensionEmployee,
+          employmentInsuranceEmployee: updated.employmentInsuranceEmployee,
+          residentTax: updated.residentTax,
+          incomeTax: updated.incomeTax,
+          nursingCareInsurance: updated.nursingCareInsurance,
+          totalCompanyCost: updated.totalCompanyCost,
         });
       }
       setIsEditing(false);
@@ -1117,6 +1130,7 @@ export default function PayrollClient({
           ...record,
           id: matchingDb?.id || `payroll-${record.employeeId}-${record.month}`,
           status: matchingDb?.status || record.status,
+          ...(matchingDb || {}),
         };
       });
 
@@ -1263,14 +1277,6 @@ export default function PayrollClient({
 
               {viewType === 'month' && (
                 <div className="flex gap-2 flex-wrap items-center">
-                  {!isEmployeeMode && (
-                    <button
-                      onClick={handleCalculatePayroll}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                      給与計算
-                    </button>
-                  )}
                   <button onClick={handleCalculate} disabled={calculating}
                     className="px-4 py-2 bg-blue-650 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold disabled:opacity-50 cursor-pointer shadow-sm">
                     {calculating ? t('payroll.calculating') : t('payroll.calculateBtn')}

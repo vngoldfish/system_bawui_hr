@@ -152,6 +152,7 @@ export async function POST(request: NextRequest) {
             dailyRate: true,
             benefits: true,
             birthDate: true,
+            dependents: true,
           },
         });
         if (employee) {
@@ -165,10 +166,14 @@ export async function POST(request: NextRequest) {
             benefits: employee.benefits,
             birthDate: employee.birthDate ? employee.birthDate.toISOString() : null,
             month: data.month,
-            dependentsCount: 0,
-            dependents: [],
-            customAllowances: parseFloat(data.allowances || data.bonus) || 0,
-            customBonus: 0,
+            dependentsCount: employee.dependents.length,
+            dependents: employee.dependents,
+            customAllowances: (data.allowances !== undefined && data.allowances !== null)
+              ? parseFloat(data.allowances)
+              : (data.bonus !== undefined && data.bonus !== null)
+                ? parseFloat(data.bonus)
+                : undefined,
+            customBonus: (data.bonus !== undefined && data.bonus !== null) ? parseFloat(data.bonus) : undefined,
           });
 
           // Map all 11 detailed fields
@@ -183,6 +188,26 @@ export async function POST(request: NextRequest) {
           data.incomeTax = details.incomeTax;
           data.nursingCareInsurance = details.nursingCareInsurance;
           data.totalCompanyCost = details.totalCompanyCost;
+
+          // Populate missing fields in data from details before saving
+          if (data.baseSalary === undefined || data.baseSalary === null) {
+            data.baseSalary = details.baseSalary;
+          }
+          if (data.overtimePay === undefined || data.overtimePay === null) {
+            data.overtimePay = details.overtimePay;
+          }
+          if (data.allowances === undefined || data.allowances === null) {
+            data.allowances = details.allowances;
+          }
+          if (data.tax === undefined || data.tax === null) {
+            data.tax = details.incomeTax + details.residentTax;
+          }
+          if (data.insurance === undefined || data.insurance === null) {
+            data.insurance = details.healthInsurance + details.pension + details.employmentInsurance;
+          }
+          if (data.netSalary === undefined || data.netSalary === null) {
+            data.netSalary = details.netSalary;
+          }
         }
       }
     }
@@ -378,6 +403,61 @@ export async function PUT(request: NextRequest) {
       return errorResponse('Net salary cannot be negative', 400);
     }
 
+    const employee = await prisma.employee.findUnique({
+      where: { id: existing.employeeId },
+      select: {
+        salary: true,
+        salaryType: true,
+        hourlyRate: true,
+        dailyRate: true,
+        benefits: true,
+        birthDate: true,
+        dependents: true,
+      },
+    });
+
+    let healthInsuranceCompany = existing.healthInsuranceCompany;
+    let pensionCompany = existing.pensionCompany;
+    let employmentInsuranceCompany = existing.employmentInsuranceCompany;
+    let workersCompCompany = existing.workersCompCompany;
+    let healthInsuranceEmployee = existing.healthInsuranceEmployee;
+    let pensionEmployee = existing.pensionEmployee;
+    let employmentInsuranceEmployee = existing.employmentInsuranceEmployee;
+    let residentTax = existing.residentTax;
+    let incomeTax = existing.incomeTax;
+    let nursingCareInsurance = existing.nursingCareInsurance;
+    let totalCompanyCost = existing.totalCompanyCost;
+
+    if (employee) {
+      const details = calculatePayrollDetails({
+        baseSalary,
+        salaryType: employee.salaryType || '月給',
+        workDays: workDays !== null ? workDays : 20,
+        hourlyRate: employee.hourlyRate || 0,
+        dailyRate: employee.dailyRate || 0,
+        overtimeHours: overtimeHours !== null ? overtimeHours : 0,
+        benefits: employee.benefits,
+        birthDate: employee.birthDate ? employee.birthDate.toISOString() : null,
+        month: existing.month,
+        dependentsCount: employee.dependents.length,
+        dependents: employee.dependents,
+        customAllowances: allowances,
+        customBonus: undefined,
+      });
+
+      healthInsuranceCompany = details.healthInsuranceCompany;
+      pensionCompany = details.pensionCompany;
+      employmentInsuranceCompany = details.employmentInsuranceCompany;
+      workersCompCompany = details.workersCompCompany;
+      healthInsuranceEmployee = details.healthInsuranceEmployee;
+      pensionEmployee = details.pensionEmployee;
+      employmentInsuranceEmployee = details.employmentInsuranceEmployee;
+      residentTax = details.residentTax;
+      incomeTax = details.incomeTax;
+      nursingCareInsurance = details.nursingCareInsurance;
+      totalCompanyCost = details.totalCompanyCost;
+    }
+
     const updatedRecord = await prisma.payrollRecord.update({
       where: { id: body.id },
       data: {
@@ -394,6 +474,17 @@ export async function PUT(request: NextRequest) {
         workHours,
         overtimeHours,
         absentDays,
+        healthInsuranceCompany,
+        pensionCompany,
+        employmentInsuranceCompany,
+        workersCompCompany,
+        healthInsuranceEmployee,
+        pensionEmployee,
+        employmentInsuranceEmployee,
+        residentTax,
+        incomeTax,
+        nursingCareInsurance,
+        totalCompanyCost,
       },
     });
 
