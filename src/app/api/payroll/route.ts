@@ -437,9 +437,10 @@ export async function DELETE(request: NextRequest) {
     const deleted = await prisma.payrollRecord.deleteMany({ where });
 
     logDatabaseChange({
-      user: user.userId,
+      user,
       action: 'DELETE',
       model: 'PayrollRecord',
+      recordId: 'bulk-delete',
       details: { count: deleted.count, where }
     });
 

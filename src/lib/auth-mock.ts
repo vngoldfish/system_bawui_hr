@@ -8,6 +8,7 @@ export type Permission =
   | 'employees:delete'
   | 'payroll:view'
   | 'payroll:edit'
+  | 'payroll:delete'
   | 'attendance:view'
   | 'attendance:edit'
   | 'attendance:view_all_departments'
@@ -38,6 +39,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'employees:delete',
     'payroll:view',
     'payroll:edit',
+    'payroll:delete',
     'attendance:view',
     'attendance:edit',
     'attendance:view_all_departments',
