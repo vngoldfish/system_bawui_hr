@@ -381,9 +381,23 @@ export async function PUT(request: NextRequest) {
       return errorResponse('Record ID is required', 400);
     }
 
-    const existing = await prisma.payrollRecord.findUnique({
+    let existing = await prisma.payrollRecord.findUnique({
       where: { id: body.id }
     });
+
+    if (!existing && body.id.startsWith('payroll-')) {
+      const parts = body.id.split('-');
+      if (parts.length >= 4) {
+        const month = `${parts[parts.length - 2]}-${parts[parts.length - 1]}`;
+        const employeeId = parts.slice(1, parts.length - 2).join('-');
+        existing = await prisma.payrollRecord.findUnique({
+          where: {
+            employeeId_month: { employeeId, month }
+          }
+        });
+      }
+    }
+
     if (!existing) {
       return errorResponse('Payroll record not found', 404);
     }
