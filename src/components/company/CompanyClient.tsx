@@ -380,7 +380,13 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function PayrollStatus({ cutoffDay, payday, t }: { cutoffDay: string; payday: string; t: any }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const status = useMemo(() => {
+    if (!mounted) return null;
     const today = new Date();
     const todayDate = today.getDate();
     const currentMonth = today.getMonth();
@@ -412,7 +418,11 @@ function PayrollStatus({ cutoffDay, payday, t }: { cutoffDay: string; payday: st
     const formatDateStr = (d: Date) => `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
 
     return { nextCutoff: formatDateStr(nextCutoff), nextPay: formatDateStr(nextPay), daysUntilCutoff, daysUntilPay, isPayday, isCutoffDay };
-  }, [cutoffDay, payday]);
+  }, [cutoffDay, payday, mounted]);
+
+  if (!mounted || !status) {
+    return <div className="mt-4 pt-4 border-t border-slate-200 min-h-[80px]" />;
+  }
 
   return (
     <div className="mt-4 pt-4 border-t border-slate-200">
