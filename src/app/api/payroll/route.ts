@@ -466,17 +466,19 @@ export async function PUT(request: NextRequest) {
         customBonus: undefined,
       });
 
-      healthInsuranceCompany = details.healthInsuranceCompany;
-      pensionCompany = details.pensionCompany;
-      employmentInsuranceCompany = details.employmentInsuranceCompany;
-      workersCompCompany = details.workersCompCompany;
-      healthInsuranceEmployee = details.healthInsuranceEmployee;
-      pensionEmployee = details.pensionEmployee;
-      employmentInsuranceEmployee = details.employmentInsuranceEmployee;
-      residentTax = details.residentTax;
-      incomeTax = details.incomeTax;
-      nursingCareInsurance = details.nursingCareInsurance;
-      totalCompanyCost = details.totalCompanyCost;
+      healthInsuranceCompany = body.healthInsuranceCompany !== undefined ? parseFloat(body.healthInsuranceCompany) : details.healthInsuranceCompany;
+      pensionCompany = body.pensionCompany !== undefined ? parseFloat(body.pensionCompany) : details.pensionCompany;
+      employmentInsuranceCompany = body.employmentInsuranceCompany !== undefined ? parseFloat(body.employmentInsuranceCompany) : details.employmentInsuranceCompany;
+      workersCompCompany = body.workersCompCompany !== undefined ? parseFloat(body.workersCompCompany) : details.workersCompCompany;
+      healthInsuranceEmployee = body.healthInsuranceEmployee !== undefined ? parseFloat(body.healthInsuranceEmployee) : details.healthInsuranceEmployee;
+      pensionEmployee = body.pensionEmployee !== undefined ? parseFloat(body.pensionEmployee) : details.pensionEmployee;
+      employmentInsuranceEmployee = body.employmentInsuranceEmployee !== undefined ? parseFloat(body.employmentInsuranceEmployee) : details.employmentInsuranceEmployee;
+      residentTax = body.residentTax !== undefined ? parseFloat(body.residentTax) : details.residentTax;
+      incomeTax = body.incomeTax !== undefined ? parseFloat(body.incomeTax) : details.incomeTax;
+      nursingCareInsurance = body.nursingCareInsurance !== undefined ? parseFloat(body.nursingCareInsurance) : details.nursingCareInsurance;
+      
+      const companySocialInsurance = healthInsuranceCompany + pensionCompany + employmentInsuranceCompany + workersCompCompany;
+      totalCompanyCost = baseSalary + overtimePay + allowances + companySocialInsurance;
     }
 
     const tax = employee ? (incomeTax + residentTax) : (body.tax !== undefined ? parseFloat(body.tax) : existing.tax);

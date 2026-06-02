@@ -174,6 +174,9 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
   const [editFields, setEditFields] = useState({
     baseSalary: record.baseSalary,
     overtimePay: record.overtimePay,
+    transportation: transAllow,
+    housing: houseAllow,
+    meal: mealAllow,
     allowances: 0, // "Other Allowances" adjustment in edit mode
     bonus: displayBonus, // "Bonus" adjustment in edit mode
     deductions: record.deductions || 0,
@@ -184,6 +187,16 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
     workDays: record.workDays || 22,
     absentDays: record.absentDays || 0,
     overtimeHours: record.overtimeHours || 0,
+    healthInsuranceEmployee: record.healthInsuranceEmployee ?? 0,
+    nursingCareInsurance: record.nursingCareInsurance ?? 0,
+    pensionEmployee: record.pensionEmployee ?? 0,
+    employmentInsuranceEmployee: record.employmentInsuranceEmployee ?? 0,
+    residentTax: record.residentTax ?? 0,
+    incomeTax: record.incomeTax ?? 0,
+    healthInsuranceCompany: record.healthInsuranceCompany ?? 0,
+    pensionCompany: record.pensionCompany ?? 0,
+    employmentInsuranceCompany: record.employmentInsuranceCompany ?? 0,
+    workersCompCompany: record.workersCompCompany ?? 0,
   });
 
 
@@ -198,6 +211,9 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
     setEditFields({
       baseSalary: record.baseSalary,
       overtimePay: record.overtimePay,
+      transportation: transAllow,
+      housing: houseAllow,
+      meal: mealAllow,
       allowances: 0,
       bonus: displayBonus,
       deductions: record.deductions || 0,
@@ -208,15 +224,20 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
       workDays: record.workDays || 22,
       absentDays: record.absentDays || 0,
       overtimeHours: record.overtimeHours || 0,
+      healthInsuranceEmployee: record.healthInsuranceEmployee ?? 0,
+      nursingCareInsurance: record.nursingCareInsurance ?? 0,
+      pensionEmployee: record.pensionEmployee ?? 0,
+      employmentInsuranceEmployee: record.employmentInsuranceEmployee ?? 0,
+      residentTax: record.residentTax ?? 0,
+      incomeTax: record.incomeTax ?? 0,
+      healthInsuranceCompany: record.healthInsuranceCompany ?? 0,
+      pensionCompany: record.pensionCompany ?? 0,
+      employmentInsuranceCompany: record.employmentInsuranceCompany ?? 0,
+      workersCompCompany: record.workersCompCompany ?? 0,
     });
   }, [record, employee]);
 
   const handleRecalculate = () => {
-    const transAllow = employee.benefits?.transportation || 0;
-    const houseAllow = employee.benefits?.housing || 0;
-    const mealAllow = employee.benefits?.meal || 0;
-    const fixedAllowances = transAllow + houseAllow + mealAllow;
-
     const calc = calculatePayrollDetails({
       baseSalary: editFields.baseSalary,
       salaryType: employee.salaryType || '月給',
@@ -224,11 +245,16 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
       hourlyRate: employee.hourlyRate || 0,
       dailyRate: employee.dailyRate || 0,
       overtimeHours: editFields.overtimeHours,
-      benefits: employee.benefits,
+      benefits: {
+        ...employee.benefits,
+        transportation: editFields.transportation,
+        housing: editFields.housing,
+        meal: editFields.meal,
+      },
       birthDate: employee.birthDate,
       month: record.month,
       dependents: employee.dependents,
-      customAllowances: fixedAllowances + editFields.allowances,
+      customAllowances: editFields.transportation + editFields.housing + editFields.meal + editFields.allowances,
       customBonus: editFields.bonus,
       companyRate: companyInfo?.healthInsuranceRate,
     });
@@ -237,7 +263,17 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
       ...prev,
       overtimePay: calc.overtimePay,
       tax: calc.incomeTax + calc.residentTax,
-      insurance: calc.healthInsurance + calc.pension + calc.employmentInsurance,
+      insurance: calc.healthInsuranceEmployee + calc.nursingCareInsurance + calc.pensionEmployee + calc.employmentInsuranceEmployee,
+      healthInsuranceEmployee: calc.healthInsuranceEmployee,
+      nursingCareInsurance: calc.nursingCareInsurance,
+      pensionEmployee: calc.pensionEmployee,
+      employmentInsuranceEmployee: calc.employmentInsuranceEmployee,
+      residentTax: calc.residentTax,
+      incomeTax: calc.incomeTax,
+      healthInsuranceCompany: calc.healthInsuranceCompany,
+      pensionCompany: calc.pensionCompany,
+      employmentInsuranceCompany: calc.employmentInsuranceCompany,
+      workersCompCompany: calc.workersCompCompany,
     }));
   };
 
@@ -290,25 +326,31 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const transAllow = employee.benefits?.transportation || 0;
-      const houseAllow = employee.benefits?.housing || 0;
-      const mealAllow = employee.benefits?.meal || 0;
-      const fixedAllowances = transAllow + houseAllow + mealAllow;
-
       const payload = {
         id: record.id,
         baseSalary: editFields.baseSalary,
         overtimePay: editFields.overtimePay,
-        allowances: fixedAllowances + editFields.allowances + editFields.bonus,
+        allowances: editFields.transportation + editFields.housing + editFields.meal + editFields.allowances + editFields.bonus,
         deductions: editFields.deductions,
-        tax: editFields.tax,
-        insurance: editFields.insurance,
+        tax: editFields.incomeTax + editFields.residentTax,
+        insurance: editFields.healthInsuranceEmployee + editFields.nursingCareInsurance + editFields.pensionEmployee + editFields.employmentInsuranceEmployee,
         paymentDate: editFields.paymentDate,
         status: editFields.status,
         workDays: editFields.workDays,
         workHours: editFields.workDays * 8,
         overtimeHours: editFields.overtimeHours,
         absentDays: editFields.absentDays,
+        // Detailed fields
+        healthInsuranceEmployee: editFields.healthInsuranceEmployee,
+        nursingCareInsurance: editFields.nursingCareInsurance,
+        pensionEmployee: editFields.pensionEmployee,
+        employmentInsuranceEmployee: editFields.employmentInsuranceEmployee,
+        residentTax: editFields.residentTax,
+        incomeTax: editFields.incomeTax,
+        healthInsuranceCompany: editFields.healthInsuranceCompany,
+        pensionCompany: editFields.pensionCompany,
+        employmentInsuranceCompany: editFields.employmentInsuranceCompany,
+        workersCompCompany: editFields.workersCompCompany,
       };
 
       const res = await fetch('/api/payroll', {
@@ -385,16 +427,27 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
 
   const currentBase = (isEditing ? editFields.baseSalary : record.baseSalary) || 0;
   const currentOTPay = (isEditing ? editFields.overtimePay : record.overtimePay) || 0;
-  const currentAllowances = (isEditing ? (fixedAllowances + editFields.allowances) : displayAllowances) || 0;
+  const currentAllowances = (isEditing ? (editFields.transportation + editFields.housing + editFields.meal + editFields.allowances) : displayAllowances) || 0;
   const currentBonus = (isEditing ? editFields.bonus : displayBonus) || 0;
   const currentDeductions = (isEditing ? editFields.deductions : record.deductions) || 0;
-  const currentTax = (isEditing ? editFields.tax : record.tax) || 0;
-  const currentInsurance = (isEditing ? editFields.insurance : record.insurance) || 0;
+  const currentTax = isEditing
+    ? (editFields.incomeTax + editFields.residentTax)
+    : (record.tax || 0);
+  const currentInsurance = isEditing
+    ? (editFields.healthInsuranceEmployee + editFields.nursingCareInsurance + editFields.pensionEmployee + editFields.employmentInsuranceEmployee)
+    : (record.insurance || 0);
 
   const currentOtherAllow = isEditing ? editFields.allowances : 0;
   const currentTotalGross = currentBase + currentOTPay + currentAllowances + currentBonus;
   const currentTotalDeductions = currentDeductions + currentTax + currentInsurance;
   const currentNetSalary = currentTotalGross - currentTotalDeductions;
+
+  // Company burden computed variables
+  const currentCompanyHealthIns = isEditing ? editFields.healthInsuranceCompany : companyHealthIns;
+  const currentCompanyPension = isEditing ? editFields.pensionCompany : companyPension;
+  const currentCompanyEmpIns = isEditing ? editFields.employmentInsuranceCompany : companyEmpIns;
+  const currentCompanyWorkersComp = isEditing ? editFields.workersCompCompany : companyWorkersComp;
+  const currentCompanyTotalCost = currentCompanyHealthIns + currentCompanyPension + currentCompanyEmpIns + currentCompanyWorkersComp;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 print:p-0 print:bg-white print:static" onClick={onClose}>
@@ -666,15 +719,48 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                   </tr>
                   <tr>
                     <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.transportSubject')}</td>
-                    <td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(transAllow)}</td>
+                    <td className="border border-slate-300 p-2.5 text-right print:border-black">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editFields.transportation}
+                          onChange={e => setEditFields(prev => ({ ...prev, transportation: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        `+${formatCurrency(transAllow)}`
+                      )}
+                    </td>
                   </tr>
                   <tr>
                     <td className="border border-slate-305 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.housingSubject')}</td>
-                    <td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(houseAllow)}</td>
+                    <td className="border border-slate-300 p-2.5 text-right print:border-black">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editFields.housing}
+                          onChange={e => setEditFields(prev => ({ ...prev, housing: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        `+${formatCurrency(houseAllow)}`
+                      )}
+                    </td>
                   </tr>
                   <tr>
                     <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.mealSubject')}</td>
-                    <td className="border border-slate-300 p-2.5 text-right print:border-black">+{formatCurrency(mealAllow)}</td>
+                    <td className="border border-slate-300 p-2.5 text-right print:border-black">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editFields.meal}
+                          onChange={e => setEditFields(prev => ({ ...prev, meal: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        `+${formatCurrency(mealAllow)}`
+                      )}
+                    </td>
                   </tr>
                   
                   <tr>
@@ -729,34 +815,72 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                 <tbody className="divide-y divide-slate-200 print:divide-black">
                   <tr>
                     <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.healthInsSubject')}</td>
-                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.healthInsurance)}</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.pensionSubject')}</td>
-                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.pension)}</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.employmentInsSubject')}</td>
-                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.employmentInsurance)}</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.workersCompSubject')}</td>
-                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">-{formatCurrency(record.workersComp)}</td>
-                  </tr>
-                  
-                  {isEditing && (
-                    <tr className="bg-slate-50">
-                      <td className="border border-slate-300 p-2.5 text-slate-705 font-medium">社会保険料 (手動調整用)</td>
-                      <td className="border border-slate-300 p-2.5 text-right">
-                        <input 
-                          type="number" 
-                          value={editFields.insurance}
-                          onChange={e => setEditFields(prev => ({ ...prev, insurance: parseFloat(e.target.value) || 0 }))}
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editFields.healthInsuranceEmployee}
+                          onChange={e => setEditFields(prev => ({ ...prev, healthInsuranceEmployee: parseFloat(e.target.value) || 0 }))}
                           className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
                         />
+                      ) : (
+                        `-${formatCurrency(record.healthInsuranceEmployee || 0)}`
+                      )}
+                    </td>
+                  </tr>
+                  {((record.nursingCareInsurance ?? 0) > 0 || isEditing) && (
+                    <tr>
+                      <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">介護保険料 (BH Chăm sóc dài hạn)</td>
+                      <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editFields.nursingCareInsurance}
+                            onChange={e => setEditFields(prev => ({ ...prev, nursingCareInsurance: parseFloat(e.target.value) || 0 }))}
+                            className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                          />
+                        ) : (
+                          `-${formatCurrency(record.nursingCareInsurance || 0)}`
+                        )}
                       </td>
                     </tr>
                   )}
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.pensionSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editFields.pensionEmployee}
+                          onChange={e => setEditFields(prev => ({ ...prev, pensionEmployee: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        `-${formatCurrency(record.pensionEmployee || 0)}`
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.employmentInsSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editFields.employmentInsuranceEmployee}
+                          onChange={e => setEditFields(prev => ({ ...prev, employmentInsuranceEmployee: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        `-${formatCurrency(record.employmentInsuranceEmployee || 0)}`
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.workersCompSubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">
+                      -{formatCurrency(0)}
+                    </td>
+                  </tr>
 
                   <tr>
                     <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">欠勤控除・その他控除</td>
@@ -779,19 +903,28 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                       {isEditing ? (
                         <input 
                           type="number" 
-                          value={editFields.tax}
-                          onChange={e => setEditFields(prev => ({ ...prev, tax: parseFloat(e.target.value) || 0 }))}
+                          value={editFields.incomeTax}
+                          onChange={e => setEditFields(prev => ({ ...prev, incomeTax: parseFloat(e.target.value) || 0 }))}
                           className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
                         />
                       ) : (
-                        `-${formatCurrency(currentTax)}`
+                        `-${formatCurrency(record.incomeTax || 0)}`
                       )}
                     </td>
                   </tr>
                   <tr>
                     <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.residentTaxSubject')}</td>
                     <td className="border border-slate-300 p-2.5 text-right font-semibold text-red-500 print:text-black print:border-black">
-                      -{formatCurrency(record.residentTax)}
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={editFields.residentTax}
+                          onChange={e => setEditFields(prev => ({ ...prev, residentTax: parseFloat(e.target.value) || 0 }))}
+                          className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                        />
+                      ) : (
+                        `-${formatCurrency(record.residentTax || 0)}`
+                      )}
                     </td>
                   </tr>
                   <tr className="bg-red-50/50 font-bold print:bg-slate-100">
@@ -806,13 +939,61 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
             <div className="mt-4 pt-4 border-t border-slate-200">
               <div className="text-sm font-semibold text-slate-700 mb-2">【会社負担分】</div>
               <div className="space-y-1 text-sm">
-                <div className="flex justify-between"><span className="text-slate-600">健康保険 会社負担</span><span>¥{companyHealthIns.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">厚生年金 会社負担</span><span>¥{companyPension.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">雇用保険 会社負担</span><span>¥{companyEmpIns.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">労災保険 会社負担</span><span>¥{companyWorkersComp.toLocaleString()}</span></div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600">健康保険 会社負担</span>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      value={editFields.healthInsuranceCompany}
+                      onChange={e => setEditFields(prev => ({ ...prev, healthInsuranceCompany: parseFloat(e.target.value) || 0 }))}
+                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                    />
+                  ) : (
+                    <span>¥{companyHealthIns.toLocaleString()}</span>
+                  )}
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600">厚生年金 会社負担</span>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      value={editFields.pensionCompany}
+                      onChange={e => setEditFields(prev => ({ ...prev, pensionCompany: parseFloat(e.target.value) || 0 }))}
+                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                    />
+                  ) : (
+                    <span>¥{companyPension.toLocaleString()}</span>
+                  )}
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600">雇用保険 会社負担</span>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      value={editFields.employmentInsuranceCompany}
+                      onChange={e => setEditFields(prev => ({ ...prev, employmentInsuranceCompany: parseFloat(e.target.value) || 0 }))}
+                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                    />
+                  ) : (
+                    <span>¥{companyEmpIns.toLocaleString()}</span>
+                  )}
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600">労災保険 会社負担</span>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      value={editFields.workersCompCompany}
+                      onChange={e => setEditFields(prev => ({ ...prev, workersCompCompany: parseFloat(e.target.value) || 0 }))}
+                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                    />
+                  ) : (
+                    <span>¥{companyWorkersComp.toLocaleString()}</span>
+                  )}
+                </div>
                 <div className="flex justify-between pt-2 border-t font-semibold text-blue-700">
                   <span>総額 会社負担</span>
-                  <span>¥{totalCompanyCost.toLocaleString()}</span>
+                  <span>¥{currentCompanyTotalCost.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -853,22 +1034,22 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="space-y-2">
                   <div className="flex justify-between text-slate-600">
-                    <span>健康保険・厚生年金・介護保険 (会社折半)</span>
-                    <span className="font-semibold">{formatCurrency(Math.max(0, currentInsurance - Math.round(currentTotalGross * 0.006)))}</span>
+                    <span>健康保険 会社負担</span>
+                    <span className="font-semibold">{formatCurrency(currentCompanyHealthIns)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
-                    <span>雇用保険 (会社負担分: 0.95%)</span>
-                    <span className="font-semibold">{formatCurrency(Math.round(currentTotalGross * 0.0095))}</span>
+                    <span>厚生年金 会社負担</span>
+                    <span className="font-semibold">{formatCurrency(currentCompanyPension)}</span>
                   </div>
                 </div>
                 <div className="space-y-2 md:border-l md:border-slate-200 md:pl-4">
                   <div className="flex justify-between text-slate-600">
-                    <span>労災保険 (会社全額負担: 0.3%)</span>
-                    <span className="font-semibold">{formatCurrency(Math.round(currentTotalGross * 0.003))}</span>
+                    <span>雇用保険 会社負担</span>
+                    <span className="font-semibold">{formatCurrency(currentCompanyEmpIns)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
-                    <span>子ども・子育て拠出金 (会社全額負担: ~0.36%)</span>
-                    <span className="font-semibold">{formatCurrency(Math.round(currentInsurance * 0.04))}</span>
+                    <span>労災保険 会社負担</span>
+                    <span className="font-semibold">{formatCurrency(currentCompanyWorkersComp)}</span>
                   </div>
                 </div>
               </div>
@@ -878,12 +1059,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                   <p className="text-[10px] text-slate-400">Total Employer Social Insurance Burden</p>
                 </div>
                 <span className="text-sm font-bold text-slate-800">
-                  +{formatCurrency(
-                    Math.max(0, currentInsurance - Math.round(currentTotalGross * 0.006)) +
-                    Math.round(currentTotalGross * 0.0095) +
-                    Math.round(currentTotalGross * 0.003) +
-                    Math.round(currentInsurance * 0.04)
-                  )}
+                  +{formatCurrency(currentCompanyTotalCost)}
                 </span>
               </div>
               <div className="border-t border-slate-200 pt-2.5 flex items-center justify-between bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
@@ -892,13 +1068,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                   <p className="text-[10px] text-blue-500">Gross Salary + Employer Burden</p>
                 </div>
                 <span className="text-base font-black text-blue-700">
-                  {formatCurrency(
-                    currentTotalGross +
-                    Math.max(0, currentInsurance - Math.round(currentTotalGross * 0.006)) +
-                    Math.round(currentTotalGross * 0.0095) +
-                    Math.round(currentTotalGross * 0.003) +
-                    Math.round(currentInsurance * 0.04)
-                  )}
+                  {formatCurrency(currentTotalGross + currentCompanyTotalCost)}
                 </span>
               </div>
             </div>

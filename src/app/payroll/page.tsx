@@ -93,25 +93,28 @@ export default async function PayrollPage() {
       const allowances = r.bonus;
       const totalGross = r.baseSalary + r.overtimePay + allowances;
       
-      const healthInsurance = (r.healthInsuranceEmployee !== null && r.healthInsuranceEmployee !== 0)
+      const isLegacyInsurance = r.insurance > 0 && r.healthInsuranceEmployee === 0 && r.pensionEmployee === 0 && r.employmentInsuranceEmployee === 0;
+      const isLegacyTax = r.tax > 0 && r.incomeTax === 0 && r.residentTax === 0;
+
+      const healthInsurance = !isLegacyInsurance
         ? (r.healthInsuranceEmployee + (r.nursingCareInsurance || 0))
         : Math.round(r.insurance * 5 / 14.3);
 
-      const pension = (r.pensionEmployee !== null && r.pensionEmployee !== 0)
+      const pension = !isLegacyInsurance
         ? r.pensionEmployee
         : Math.round(r.insurance * 9 / 14.3);
 
-      const employmentInsurance = (r.employmentInsuranceEmployee !== null && r.employmentInsuranceEmployee !== 0)
+      const employmentInsurance = !isLegacyInsurance
         ? r.employmentInsuranceEmployee
         : Math.round(r.insurance * 0.3 / 14.3);
 
       const workersComp = 0;
       
-      const incomeTax = (r.incomeTax !== null && r.incomeTax !== 0)
+      const incomeTax = !isLegacyTax
         ? r.incomeTax
         : Math.round(r.tax * 2 / 6);
 
-      const residentTax = (r.residentTax !== null && r.residentTax !== 0)
+      const residentTax = !isLegacyTax
         ? r.residentTax
         : Math.max(0, r.tax - incomeTax);
 
@@ -266,25 +269,28 @@ export default async function PayrollPage() {
       const allowances = r.bonus;
       const totalGross = r.baseSalary + r.overtimePay + allowances;
       
-      const healthInsurance = (r.healthInsuranceEmployee !== null && r.healthInsuranceEmployee !== 0)
+      const isLegacyInsurance = r.insurance > 0 && r.healthInsuranceEmployee === 0 && r.pensionEmployee === 0 && r.employmentInsuranceEmployee === 0;
+      const isLegacyTax = r.tax > 0 && r.incomeTax === 0 && r.residentTax === 0;
+
+      const healthInsurance = !isLegacyInsurance
         ? (r.healthInsuranceEmployee + (r.nursingCareInsurance || 0))
         : Math.round(r.insurance * 5 / 14.3);
 
-      const pension = (r.pensionEmployee !== null && r.pensionEmployee !== 0)
+      const pension = !isLegacyInsurance
         ? r.pensionEmployee
         : Math.round(r.insurance * 9 / 14.3);
 
-      const employmentInsurance = (r.employmentInsuranceEmployee !== null && r.employmentInsuranceEmployee !== 0)
+      const employmentInsurance = !isLegacyInsurance
         ? r.employmentInsuranceEmployee
         : Math.round(r.insurance * 0.3 / 14.3);
 
       const workersComp = 0;
       
-      const incomeTax = (r.incomeTax !== null && r.incomeTax !== 0)
+      const incomeTax = !isLegacyTax
         ? r.incomeTax
         : Math.round(r.tax * 2 / 6);
 
-      const residentTax = (r.residentTax !== null && r.residentTax !== 0)
+      const residentTax = !isLegacyTax
         ? r.residentTax
         : Math.max(0, r.tax - incomeTax);
 
