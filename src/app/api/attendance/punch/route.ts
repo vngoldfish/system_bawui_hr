@@ -4,6 +4,8 @@ import { errorResponse, handleApiError, successResponse } from '@/lib/api-utils'
 import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
 import { isRateLimited } from '@/lib/rate-limiter';
+import { calculateContractAwareOvertime } from '@/lib/attendance-helpers';
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -94,6 +96,39 @@ export async function POST(request: NextRequest) {
             where: { id: record!.id }
           });
 
+          // Retrieve rounding policy
+          const company = await tx.company.findFirst();
+          const policy = company?.roundingPolicy || 'exact';
+
+          // Fetch employee along with contracts
+          const employee = await tx.employee.findUnique({
+            where: { id: employeeId },
+            include: {
+              employeeContracts: {
+                where: { isActive: true }
+              }
+            }
+          });
+
+          // Fetch active holiday for today if any
+          const todayHoliday = await tx.holiday.findFirst({
+            where: {
+              date: {
+                gte: todayStart,
+                lt: todayEnd,
+              },
+              isActive: true
+            }
+          });
+
+          // Find contract active for today
+          const activeContract = employee?.employeeContracts?.find(contract => {
+            const start = new Date(contract.startDate);
+            const end = contract.endDate ? new Date(contract.endDate) : null;
+            const target = latestRecord.date;
+            return start <= target && (!end || end >= target);
+          }) || employee?.employeeContracts?.find(c => c.isActive) || null;
+
           const updateData: any = {};
           updateData.checkOut = now;
 
@@ -102,14 +137,18 @@ export async function POST(request: NextRequest) {
           const breakStart = latestRecord.breakStart;
           const breakEnd = latestRecord.breakEnd;
 
-          let workMins = (now.getTime() - checkInTime.getTime()) / (1000 * 60);
-          if (breakStart && breakEnd) {
-            workMins -= (breakEnd.getTime() - breakStart.getTime()) / (1000 * 60);
-          }
-
-          const workHours = Math.max(0, workMins / 60);
-          // Overtime is any work past 8 hours
-          const overtimeHours = Math.max(0, Math.round((workHours - 8) * 10) / 10);
+          const overtimeHours = calculateContractAwareOvertime(
+            {
+              checkIn: checkInTime,
+              checkOut: now,
+              breakStart,
+              breakEnd,
+              date: latestRecord.date,
+            },
+            activeContract,
+            todayHoliday,
+            policy
+          );
           updateData.overtimeHours = overtimeHours;
 
           return tx.attendanceRecord.update({

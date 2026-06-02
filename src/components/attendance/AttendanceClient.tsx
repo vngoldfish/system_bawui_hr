@@ -81,30 +81,14 @@ const statusOptions = [
   { value: 'HOLIDAY', color: 'bg-sky-500', text: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-50 dark:bg-sky-950/30 border-sky-100 dark:border-sky-900/50' },
 ];
 
+import {
+  applyRounding as sharedApplyRounding,
+  calculateRecordWorkHours as sharedCalculateRecordWorkHours,
+  calculateContractAwareOvertime as sharedCalculateContractAwareOvertime
+} from '@/lib/attendance-helpers';
+
 export function applyRounding(dateVal: Date | string | null | undefined, policy: string, roundUp: boolean): Date | null {
-  if (!dateVal) return null;
-  const date = new Date(dateVal);
-  if (isNaN(date.getTime())) return null;
-
-  if (policy === 'exact' || !policy) {
-    return date;
-  }
-
-  const interval = policy === '30min' ? 30 : 15;
-  const minutes = date.getMinutes();
-  const seconds = date.getSeconds();
-  
-  let roundedMinutes = minutes;
-  if (roundUp) {
-    const totalFraction = minutes + seconds / 60;
-    roundedMinutes = Math.ceil(totalFraction / interval) * interval;
-  } else {
-    roundedMinutes = Math.floor(minutes / interval) * interval;
-  }
-
-  const newDate = new Date(date.getTime());
-  newDate.setMinutes(roundedMinutes, 0, 0);
-  return newDate;
+  return sharedApplyRounding(dateVal, policy, roundUp);
 }
 
 export function calculateRecordWorkHours(
@@ -114,23 +98,7 @@ export function calculateRecordWorkHours(
   breakEnd: string | Date | null,
   policy: string
 ): number {
-  if (!checkIn || !checkOut) return 0;
-
-  const rCheckIn = applyRounding(checkIn, policy, true);
-  const rCheckOut = applyRounding(checkOut, policy, false);
-
-  if (!rCheckIn || !rCheckOut) return 0;
-  let durationMins = (rCheckOut.getTime() - rCheckIn.getTime()) / (1000 * 60);
-
-  if (breakStart && breakEnd) {
-    const rBreakStart = applyRounding(breakStart, policy, true);
-    const rBreakEnd = applyRounding(breakEnd, policy, false);
-    if (rBreakStart && rBreakEnd) {
-      durationMins -= (rBreakEnd.getTime() - rBreakStart.getTime()) / (1000 * 60);
-    }
-  }
-
-  return Math.max(0, durationMins / 60);
+  return sharedCalculateRecordWorkHours(checkIn, checkOut, breakStart, breakEnd, policy);
 }
 
 const dateOnly = (value: string | Date) => {
@@ -166,15 +134,7 @@ function calculateContractAwareOvertime(
   holiday: Holiday | null,
   policy: string
 ): number {
-  if (!record) return 0;
-  const workHours = calculateRecordWorkHours(record.checkIn, record.checkOut, record.breakStart, record.breakEnd, policy);
-  if (workHours <= 0) return 0;
-  const dayStr = dateOnly(record.date);
-  const contractWorkDay = isContractWorkDay(contract, dayStr);
-  const holidayCountsAsOvertime = !!holiday && (contract?.holidayWorkCountsAsOvertime ?? true);
-  if (holidayCountsAsOvertime || !contractWorkDay) return Math.round(workHours * 10) / 10;
-  const standard = contract?.standardHoursPerDay ?? 8;
-  return Math.max(0, Math.round((workHours - standard) * 10) / 10);
+  return sharedCalculateContractAwareOvertime(record, contract, holiday, policy);
 }
 
 function getWorkDayLabel(contract: EmployeeContract | null, holiday: Holiday | null, dateStr: string, locale: string) {

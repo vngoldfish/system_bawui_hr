@@ -292,12 +292,14 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
                 <select value={data.roundingPolicy} onChange={e => handleChange('roundingPolicy', e.target.value)}
                   className="flex-1 px-3 py-2 border border-slate-355 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-semibold cursor-pointer">
                   <option value="exact">{t('company.roundingExact')}</option>
+                  <option value="10min">{t('company.rounding10')}</option>
                   <option value="15min">{t('company.rounding15')}</option>
                   <option value="30min">{t('company.rounding30')}</option>
                 </select>
               ) : (
                 <p className="flex-1 text-sm text-slate-800 font-bold">
                   {data.roundingPolicy === 'exact' && t('company.roundingExactLabel')}
+                  {data.roundingPolicy === '10min' && t('company.rounding10Label')}
                   {data.roundingPolicy === '15min' && t('company.rounding15Label')}
                   {data.roundingPolicy === '30min' && t('company.rounding30Label')}
                 </p>
@@ -337,6 +339,7 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
               <Row label={t('company.labelPayday')} value={t('company.previewPayday').replace('{day}', data.payday)} />
               <Row label={t('company.previewRounding')} value={
                 data.roundingPolicy === 'exact' ? t('company.previewRoundingExact') :
+                data.roundingPolicy === '10min' ? t('company.previewRounding10') :
                 data.roundingPolicy === '15min' ? t('company.previewRounding15') : t('company.previewRounding30')
               } />
               <Row label={t('company.labelHealthInsuranceRate')} value={`${data.healthInsuranceRate}%`} />

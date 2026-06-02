@@ -1101,6 +1101,11 @@ export default function PayrollClient({
   companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null };
 }) {
   const { t, locale } = useI18n();
+  const getStatusLabel = (s: string) =>
+    s === 'PAID' ? t('payroll.statusPaid') :
+    s === 'APPROVED' ? t('payroll.statusApproved') :
+    s === 'CALCULATED' ? t('payroll.statusCalculated') :
+    s === 'PENDING' ? t('payroll.statusPending') : s;
   const [records, setRecords] = useState(initialRecords);
   const [viewType, setViewType] = useState<'month' | 'employee'>('month');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(() => employees[0]?.id || '');
@@ -1132,6 +1137,95 @@ export default function PayrollClient({
   }, []);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+
+  const allPayrollColumns = [
+    { key: 'name', label: t('payroll.colName') },
+    { key: 'salaryType', label: t('payroll.contractSalaryType') },
+    { key: 'baseSalary', label: t('payroll.baseSalarySubject') },
+    { key: 'overtimePay', label: t('payroll.overtimeHours') },
+    { key: 'allowances', label: t('payroll.colAllowance') },
+    { key: 'bonus', label: '賞与' },
+    { key: 'deductions', label: t('payroll.colDeduction') },
+    { key: 'netSalary', label: t('payroll.colNet') },
+    { key: 'companyCost', label: '会社負担' },
+    { key: 'status', label: t('payroll.colStatus') },
+  ];
+
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('payroll_visible_columns');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return {
+      name: true, salaryType: true, baseSalary: true, overtimePay: true,
+      allowances: true, bonus: true, deductions: true, netSalary: true,
+      companyCost: true, status: true,
+    };
+  });
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('payroll_visible_columns', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const activeColumns = allPayrollColumns.filter(c => visibleColumns[c.key]);
+
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('payroll_column_widths');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return {
+      name: 170,
+      salaryType: 110,
+      baseSalary: 110,
+      overtimePay: 100,
+      allowances: 100,
+      bonus: 100,
+      deductions: 110,
+      netSalary: 115,
+      companyCost: 105,
+      status: 95,
+    };
+  });
+
+  const [payrollLayoutView, setPayrollLayoutView] = useState<'table' | 'card'>('table');
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+
+  const handleResizeMouseDown = (e: React.MouseEvent, colKey: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = columnWidths[colKey] || 100;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(50, startWidth + deltaX);
+      setColumnWidths(prev => {
+        const updated = { ...prev, [colKey]: newWidth };
+        localStorage.setItem('payroll_column_widths', JSON.stringify(updated));
+        return updated;
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const totalTableWidth = activeColumns.reduce((sum, col) => sum + (columnWidths[col.key] || 100), 0) + 110;
+
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
   const [selectedPayslip, setSelectedPayslip] = useState<PayrollRecord | null>(null);
@@ -1650,199 +1744,477 @@ export default function PayrollClient({
               <button onClick={() => { setColumnFilters({}); setCurrentPage(1); }}
                 className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg border border-red-200">{t('payroll.filterClear')} ({activeFilterCount})</button>
             )}
-            <ExportButtons
-              data={filtered.map(r => {
-                const emp = employees.find(e => e.id === r.employeeId);
-                const translatedSalaryType = r.salaryType === '月給' ? t('payroll.typeMonthly') : r.salaryType === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly');
-                const getStatusLabel = (s: string) =>
-                  s === 'PAID' ? t('payroll.statusPaid') :
-                  s === 'APPROVED' ? t('payroll.statusApproved') :
-                  s === 'CALCULATED' ? t('payroll.statusCalculated') :
-                  s === 'PENDING' ? t('payroll.statusPending') : s;
+            
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              {/* Column Settings */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowColumnSettings(!showColumnSettings)}
+                  className="p-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl transition-all cursor-pointer bg-white"
+                  title="Cấu hình hiển thị cột"
+                >
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                </button>
+                {showColumnSettings && (
+                  <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200/50 rounded-3xl shadow-premium z-30 p-4 min-w-[200px] animate-fadeIn text-slate-800">
+                    <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider pb-1.5 border-b">{t('common.selectColumns')}</p>
+                    <div className="space-y-1 max-h-[240px] overflow-y-auto pr-1">
+                      {allPayrollColumns.map(col => (
+                        <label key={col.key} className="flex items-center gap-2.5 py-1.5 px-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors">
+                          <input type="checkbox" checked={visibleColumns[col.key]} onChange={() => toggleColumn(col.key)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5" />
+                          <span className="text-xs font-semibold text-slate-700">{col.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-                const transAllow = emp?.benefits?.transportation || 0;
-                const houseAllow = emp?.benefits?.housing || 0;
-                const mealAllow = emp?.benefits?.meal || 0;
-                const fixedAllowances = transAllow + houseAllow + mealAllow;
-                const displayBonus = Math.max(0, r.allowances - fixedAllowances);
-                const displayAllowances = r.allowances - displayBonus;
+              {/* Layout Mode Toggles */}
+              <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                <button
+                  onClick={() => setPayrollLayoutView('table')}
+                  className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${payrollLayoutView === 'table' ? 'bg-white text-blue-605 shadow-sm font-black' : 'text-slate-500 hover:text-slate-805'}`}
+                  title="Dạng bảng"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setPayrollLayoutView('card')}
+                  className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${payrollLayoutView === 'card' ? 'bg-white text-blue-605 shadow-sm font-black' : 'text-slate-500 hover:text-slate-850'}`}
+                  title="Dạng thẻ"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z" />
+                  </svg>
+                </button>
+              </div>
 
-                return {
-                  name: emp ? `${emp.lastName} ${emp.firstName}` : '',
-                  month: getDisplayMonth(r.month, locale),
-                  salaryType: translatedSalaryType,
-                  baseSalary: formatCurrency(r.baseSalary), 
-                  overtimePay: formatCurrency(r.overtimePay),
-                  allowances: formatCurrency(displayAllowances),
-                  bonus: formatCurrency(displayBonus),
-                  totalGross: formatCurrency(r.totalGross),
-                  deductions: formatCurrency(r.totalDeductions), 
-                  netSalary: formatCurrency(r.netSalary),
-                  status: getStatusLabel(r.status),
-                };
-              })}
-              columns={viewType === 'employee' ? [
-                { header: t('payroll.processMonth'), key: 'month' }, { header: t('payroll.contractSalaryType'), key: 'salaryType' },
-                { header: t('payroll.baseSalarySubject'), key: 'baseSalary' }, { header: t('payroll.overtimeHours'), key: 'overtimePay' },
-                { header: t('payroll.colAllowance'), key: 'allowances' }, { header: '賞与', key: 'bonus' }, { header: t('payroll.totalEarnings'), key: 'totalGross' },
-                { header: t('payroll.deductions'), key: 'deductions' }, { header: t('payroll.colNet'), key: 'netSalary' },
-                { header: t('payroll.colStatus'), key: 'status' },
-              ] : [
-                { header: t('payroll.colName'), key: 'name' }, { header: t('payroll.contractSalaryType'), key: 'salaryType' },
-                { header: t('payroll.baseSalarySubject'), key: 'baseSalary' }, { header: t('payroll.overtimeHours'), key: 'overtimePay' },
-                { header: t('payroll.colAllowance'), key: 'allowances' }, { header: '賞与', key: 'bonus' }, { header: t('payroll.totalEarnings'), key: 'totalGross' },
-                { header: t('payroll.deductions'), key: 'deductions' }, { header: t('payroll.colNet'), key: 'netSalary' },
-                { header: t('payroll.colStatus'), key: 'status' },
-              ]}
-              fileName={viewType === 'employee' ? `${t('payroll.payslipTitle')}_${employees.find(e => e.id === selectedEmployeeId)?.lastName}_${employees.find(e => e.id === selectedEmployeeId)?.firstName}` : (startMonth === endMonth ? `${t('payroll.payslipTitle')}_${endMonth}` : `${t('payroll.payslipTitle')}_${startMonth}_to_${endMonth}`)}
-            />
+              <ExportButtons
+                data={filtered.map(r => {
+                  const emp = employees.find(e => e.id === r.employeeId);
+                  const translatedSalaryType = r.salaryType === '月給' ? t('payroll.typeMonthly') : r.salaryType === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly');
+                  const getStatusLabel = (s: string) =>
+                    s === 'PAID' ? t('payroll.statusPaid') :
+                    s === 'APPROVED' ? t('payroll.statusApproved') :
+                    s === 'CALCULATED' ? t('payroll.statusCalculated') :
+                    s === 'PENDING' ? t('payroll.statusPending') : s;
+
+                  const transAllow = emp?.benefits?.transportation || 0;
+                  const houseAllow = emp?.benefits?.housing || 0;
+                  const mealAllow = emp?.benefits?.meal || 0;
+                  const fixedAllowances = transAllow + houseAllow + mealAllow;
+                  const displayBonus = Math.max(0, r.allowances - fixedAllowances);
+                  const displayAllowances = r.allowances - displayBonus;
+
+                  return {
+                    name: emp ? `${emp.lastName} ${emp.firstName}` : '',
+                    month: getDisplayMonth(r.month, locale),
+                    salaryType: translatedSalaryType,
+                    baseSalary: formatCurrency(r.baseSalary), 
+                    overtimePay: formatCurrency(r.overtimePay),
+                    allowances: formatCurrency(displayAllowances),
+                    bonus: formatCurrency(displayBonus),
+                    totalGross: formatCurrency(r.totalGross),
+                    deductions: formatCurrency(r.totalDeductions), 
+                    netSalary: formatCurrency(r.netSalary),
+                    status: getStatusLabel(r.status),
+                  };
+                })}
+                columns={viewType === 'employee' ? [
+                  { header: t('payroll.processMonth'), key: 'month' }, { header: t('payroll.contractSalaryType'), key: 'salaryType' },
+                  { header: t('payroll.baseSalarySubject'), key: 'baseSalary' }, { header: t('payroll.overtimeHours'), key: 'overtimePay' },
+                  { header: t('payroll.colAllowance'), key: 'allowances' }, { header: '賞与', key: 'bonus' }, { header: t('payroll.totalEarnings'), key: 'totalGross' },
+                  { header: t('payroll.deductions'), key: 'deductions' }, { header: t('payroll.colNet'), key: 'netSalary' },
+                  { header: t('payroll.colStatus'), key: 'status' },
+                ] : [
+                  { header: t('payroll.colName'), key: 'name' }, { header: t('payroll.contractSalaryType'), key: 'salaryType' },
+                  { header: t('payroll.baseSalarySubject'), key: 'baseSalary' }, { header: t('payroll.overtimeHours'), key: 'overtimePay' },
+                  { header: t('payroll.colAllowance'), key: 'allowances' }, { header: '賞与', key: 'bonus' }, { header: t('payroll.totalEarnings'), key: 'totalGross' },
+                  { header: t('payroll.deductions'), key: 'deductions' }, { header: t('payroll.colNet'), key: 'netSalary' },
+                  { header: t('payroll.colStatus'), key: 'status' },
+                ]}
+                fileName={viewType === 'employee' ? `${t('payroll.payslipTitle')}_${employees.find(e => e.id === selectedEmployeeId)?.lastName}_${employees.find(e => e.id === selectedEmployeeId)?.firstName}` : (startMonth === endMonth ? `${t('payroll.payslipTitle')}_${endMonth}` : `${t('payroll.payslipTitle')}_${startMonth}_to_${endMonth}`)}
+              />
+            </div>
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '1150px' }}>
-            <colgroup><col style={{ width: '170px' }} /><col style={{ width: '110px' }} /><col style={{ width: '110px' }} /><col style={{ width: '100px' }} /><col style={{ width: '100px' }} /><col style={{ width: '100px' }} /><col style={{ width: '110px' }} /><col style={{ width: '115px' }} /><col style={{ width: '95px' }} /><col style={{ width: !isEmployeeMode ? '210px' : '90px' }} /></colgroup>
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                {(isEmployeeMode || viewType === 'employee') ? (
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.processMonth')}</th>
-                ) : (
-                  <FilterTh label={t('payroll.colName')} filterKey="name" options={nameOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
-                )}
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.contractSalaryType')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.baseSalarySubject')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.overtimeHours')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colAllowance')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">賞与</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colDeduction')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colNet')}</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap">会社負担</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{t('payroll.colStatus')}</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase whitespace-nowrap">{!isEmployeeMode ? '操作' : t('payroll.detailBtn')}</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {paginated.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-12 text-center text-slate-400">
-                  {isEmployeeMode ? t('payroll.noPayslipRecord') : (viewType === 'employee' ? t('payroll.noEmployeePayslipRecord') : (monthRecords.length === 0 ? t('payroll.clickCalculatePrompt') : t('common.noData')))}
-                </td></tr>
-              ) : paginated.map(record => {
-                const emp = employees.find(e => e.id === record.employeeId);
-                return (
-                  <tr key={record.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {(isEmployeeMode || viewType === 'employee') ? (
-                        <span className="font-bold text-slate-800">{getDisplayMonth(record.month, locale)}</span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs shrink-0">{emp?.firstNameKana?.charAt(0).toUpperCase()}</div>
-                          <div className="min-w-0">
-                            <span className="text-sm font-medium text-slate-800 block truncate">{emp?.lastName} {emp?.firstName}</span>
-                            {startMonth !== endMonth && (
-                              <span className="text-xs text-blue-600 dark:text-blue-400 font-bold ml-1.5">
-                                ({getDisplayMonth(record.month, locale)})
-                              </span>
-                            )}
-                            <p className="text-xs text-slate-400 truncate">{emp?.department}</p>
-                          </div>
-                        </div>
-                      )}
+        {payrollLayoutView === 'table' && (
+          <div className="overflow-x-auto border border-slate-200/65 rounded-2xl shadow-sm mb-5 bg-white">
+            <table className="table-fixed border-collapse" style={{ width: '100%', minWidth: `${totalTableWidth}px` }}>
+              <colgroup>
+                {activeColumns.map(col => (
+                  <col key={col.key} style={{ width: `${columnWidths[col.key] || 100}px` }} />
+                ))}
+                <col style={{ width: !isEmployeeMode ? '210px' : '90px' }} />
+              </colgroup>
+              <thead>
+                <tr className="bg-slate-50/90 border-b border-slate-200/60 text-slate-500 text-xs">
+                  {activeColumns.map((col, idx) => {
+                    const isFirst = idx === 0;
+                    let stickyStyle: React.CSSProperties = {};
+                    let stickyClass = "";
+                    if (isFirst) {
+                      stickyStyle = { position: 'sticky', left: 0, zIndex: 20 };
+                      stickyClass = "sticky left-0 bg-slate-50 z-20 border-r border-slate-250/80 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]";
+                    }
+
+                    const isRightAlign = ['baseSalary', 'overtimePay', 'allowances', 'bonus', 'deductions', 'netSalary', 'companyCost'].includes(col.key);
+                    const alignClass = isRightAlign ? 'text-right' : (col.key === 'status' ? 'text-center' : 'text-left');
+
+                    return (
+                      <th
+                        key={col.key}
+                        className={`px-4 py-3.5 text-xs font-bold text-slate-500 uppercase whitespace-nowrap relative group ${stickyClass} ${alignClass}`}
+                        style={{ width: `${columnWidths[col.key] || 100}px`, ...stickyStyle }}
+                      >
+                        {col.key === 'name' && !(isEmployeeMode || viewType === 'employee') ? (
+                          <FilterTh label={t('payroll.colName')} filterKey="name" options={nameOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
+                        ) : col.label}
+
+                        {/* Resizer Handle */}
+                        <div
+                          onMouseDown={(e) => handleResizeMouseDown(e, col.key)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-slate-350 opacity-0 group-hover:opacity-100 active:opacity-100 hover:w-2 active:bg-blue-500 transition-all select-none z-30"
+                        />
+                      </th>
+                    );
+                  })}
+                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase whitespace-nowrap" style={{ width: !isEmployeeMode ? '210px' : '90px' }}>
+                    {!isEmployeeMode ? '操作' : t('payroll.detailBtn')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-150">
+                {paginated.length === 0 ? (
+                  <tr>
+                    <td colSpan={activeColumns.length + 1} className="px-4 py-12 text-center text-slate-400">
+                      {isEmployeeMode ? t('payroll.noPayslipRecord') : (viewType === 'employee' ? t('payroll.noEmployeePayslipRecord') : (monthRecords.length === 0 ? t('payroll.clickCalculatePrompt') : t('common.noData')))}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap"><span className={`px-2 py-0.5 text-xs rounded ${salaryTypeColor(record.salaryType)}`}>{record.salaryType === '月給' ? t('payroll.typeMonthly') : record.salaryType === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly')}</span></td>
-                    <td className="px-4 py-3 text-sm text-right text-slate-600 whitespace-nowrap">{formatCurrency(record.baseSalary)}</td>
-                    <td className="px-4 py-3 text-sm text-right text-slate-600 whitespace-nowrap">{record.overtimePay > 0 ? formatCurrency(record.overtimePay) : '-'}</td>
-                    {(() => {
-                      const transAllow = emp?.benefits?.transportation || 0;
-                      const houseAllow = emp?.benefits?.housing || 0;
-                      const mealAllow = emp?.benefits?.meal || 0;
-                      const fixedAllowances = transAllow + houseAllow + mealAllow;
-                      const displayBonus = Math.max(0, record.allowances - fixedAllowances);
-                      const displayAllowances = record.allowances - displayBonus;
-                      
-                      return (
-                        <>
-                          <td className="px-4 py-3 text-sm text-right text-slate-600 whitespace-nowrap">{displayAllowances > 0 ? formatCurrency(displayAllowances) : '-'}</td>
-                          <td className="px-4 py-3 text-sm text-right text-slate-600 whitespace-nowrap">{displayBonus > 0 ? formatCurrency(displayBonus) : '-'}</td>
-                        </>
-                      );
-                    })()}
-                    <td className="px-4 py-3 text-sm text-right text-red-600 whitespace-nowrap">{formatCurrency(record.totalDeductions)}</td>
-                    <td className="px-4 py-3 text-sm text-right font-medium text-slate-800 whitespace-nowrap">{formatCurrency(record.netSalary)}</td>
-                    <td className="px-4 py-3 text-sm text-right text-blue-700 whitespace-nowrap">¥{(record as any).totalCompanyCost?.toLocaleString() || '-'}</td>
-                    <td className="px-4 py-3 text-center whitespace-nowrap"><span className={`px-2 py-0.5 text-xs rounded ${statusColor(record.status)}`}>{
-                      record.status === 'PAID' ? t('payroll.statusPaid') :
-                      record.status === 'APPROVED' ? t('payroll.statusApproved') :
-                      record.status === 'CALCULATED' ? t('payroll.statusCalculated') :
-                      record.status === 'PENDING' ? t('payroll.statusPending') : record.status
-                    }</span></td>
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
-                      <div className="flex gap-1.5 justify-center items-center">
-                        {emp && (
-                          <button onClick={() => setSelectedPayslip(record)}
-                            className="px-2.5 py-1 text-xs bg-blue-50 text-blue-650 rounded hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap font-medium"
-                            title={t('payroll.detailBtn')}
-                          >
-                            明細
-                          </button>
-                        )}
-                        {!isEmployeeMode && emp && (
-                          <>
-                            <button 
-                              onClick={() => setSelectedAttendanceCheck({ 
-                                employeeId: record.employeeId, 
-                                month: record.month, 
-                                employeeName: `${emp.lastName} ${emp.firstName}` 
-                              })}
-                              className="px-2 py-1 text-xs bg-slate-100 text-slate-650 hover:bg-slate-200 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
-                              title="勤怠実績確認"
+                  </tr>
+                ) : paginated.map(record => {
+                  const emp = employees.find(e => e.id === record.employeeId);
+                  const translatedSalaryType = record.salaryType === '月給' ? t('payroll.typeMonthly') : record.salaryType === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly');
+                  
+                  const transAllow = emp?.benefits?.transportation || 0;
+                  const houseAllow = emp?.benefits?.housing || 0;
+                  const mealAllow = emp?.benefits?.meal || 0;
+                  const fixedAllowances = transAllow + houseAllow + mealAllow;
+                  const displayBonus = Math.max(0, record.allowances - fixedAllowances);
+                  const displayAllowances = record.allowances - displayBonus;
+
+                  return (
+                    <tr key={record.id} className="hover:bg-slate-50 group">
+                      {/* First Column Sticky */}
+                      {visibleColumns.name && (
+                        <td 
+                          className="px-4 py-3.5 whitespace-nowrap sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10 border-r border-slate-250/80 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]"
+                          style={{ position: 'sticky', left: 0 }}
+                        >
+                          {(isEmployeeMode || viewType === 'employee') ? (
+                            <span className="font-bold text-slate-800">{getDisplayMonth(record.month, locale)}</span>
+                          ) : (
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs shrink-0 font-bold">{emp?.firstNameKana?.charAt(0).toUpperCase()}</div>
+                              <div className="min-w-0">
+                                <span className="text-sm font-bold text-slate-800 block truncate">{emp?.lastName} {emp?.firstName}</span>
+                                {startMonth !== endMonth && (
+                                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                                    ({getDisplayMonth(record.month, locale)})
+                                  </span>
+                                )}
+                                <p className="text-[10px] text-slate-400 truncate">{emp?.department}</p>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      )}
+
+                      {visibleColumns.salaryType && (
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 text-xs rounded ${salaryTypeColor(record.salaryType)}`}>
+                            {translatedSalaryType}
+                          </span>
+                        </td>
+                      )}
+
+                      {visibleColumns.baseSalary && (
+                        <td className="px-4 py-3.5 text-sm text-right text-slate-650 font-mono whitespace-nowrap">
+                          {formatCurrency(record.baseSalary)}
+                        </td>
+                      )}
+
+                      {visibleColumns.overtimePay && (
+                        <td className="px-4 py-3.5 text-sm text-right text-slate-650 font-mono whitespace-nowrap">
+                          {record.overtimePay > 0 ? formatCurrency(record.overtimePay) : '-'}
+                        </td>
+                      )}
+
+                      {visibleColumns.allowances && (
+                        <td className="px-4 py-3.5 text-sm text-right text-slate-650 font-mono whitespace-nowrap">
+                          {displayAllowances > 0 ? formatCurrency(displayAllowances) : '-'}
+                        </td>
+                      )}
+
+                      {visibleColumns.bonus && (
+                        <td className="px-4 py-3.5 text-sm text-right text-slate-650 font-mono whitespace-nowrap">
+                          {displayBonus > 0 ? formatCurrency(displayBonus) : '-'}
+                        </td>
+                      )}
+
+                      {visibleColumns.deductions && (
+                        <td className="px-4 py-3.5 text-sm text-right text-rose-600 font-mono whitespace-nowrap">
+                          {formatCurrency(record.totalDeductions)}
+                        </td>
+                      )}
+
+                      {visibleColumns.netSalary && (
+                        <td className="px-4 py-3.5 text-sm text-right font-bold text-slate-850 font-mono whitespace-nowrap">
+                          {formatCurrency(record.netSalary)}
+                        </td>
+                      )}
+
+                      {visibleColumns.companyCost && (
+                        <td className="px-4 py-3.5 text-sm text-right text-blue-700 font-mono whitespace-nowrap">
+                          ¥{record.totalCompanyCost?.toLocaleString() || '-'}
+                        </td>
+                      )}
+
+                      {visibleColumns.status && (
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          <span className={`px-2 py-0.5 text-xs rounded ${statusColor(record.status)}`}>
+                            {getStatusLabel(record.status)}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Action cell */}
+                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                        <div className="flex gap-1.5 justify-center items-center">
+                          {emp && (
+                            <button onClick={() => setSelectedPayslip(record)}
+                              className="px-2.5 py-1 text-xs bg-blue-50 text-blue-650 rounded hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap font-medium"
+                              title={t('payroll.detailBtn')}
                             >
-                              勤怠
+                              明細
                             </button>
-                            {(record.status === 'PENDING' || record.status === 'CALCULATED') && (
+                          )}
+                          {!isEmployeeMode && emp && (
+                            <>
                               <button 
-                                onClick={() => handleUpdateStatus(record.id, 'APPROVED')}
-                                className="px-2 py-1 text-xs bg-yellow-50 text-yellow-750 hover:bg-yellow-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                                onClick={() => setSelectedAttendanceCheck({ 
+                                  employeeId: record.employeeId, 
+                                  month: record.month, 
+                                  employeeName: `${emp.lastName} ${emp.firstName}` 
+                                })}
+                                className="px-2 py-1 text-xs bg-slate-100 text-slate-650 hover:bg-slate-200 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                                title="勤怠実績確認"
                               >
-                                承認
+                                勤怠
                               </button>
-                            )}
-                            {record.status === 'APPROVED' && (
-                              <button 
-                                onClick={() => handleUpdateStatus(record.id, 'PAID')}
-                                className="px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
-                              >
-                                支払
-                              </button>
-                            )}
-                            {(record.status === 'APPROVED' || record.status === 'PAID') && (
-                              <button 
-                                onClick={() => {
-                                  if (confirm('この給与明細を未確定に戻しますか？勤怠や明細の修正が可能になります。(Bạn có muốn hủy chốt bảng lương này không? Sẽ có thể sửa lại chấm công và chi tiết lương.)')) {
-                                    handleUpdateStatus(record.id, 'CALCULATED');
-                                  }
-                                }}
-                                className="px-2 py-1 text-xs bg-red-50 text-red-750 hover:bg-red-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
-                              >
-                                未確定
-                              </button>
-                            )}
+                              {(record.status === 'PENDING' || record.status === 'CALCULATED') && (
+                                <button 
+                                  onClick={() => handleUpdateStatus(record.id, 'APPROVED')}
+                                  className="px-2 py-1 text-xs bg-yellow-50 text-yellow-750 hover:bg-yellow-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                                >
+                                  承認
+                                </button>
+                              )}
+                              {record.status === 'APPROVED' && (
+                                <button 
+                                  onClick={() => handleUpdateStatus(record.id, 'PAID')}
+                                  className="px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                                >
+                                  支払
+                                </button>
+                              )}
+                              {(record.status === 'APPROVED' || record.status === 'PAID') && (
+                                <button 
+                                  onClick={() => {
+                                    if (confirm('この給与明細を未確定に戻しますか？勤怠や明細の修正が可能になります。(Bạn có muốn hủy chốt bảng lương này không? Sẽ có thể sửa lại chấm công và chi tiết lương.)')) {
+                                      handleUpdateStatus(record.id, 'CALCULATED');
+                                    }
+                                  }}
+                                  className="px-2 py-1 text-xs bg-red-50 text-red-750 hover:bg-red-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                                >
+                                  未確定
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-100/80 font-bold border-t border-slate-200">
+                  <td colSpan={activeColumns.length} className="px-4 py-3 text-right text-xs text-slate-500 uppercase">会社負担 合計</td>
+                  <td className="px-4 py-3 text-right text-sm text-blue-700 font-mono">¥{filtered.reduce((sum, r) => sum + ((r as any).totalCompanyCost || 0), 0).toLocaleString()}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+
+        {payrollLayoutView === 'card' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+            {paginated.length === 0 ? (
+              <div className="col-span-full py-16 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed">
+                {isEmployeeMode ? t('payroll.noPayslipRecord') : (viewType === 'employee' ? t('payroll.noEmployeePayslipRecord') : (monthRecords.length === 0 ? t('payroll.clickCalculatePrompt') : t('common.noData')))}
+              </div>
+            ) : paginated.map(record => {
+              const emp = employees.find(e => e.id === record.employeeId);
+              const translatedSalaryType = record.salaryType === '月給' ? t('payroll.typeMonthly') : record.salaryType === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly');
+              
+              const transAllow = emp?.benefits?.transportation || 0;
+              const houseAllow = emp?.benefits?.housing || 0;
+              const mealAllow = emp?.benefits?.meal || 0;
+              const fixedAllowances = transAllow + houseAllow + mealAllow;
+              const displayBonus = Math.max(0, record.allowances - fixedAllowances);
+              const displayAllowances = record.allowances - displayBonus;
+
+              return (
+                <div key={record.id} className="bg-white border border-slate-200/70 rounded-2xl p-5 shadow-premium hover:shadow-premium-hover transition-all duration-200 relative group animate-fadeIn">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-tr from-slate-100 to-slate-250 rounded-full flex items-center justify-center text-sm font-bold text-slate-700 shrink-0">
+                        {emp?.firstNameKana?.charAt(0).toUpperCase() || record.month.split('-')[1]}
+                      </div>
+                      <div className="min-w-0">
+                        {(isEmployeeMode || viewType === 'employee') ? (
+                          <span className="text-sm font-black text-slate-800 block">{getDisplayMonth(record.month, locale)}</span>
+                        ) : (
+                          <>
+                            <span className="text-sm font-black text-slate-800 block truncate">{emp?.lastName} {emp?.firstName}</span>
+                            <span className="text-[11px] font-bold text-slate-400 block truncate">{emp?.department || '-'}</span>
                           </>
                         )}
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="bg-slate-100 font-semibold">
-                <td colSpan={8} className="px-4 py-2 text-right text-xs text-slate-600">会社負担 合計</td>
-                <td className="px-4 py-2 text-right text-sm text-blue-700">¥{filtered.reduce((sum, r) => sum + ((r as any).totalCompanyCost || 0), 0).toLocaleString()}</td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                    </div>
+                    {visibleColumns.status && (
+                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${statusColor(record.status)}`}>
+                        {getStatusLabel(record.status)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 border-t border-slate-100 pt-4 text-xs">
+                    {visibleColumns.salaryType && (
+                      <div>
+                        <span className="text-slate-400 font-bold block mb-0.5">給与種別 (Loại lương)</span>
+                        <span className="font-semibold text-slate-800">{translatedSalaryType}</span>
+                      </div>
+                    )}
+                    {visibleColumns.baseSalary && (
+                      <div>
+                        <span className="text-slate-400 font-bold block mb-0.5">基本給 (Lương cơ bản)</span>
+                        <span className="font-semibold text-slate-800 font-mono">{formatCurrency(record.baseSalary)}</span>
+                      </div>
+                    )}
+                    {visibleColumns.overtimePay && (
+                      <div>
+                        <span className="text-slate-400 font-bold block mb-0.5">残業手当 (Tăng ca)</span>
+                        <span className="font-semibold text-slate-850 font-mono">{formatCurrency(record.overtimePay)} ({record.overtimeHours}h)</span>
+                      </div>
+                    )}
+                    {visibleColumns.allowances && (
+                      <div>
+                        <span className="text-slate-400 font-bold block mb-0.5">手当 (Phụ cấp)</span>
+                        <span className="font-semibold text-slate-850 font-mono">{formatCurrency(displayAllowances)}</span>
+                      </div>
+                    )}
+                    {visibleColumns.bonus && displayBonus > 0 && (
+                      <div>
+                        <span className="text-slate-400 font-bold block mb-0.5">賞与 (Thưởng)</span>
+                        <span className="font-black text-emerald-600 font-mono">{formatCurrency(displayBonus)}</span>
+                      </div>
+                    )}
+                    {visibleColumns.deductions && (
+                      <div>
+                        <span className="text-slate-400 font-bold block mb-0.5 font-sans">控除 (Khấu trừ)</span>
+                        <span className="font-semibold text-rose-600 font-mono">{formatCurrency(record.totalDeductions)}</span>
+                      </div>
+                    )}
+                    {visibleColumns.companyCost && (
+                      <div>
+                        <span className="text-slate-400 font-bold block mb-0.5">会社負担 (Công ty trả)</span>
+                        <span className="font-semibold text-blue-650 font-mono">¥{record.totalCompanyCost?.toLocaleString() || '-'}</span>
+                      </div>
+                    )}
+                    
+                    {visibleColumns.netSalary && (
+                      <div className="col-span-2 bg-slate-50/70 border border-slate-100 rounded-2xl p-3 flex justify-between items-center mt-1">
+                        <span className="text-slate-500 font-extrabold text-xs">差引支給額 (Thực nhận Net)</span>
+                        <span className="text-base font-black text-blue-600 font-mono">{formatCurrency(record.netSalary)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end gap-2 mt-4 pt-3.5 border-t border-slate-100">
+                    <button
+                      onClick={() => setSelectedPayslip(record)}
+                      className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-black transition-all cursor-pointer"
+                    >
+                      {t('payroll.detailBtn')}
+                    </button>
+                    {!isEmployeeMode && emp && (
+                      <>
+                        <button 
+                          onClick={() => setSelectedAttendanceCheck({ 
+                            employeeId: record.employeeId, 
+                            month: record.month, 
+                            employeeName: `${emp.lastName} ${emp.firstName}` 
+                          })}
+                          className="px-3.5 py-2 bg-slate-100 text-slate-650 hover:bg-slate-200 rounded-xl transition-all cursor-pointer font-bold text-xs"
+                          title="勤怠実績"
+                        >
+                          勤怠
+                        </button>
+                        {(record.status === 'PENDING' || record.status === 'CALCULATED') && (
+                          <button
+                            onClick={() => handleUpdateStatus(record.id, 'APPROVED')}
+                            className="px-3.5 py-2 bg-blue-650 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all shadow-sm cursor-pointer"
+                          >
+                            承認 (Duyệt)
+                          </button>
+                        )}
+                        {record.status === 'APPROVED' && (
+                          <button
+                            onClick={() => handleUpdateStatus(record.id, 'PAID')}
+                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-sm cursor-pointer"
+                          >
+                            支払 (Trả)
+                          </button>
+                        )}
+                        {(record.status === 'APPROVED' || record.status === 'PAID') && (
+                          <button
+                            onClick={() => {
+                              if (confirm('この給与明細を未確定に戻しますか？')) {
+                                handleUpdateStatus(record.id, 'CALCULATED');
+                              }
+                            }}
+                            className="px-3.5 py-2 bg-red-50 text-red-700 hover:bg-red-100 rounded-xl text-xs font-black transition-all cursor-pointer"
+                          >
+                            未確定
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-200">

@@ -687,9 +687,17 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [searchField, setSearchField] = useState<string>('all');
   const [showColumnSettings, setShowColumnSettings] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
-    no: true, code: true, name: true, department: true, position: true,
-    birthDate: true, nationality: true, visa: true, hireDate: true, card: true, expiry: true,
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('employee_visible_columns');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return {
+      no: true, code: true, name: true, department: true, position: true,
+      birthDate: true, nationality: true, visa: true, hireDate: true, card: true, expiry: true,
+    };
   });
 
   const allColumns = [
@@ -707,23 +715,60 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
   ];
 
   const toggleColumn = (key: string) => {
-    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
+    setVisibleColumns(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('employee_visible_columns', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const activeColumns = allColumns.filter(c => visibleColumns[c.key]);
 
-  const columnWidths: Record<string, number> = {
-    no: 50,
-    code: 100,
-    name: 185,
-    department: 140,
-    position: 120,
-    birthDate: 120,
-    nationality: 100,
-    visa: 155,
-    hireDate: 120,
-    card: 150,
-    expiry: 120,
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('employee_column_widths');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return {
+      no: 50,
+      code: 100,
+      name: 185,
+      department: 140,
+      position: 120,
+      birthDate: 120,
+      nationality: 100,
+      visa: 155,
+      hireDate: 120,
+      card: 150,
+      expiry: 120,
+    };
+  });
+
+  const handleResizeMouseDown = (e: React.MouseEvent, colKey: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = columnWidths[colKey] || 100;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(40, startWidth + deltaX);
+      setColumnWidths(prev => {
+        const updated = { ...prev, [colKey]: newWidth };
+        localStorage.setItem('employee_column_widths', JSON.stringify(updated));
+        return updated;
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   const totalTableWidth = activeColumns.reduce((sum, col) => sum + (columnWidths[col.key] || 100), 0) + 100;
@@ -1167,29 +1212,50 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
             </colgroup>
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200/60 text-slate-500 text-xs">
-                {activeColumns.map(col => (
-                  <th
-                    key={col.key}
-                    className={`px-4 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider ${col.key === 'no' ? 'text-center' : 'cursor-pointer select-none hover:bg-slate-100 transition-colors'}`}
-                    style={{ width: `${columnWidths[col.key]}px` }}
-                    onClick={col.key === 'no' ? undefined : () => handleSort(col.key)}
-                  >
-                    {col.key === 'no' ? col.label : (
-                      <span className="inline-flex items-center gap-1">
-                        {col.label}
-                        {sortField === col.key ? (
-                          sortDir === 'asc' ? (
-                            <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                {activeColumns.map(col => {
+                  const isSticky = col.key === 'no' || col.key === 'name';
+                  let stickyStyle: React.CSSProperties = {};
+                  let stickyClass = "";
+                  if (col.key === 'no') {
+                    stickyStyle = { position: 'sticky', left: 0, zIndex: 20 };
+                    stickyClass = "sticky left-0 bg-slate-50 z-20";
+                  } else if (col.key === 'name') {
+                    const leftVal = visibleColumns.no ? (columnWidths.no || 50) : 0;
+                    stickyStyle = { position: 'sticky', left: leftVal, zIndex: 20 };
+                    stickyClass = `sticky bg-slate-50 z-20 ${visibleColumns.no ? 'border-r border-slate-200/85 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]' : ''}`;
+                  }
+
+                  return (
+                    <th
+                      key={col.key}
+                      className={`px-4 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider relative group ${stickyClass} ${col.key === 'no' ? 'text-center' : 'cursor-pointer select-none hover:bg-slate-100 transition-colors'}`}
+                      style={{ width: `${columnWidths[col.key]}px`, ...stickyStyle }}
+                      onClick={col.key === 'no' ? undefined : () => handleSort(col.key)}
+                    >
+                      {col.key === 'no' ? col.label : (
+                        <span className="inline-flex items-center gap-1">
+                          {col.label}
+                          {sortField === col.key ? (
+                            sortDir === 'asc' ? (
+                              <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                            ) : (
+                              <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                            )
                           ) : (
-                            <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                          )
-                        ) : (
-                          <svg className="w-3 h-3 text-slate-355" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-                        )}
-                      </span>
-                    )}
-                  </th>
-                ))}
+                            <svg className="w-3 h-3 text-slate-355" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                          )}
+                        </span>
+                      )}
+
+                      {/* Resizer Handle */}
+                      <div
+                        onMouseDown={(e) => handleResizeMouseDown(e, col.key)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-slate-300 opacity-0 group-hover:opacity-100 active:opacity-100 hover:w-2 active:bg-blue-500 transition-all select-none z-30"
+                      />
+                    </th>
+                  );
+                })}
                 <th className="px-4 py-3.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[100px]" style={{ width: '100px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
@@ -1209,33 +1275,52 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                   </td>
                 </tr>
               ) : (
-                paginated.map((employee, idx) => (
-                  <tr key={employee.id} className="hover:bg-slate-50/80 cursor-pointer transition-colors" onClick={() => setViewingEmployee(employee)}>
-                    {visibleColumns.no && <td className="px-4 py-3.5 text-xs text-slate-450 font-bold font-mono text-center">{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>}
-                    {visibleColumns.code && <td className="px-4 py-3.5"><span className="text-xs font-mono font-bold text-blue-600 bg-blue-50/50 px-2 py-1 rounded border border-blue-100 truncate block max-w-full text-center">{employee.employeeCode}</span></td>}
-                    {visibleColumns.name && (
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="relative flex-shrink-0">
-                            {employee.avatar ? (
-                              <img src={employee.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
-                            ) : (
-                              <div className="w-10 h-10 bg-gradient-to-tr from-slate-100 to-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-650 border border-slate-200">
-                                {employee.firstNameKana?.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                              employee.status === 'ACTIVE' ? 'bg-emerald-500' :
-                              employee.status === 'ON_LEAVE' ? 'bg-blue-500' : 'bg-slate-300'
-                            }`} />
+                paginated.map((employee, idx) => {
+                  const leftValForName = visibleColumns.no ? (columnWidths.no || 50) : 0;
+                  
+                  return (
+                    <tr key={employee.id} className="hover:bg-slate-50/80 cursor-pointer transition-colors group" onClick={() => setViewingEmployee(employee)}>
+                      {visibleColumns.no && (
+                        <td 
+                          className="px-4 py-3.5 text-xs text-slate-450 font-bold font-mono text-center sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10"
+                          style={{ position: 'sticky', left: 0 }}
+                        >
+                          {(currentPage - 1) * PAGE_SIZE + idx + 1}
+                        </td>
+                      )}
+                      {visibleColumns.code && (
+                        <td className="px-4 py-3.5">
+                          <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50/50 px-2 py-1 rounded border border-blue-100 truncate block max-w-full text-center">
+                            {employee.employeeCode}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.name && (
+                        <td 
+                          className={`px-4 py-3.5 sticky bg-white group-hover:bg-slate-50 transition-colors z-10 ${visibleColumns.no ? 'border-r border-slate-200/85 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]' : ''}`}
+                          style={{ position: 'sticky', left: leftValForName }}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="relative flex-shrink-0">
+                              {employee.avatar ? (
+                                <img src={employee.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                              ) : (
+                                <div className="w-10 h-10 bg-gradient-to-tr from-slate-100 to-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-650 border border-slate-200">
+                                  {employee.firstNameKana?.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                                employee.status === 'ACTIVE' ? 'bg-emerald-500' :
+                                employee.status === 'ON_LEAVE' ? 'bg-blue-500' : 'bg-slate-300'
+                              }`} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-800 truncate">{employee.lastName} {employee.firstName}</p>
+                              <p className="text-[10px] text-slate-400 font-semibold truncate">{employee.lastNameKana} {employee.firstNameKana}</p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-800 truncate">{employee.lastName} {employee.firstName}</p>
-                            <p className="text-[10px] text-slate-400 font-semibold truncate">{employee.lastNameKana} {employee.firstNameKana}</p>
-                          </div>
-                        </div>
-                      </td>
-                    )}
+                        </td>
+                      )}
                     {visibleColumns.department && <td className="px-4 py-3.5 text-xs font-bold text-slate-700 truncate">{employee.department?.name || <span className="text-slate-300">-</span>}</td>}
                     {visibleColumns.position && <td className="px-4 py-3.5 text-xs font-semibold text-slate-650 truncate">{employee.position?.name || <span className="text-slate-300">-</span>}</td>}
                     {visibleColumns.birthDate && <td className="px-4 py-3.5 text-xs font-medium text-slate-650 font-mono truncate">{employee.birthDate ? formatDate(employee.birthDate) : <span className="text-slate-300">-</span>}</td>}
@@ -1277,8 +1362,9 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                );
+              })
+            )}
             </tbody>
           </table>
         </div>
