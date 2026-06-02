@@ -551,6 +551,19 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
         </div>
 
         {/* Payslip Print Sheet */}
+        {record.baseSalary !== employee.salary && (
+          <div className="mx-8 mt-6 -mb-2 p-4 bg-amber-50 border border-amber-250 text-amber-800 rounded-xl flex items-start gap-2.5 text-xs font-semibold print:hidden shadow-sm">
+            <svg className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <p className="font-bold text-sm text-amber-900">{t('payroll.salaryMismatchAlert')}</p>
+              <p className="text-xs text-amber-700 mt-1 font-medium">
+                {t('payroll.appliedSalary')}: <span className="font-bold text-slate-800">{formatCurrency(record.baseSalary)}</span> | {t('payroll.profileSalary')}: <span className="font-bold text-slate-800">{formatCurrency(employee.salary)}</span>
+              </p>
+            </div>
+          </div>
+        )}
         <div id="payslip-print-area" className="p-8 bg-white print:p-0 print:w-full print:text-black">
           
           {/* Header Block */}
@@ -688,7 +701,16 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                 </thead>
                 <tbody className="divide-y divide-slate-200 print:divide-black">
                   <tr>
-                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">{t('payroll.baseSalarySubject')}</td>
+                    <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">
+                      <div className="flex flex-col">
+                        <span>{t('payroll.baseSalarySubject')}</span>
+                        {!isEditing && record.baseSalary !== employee.salary && (
+                          <span className="text-[10px] text-amber-600 font-normal print:hidden">
+                            ({t('payroll.profileSalary')}: {formatCurrency(employee.salary)})
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="border border-slate-300 p-2.5 text-right font-semibold print:border-black">
                       {isEditing ? (
                         <input 
@@ -698,7 +720,14 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                           className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
                         />
                       ) : (
-                        formatCurrency(record.baseSalary)
+                        <div className="flex flex-col items-end">
+                          <span>{formatCurrency(record.baseSalary)}</span>
+                          {record.baseSalary !== employee.salary && (
+                            <span className="text-[10px] text-amber-650 font-bold block mt-0.5 print:hidden">
+                              ⚠️
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -1947,7 +1976,15 @@ export default function PayrollClient({
 
                       {visibleColumns.baseSalary && (
                         <td className="px-4 py-3.5 text-sm text-right text-slate-650 font-mono whitespace-nowrap">
-                          {formatCurrency(record.baseSalary)}
+                          <div className="inline-flex flex-col items-end justify-center">
+                            <span className="font-semibold">{formatCurrency(record.baseSalary)}</span>
+                            {emp && record.baseSalary !== emp.salary && (
+                              <span className="text-[10px] text-amber-605 font-sans font-bold mt-0.5 flex items-center gap-0.5" title={`${t('payroll.profileSalary')}: ${formatCurrency(emp.salary)}`}>
+                                <span className="text-amber-500">⚠️</span>
+                                <span>({formatCurrency(emp.salary)})</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
                       )}
 
@@ -2118,7 +2155,14 @@ export default function PayrollClient({
                     {visibleColumns.baseSalary && (
                       <div>
                         <span className="text-slate-400 font-bold block mb-0.5">基本給 (Lương cơ bản)</span>
-                        <span className="font-semibold text-slate-800 font-mono">{formatCurrency(record.baseSalary)}</span>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-800 font-mono">{formatCurrency(record.baseSalary)}</span>
+                          {emp && record.baseSalary !== emp.salary && (
+                            <span className="text-[10px] text-amber-655 font-sans font-bold flex items-center gap-0.5 mt-0.5" title={`${t('payroll.profileSalary')}: ${formatCurrency(emp.salary)}`}>
+                              ⚠️ {t('payroll.profileSalary')}: {formatCurrency(emp.salary)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
                     {visibleColumns.overtimePay && (

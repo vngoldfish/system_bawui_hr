@@ -101,7 +101,10 @@ export const financeTranslations = {
             residentTaxSubject: '住民税',
             totalDeductions: '控除合計額',
             printBtn: '印刷',
-            pdfDownloadBtn: 'PDFダウンロード'
+            pdfDownloadBtn: 'PDFダウンロード',
+            appliedSalary: '今月の適用給与',
+            profileSalary: '現在の登録給与',
+            salaryMismatchAlert: '今月の基本給が現在の登録給与と異なります'
         },
         salaryTable: {
             title: '給与テーブル管理',
@@ -398,7 +401,10 @@ export const financeTranslations = {
             residentTaxSubject: 'Resident Tax',
             totalDeductions: 'Total Deductions',
             printBtn: 'Print',
-            pdfDownloadBtn: 'Download PDF'
+            pdfDownloadBtn: 'Download PDF',
+            appliedSalary: 'Applied Base Salary',
+            profileSalary: 'Profile Salary',
+            salaryMismatchAlert: 'This month\'s base salary differs from the current profile salary'
         },
         salaryTable: {
             title: 'Salary Table Settings',
@@ -695,7 +701,10 @@ export const financeTranslations = {
             residentTaxSubject: 'Thuế thị dân',
             totalDeductions: 'Tổng khấu trừ',
             printBtn: 'In phiếu',
-            pdfDownloadBtn: 'Tải PDF'
+            pdfDownloadBtn: 'Tải PDF',
+            appliedSalary: 'Lương áp dụng tháng này',
+            profileSalary: 'Lương hồ sơ hiện tại',
+            salaryMismatchAlert: 'Mức lương cơ bản tháng này khác với hồ sơ hiện tại'
         },
         salaryTable: {
             title: 'Thiết lập bảng lương',
@@ -987,7 +996,10 @@ export const financeTranslations = {
             residentTaxSubject: '居民税',
             totalDeductions: '扣款总额',
             printBtn: '打印',
-            pdfDownloadBtn: '下载 PDF'
+            pdfDownloadBtn: '下载 PDF',
+            appliedSalary: '本月适用工资',
+            profileSalary: '当前档案工资',
+            salaryMismatchAlert: '本月基本工资与当前档案工资不一致'
         },
         salaryTable: {
             title: '工资标准表设置',
@@ -1279,7 +1291,10 @@ export const financeTranslations = {
             residentTaxSubject: 'ภาษีบำรุงท้องถิ่น',
             totalDeductions: 'รวมเงินหักทั้งหมด',
             printBtn: 'สั่งพิมพ์',
-            pdfDownloadBtn: 'ดาวน์โหลด PDF'
+            pdfDownloadBtn: 'ดาวน์โหลด PDF',
+            appliedSalary: 'เงินเดือนพื้นฐานที่ใช้เดือนนี้',
+            profileSalary: 'เงินเดือนในประวัติพนักงาน',
+            salaryMismatchAlert: 'เงินเดือนพื้นฐานเดือนนี้ต่างจากเงินเดือนปัจจุบันในข้อมูลพนักงาน'
         },
         salaryTable: {
             title: 'การจัดการตารางเงินเดือน',
