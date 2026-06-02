@@ -92,33 +92,6 @@ export default async function PayrollPage() {
     const records = await Promise.all(dbRecords.map(async (r) => {
       const allowances = r.bonus;
       const totalGross = r.baseSalary + r.overtimePay + allowances;
-      
-      const isLegacyInsurance = r.insurance > 0 && r.healthInsuranceEmployee === 0 && r.pensionEmployee === 0 && r.employmentInsuranceEmployee === 0;
-      const isLegacyTax = r.tax > 0 && r.incomeTax === 0 && r.residentTax === 0;
-
-      const healthInsurance = !isLegacyInsurance
-        ? (r.healthInsuranceEmployee + (r.nursingCareInsurance || 0))
-        : Math.round(r.insurance * 5 / 14.3);
-
-      const pension = !isLegacyInsurance
-        ? r.pensionEmployee
-        : Math.round(r.insurance * 9 / 14.3);
-
-      const employmentInsurance = !isLegacyInsurance
-        ? r.employmentInsuranceEmployee
-        : Math.round(r.insurance * 0.3 / 14.3);
-
-      const workersComp = 0;
-      
-      const incomeTax = !isLegacyTax
-        ? r.incomeTax
-        : Math.round(r.tax * 2 / 6);
-
-      const residentTax = !isLegacyTax
-        ? r.residentTax
-        : Math.max(0, r.tax - incomeTax);
-
-      const totalDeductions = r.deductions + healthInsurance + pension + employmentInsurance + incomeTax + residentTax;
 
       // Query attendance records for the working month (previous month) to get real days/hours
       const [year, monthVal] = r.month.split('-').map(Number);
@@ -140,6 +113,58 @@ export default async function PayrollPage() {
       const overtimeHours = r.overtimeHours !== null && r.overtimeHours !== undefined ? r.overtimeHours : (attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0) || 0);
       const workHours = r.workHours !== null && r.workHours !== undefined ? r.workHours : (workDays * 8);
 
+      let healthInsuranceCompany = r.healthInsuranceCompany;
+      let pensionCompany = r.pensionCompany;
+      let employmentInsuranceCompany = r.employmentInsuranceCompany;
+      let workersCompCompany = r.workersCompCompany;
+      let healthInsuranceEmployee = r.healthInsuranceEmployee;
+      let pensionEmployee = r.pensionEmployee;
+      let employmentInsuranceEmployee = r.employmentInsuranceEmployee;
+      let residentTax = r.residentTax;
+      let incomeTax = r.incomeTax;
+      let nursingCareInsurance = r.nursingCareInsurance;
+      let totalCompanyCost = r.totalCompanyCost;
+
+      if (!totalCompanyCost || totalCompanyCost === 0) {
+        const details = calculatePayrollDetails({
+          baseSalary: r.baseSalary,
+          salaryType: dbUser.salaryType || '月給',
+          workDays,
+          hourlyRate: dbUser.hourlyRate || 0,
+          dailyRate: dbUser.dailyRate || 0,
+          overtimeHours,
+          benefits: mergeBenefits(dbUser.benefits),
+          birthDate: dbUser.birthDate ? dbUser.birthDate.toISOString() : null,
+          month: r.month,
+          dependentsCount: dbUser.dependents ? dbUser.dependents.length : 0,
+          dependents: dbUser.dependents ? dbUser.dependents.map(d => ({
+            id: d.id,
+            name: d.name,
+            relationship: d.relationship,
+            birthDate: d.birthDate ? d.birthDate.toISOString() : null,
+            gender: d.gender,
+            cohabitation: d.cohabitation,
+          })) : [],
+          companyRate: company?.healthInsuranceRate,
+          customAllowances: allowances,
+        });
+
+        healthInsuranceCompany = details.healthInsuranceCompany;
+        pensionCompany = details.pensionCompany;
+        employmentInsuranceCompany = details.employmentInsuranceCompany;
+        workersCompCompany = details.workersCompCompany;
+        healthInsuranceEmployee = details.healthInsuranceEmployee;
+        pensionEmployee = details.pensionEmployee;
+        employmentInsuranceEmployee = details.employmentInsuranceEmployee;
+        residentTax = details.residentTax;
+        incomeTax = details.incomeTax;
+        nursingCareInsurance = details.nursingCareInsurance;
+        totalCompanyCost = details.totalCompanyCost;
+      }
+
+      const healthInsurance = healthInsuranceEmployee + (nursingCareInsurance || 0);
+      const totalDeductions = r.deductions + healthInsurance + pensionEmployee + employmentInsuranceEmployee + incomeTax + residentTax;
+
       return {
         id: r.id,
         employeeId: r.employeeId,
@@ -148,9 +173,9 @@ export default async function PayrollPage() {
         overtimePay: r.overtimePay,
         allowances,
         healthInsurance,
-        pension,
-        employmentInsurance,
-        workersComp,
+        pension: pensionEmployee,
+        employmentInsurance: employmentInsuranceEmployee,
+        workersComp: workersCompCompany,
         incomeTax,
         residentTax,
         totalGross,
@@ -163,15 +188,15 @@ export default async function PayrollPage() {
         absentDays,
         status: r.status,
         paymentDate: r.paymentDate ? r.paymentDate.toISOString() : undefined,
-        healthInsuranceCompany: r.healthInsuranceCompany,
-        pensionCompany: r.pensionCompany,
-        employmentInsuranceCompany: r.employmentInsuranceCompany,
-        workersCompCompany: r.workersCompCompany,
-        healthInsuranceEmployee: r.healthInsuranceEmployee,
-        pensionEmployee: r.pensionEmployee,
-        employmentInsuranceEmployee: r.employmentInsuranceEmployee,
-        nursingCareInsurance: r.nursingCareInsurance,
-        totalCompanyCost: r.totalCompanyCost,
+        healthInsuranceCompany,
+        pensionCompany,
+        employmentInsuranceCompany,
+        workersCompCompany,
+        healthInsuranceEmployee,
+        pensionEmployee,
+        employmentInsuranceEmployee,
+        nursingCareInsurance,
+        totalCompanyCost,
       };
     }));
 
@@ -269,33 +294,6 @@ export default async function PayrollPage() {
       const allowances = r.bonus;
       const totalGross = r.baseSalary + r.overtimePay + allowances;
       
-      const isLegacyInsurance = r.insurance > 0 && r.healthInsuranceEmployee === 0 && r.pensionEmployee === 0 && r.employmentInsuranceEmployee === 0;
-      const isLegacyTax = r.tax > 0 && r.incomeTax === 0 && r.residentTax === 0;
-
-      const healthInsurance = !isLegacyInsurance
-        ? (r.healthInsuranceEmployee + (r.nursingCareInsurance || 0))
-        : Math.round(r.insurance * 5 / 14.3);
-
-      const pension = !isLegacyInsurance
-        ? r.pensionEmployee
-        : Math.round(r.insurance * 9 / 14.3);
-
-      const employmentInsurance = !isLegacyInsurance
-        ? r.employmentInsuranceEmployee
-        : Math.round(r.insurance * 0.3 / 14.3);
-
-      const workersComp = 0;
-      
-      const incomeTax = !isLegacyTax
-        ? r.incomeTax
-        : Math.round(r.tax * 2 / 6);
-
-      const residentTax = !isLegacyTax
-        ? r.residentTax
-        : Math.max(0, r.tax - incomeTax);
-
-      const totalDeductions = r.deductions + healthInsurance + pension + employmentInsurance + incomeTax + residentTax;
-
       const emp = dbEmployees.find(e => e.id === r.employeeId);
 
       // Query attendance records for the working month (previous month) to get real days/hours
@@ -318,6 +316,58 @@ export default async function PayrollPage() {
       const overtimeHours = r.overtimeHours !== null && r.overtimeHours !== undefined ? r.overtimeHours : (attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0) || 0);
       const workHours = r.workHours !== null && r.workHours !== undefined ? r.workHours : (workDays * 8);
 
+      let healthInsuranceCompany = r.healthInsuranceCompany;
+      let pensionCompany = r.pensionCompany;
+      let employmentInsuranceCompany = r.employmentInsuranceCompany;
+      let workersCompCompany = r.workersCompCompany;
+      let healthInsuranceEmployee = r.healthInsuranceEmployee;
+      let pensionEmployee = r.pensionEmployee;
+      let employmentInsuranceEmployee = r.employmentInsuranceEmployee;
+      let residentTax = r.residentTax;
+      let incomeTax = r.incomeTax;
+      let nursingCareInsurance = r.nursingCareInsurance;
+      let totalCompanyCost = r.totalCompanyCost;
+
+      if (emp && (!totalCompanyCost || totalCompanyCost === 0)) {
+        const details = calculatePayrollDetails({
+          baseSalary: r.baseSalary,
+          salaryType: emp.salaryType || '月給',
+          workDays,
+          hourlyRate: emp.hourlyRate || 0,
+          dailyRate: emp.dailyRate || 0,
+          overtimeHours,
+          benefits: mergeBenefits(emp.benefits),
+          birthDate: emp.birthDate ? emp.birthDate.toISOString() : null,
+          month: r.month,
+          dependentsCount: emp.dependents ? emp.dependents.length : 0,
+          dependents: emp.dependents ? emp.dependents.map(d => ({
+            id: d.id,
+            name: d.name,
+            relationship: d.relationship,
+            birthDate: d.birthDate ? d.birthDate.toISOString() : null,
+            gender: d.gender,
+            cohabitation: d.cohabitation,
+          })) : [],
+          companyRate: company?.healthInsuranceRate,
+          customAllowances: allowances,
+        });
+
+        healthInsuranceCompany = details.healthInsuranceCompany;
+        pensionCompany = details.pensionCompany;
+        employmentInsuranceCompany = details.employmentInsuranceCompany;
+        workersCompCompany = details.workersCompCompany;
+        healthInsuranceEmployee = details.healthInsuranceEmployee;
+        pensionEmployee = details.pensionEmployee;
+        employmentInsuranceEmployee = details.employmentInsuranceEmployee;
+        residentTax = details.residentTax;
+        incomeTax = details.incomeTax;
+        nursingCareInsurance = details.nursingCareInsurance;
+        totalCompanyCost = details.totalCompanyCost;
+      }
+
+      const healthInsurance = healthInsuranceEmployee + (nursingCareInsurance || 0);
+      const totalDeductions = r.deductions + healthInsurance + pensionEmployee + employmentInsuranceEmployee + incomeTax + residentTax;
+
       return {
         id: r.id,
         employeeId: r.employeeId,
@@ -326,9 +376,9 @@ export default async function PayrollPage() {
         overtimePay: r.overtimePay,
         allowances,
         healthInsurance,
-        pension,
-        employmentInsurance,
-        workersComp,
+        pension: pensionEmployee,
+        employmentInsurance: employmentInsuranceEmployee,
+        workersComp: workersCompCompany,
         incomeTax,
         residentTax,
         totalGross,
@@ -341,15 +391,15 @@ export default async function PayrollPage() {
         absentDays,
         status: r.status,
         paymentDate: r.paymentDate ? r.paymentDate.toISOString() : undefined,
-        healthInsuranceCompany: r.healthInsuranceCompany,
-        pensionCompany: r.pensionCompany,
-        employmentInsuranceCompany: r.employmentInsuranceCompany,
-        workersCompCompany: r.workersCompCompany,
-        healthInsuranceEmployee: r.healthInsuranceEmployee,
-        pensionEmployee: r.pensionEmployee,
-        employmentInsuranceEmployee: r.employmentInsuranceEmployee,
-        nursingCareInsurance: r.nursingCareInsurance,
-        totalCompanyCost: r.totalCompanyCost,
+        healthInsuranceCompany,
+        pensionCompany,
+        employmentInsuranceCompany,
+        workersCompCompany,
+        healthInsuranceEmployee,
+        pensionEmployee,
+        employmentInsuranceEmployee,
+        nursingCareInsurance,
+        totalCompanyCost,
       };
     }));
 
