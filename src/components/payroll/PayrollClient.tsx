@@ -664,7 +664,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                           className="w-20 px-1 py-0.5 text-center border border-slate-300 rounded bg-white text-orange-655 font-bold"
                         />
                       ) : (
-                        `${record.overtimeHours} ${t('payroll.hoursUnit')}`
+                        `${Math.round((record.overtimeHours || 0) * 10) / 10} ${t('payroll.hoursUnit')}`
                       )}
                     </td>
                   </tr>
@@ -1336,9 +1336,10 @@ export default function PayrollClient({
             : 0;
 
           // Compute actual overtime hours
-          const overtimeHours = empAttendance.length > 0
+          const rawOvertimeHours = empAttendance.length > 0
             ? empAttendance.reduce((sum: number, a: any) => sum + (a.overtimeHours || 0), 0)
             : 0;
+          const overtimeHours = Math.round(rawOvertimeHours * 10) / 10;
 
           const payrollDetails = calculatePayrollDetails({
             baseSalary: emp.salary || 0,
@@ -1463,7 +1464,7 @@ export default function PayrollClient({
     const totalGross = monthRecords.reduce((s, r) => s + r.totalGross, 0);
     const totalDeductions = monthRecords.reduce((s, r) => s + r.totalDeductions, 0);
     const totalNet = monthRecords.reduce((s, r) => s + r.netSalary, 0);
-    const totalOT = monthRecords.reduce((s, r) => s + r.overtimeHours, 0);
+    const totalOT = Math.round(monthRecords.reduce((s, r) => s + r.overtimeHours, 0) * 10) / 10;
     const totalOTPay = monthRecords.reduce((s, r) => s + r.overtimePay, 0);
     const byType = { '月給': 0, '日給': 0, '時給': 0 };
     monthRecords.forEach(r => { byType[r.salaryType as keyof typeof byType] = (byType[r.salaryType as keyof typeof byType] || 0) + 1; });
@@ -2123,7 +2124,7 @@ export default function PayrollClient({
                     {visibleColumns.overtimePay && (
                       <div>
                         <span className="text-slate-400 font-bold block mb-0.5">残業手当 (Tăng ca)</span>
-                        <span className="font-semibold text-slate-850 font-mono">{formatCurrency(record.overtimePay)} ({record.overtimeHours}h)</span>
+                        <span className="font-semibold text-slate-850 font-mono">{formatCurrency(record.overtimePay)} ({Math.round((record.overtimeHours || 0) * 10) / 10}h)</span>
                       </div>
                     )}
                     {visibleColumns.allowances && (
