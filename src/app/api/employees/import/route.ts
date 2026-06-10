@@ -7,6 +7,13 @@ import { getSessionUser } from '@/lib/session';
 import { hashPassword } from '@/lib/crypto';
 import { Prisma } from '@prisma/client';
 
+function getCleanValue(val: any): string | null {
+  if (val === undefined || val === null) return null;
+  const s = String(val).trim();
+  if (s === '' || s === '-' || s === 'undefined' || s === 'null') return null;
+  return s;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 1. Authorize: Only SUPER_ADMIN and HR_MANAGER are allowed
@@ -91,21 +98,17 @@ export async function POST(request: NextRequest) {
       }
 
       // Check required name fields
-      const lastName = emp.lastName?.trim();
-      const firstName = emp.firstName?.trim();
+      const lastName = getCleanValue(emp.lastName);
+      const firstName = getCleanValue(emp.firstName);
 
-      const rowDetails: string[] = [];
-
-      if (!lastName) rowDetails.push('姓は必須です (Last name is required)');
-      if (!firstName) rowDetails.push('名は必須です (First name is required)');
-
-      if (rowDetails.length > 0) {
-        errors.push(`行 ${rowNum}: ${rowDetails.join(', ')}`);
+      if (!lastName || !firstName) {
+        if (!lastName) errors.push(`行 ${rowNum}: 姓は必須です (Last name is required)`);
+        if (!firstName) errors.push(`行 ${rowNum}: 名は必須です (First name is required)`);
         continue;
       }
 
       // Resolve employeeCode first to use in email generation
-      let employeeCode = emp.employeeCode?.trim();
+      let employeeCode = getCleanValue(emp.employeeCode);
       if (employeeCode) {
         const lowerCode = employeeCode.toLowerCase();
         if (dbCodes.has(lowerCode) || importedCodes.has(lowerCode)) {
@@ -119,11 +122,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Default values for optional fields
-      const lastNameKana = emp.lastNameKana?.trim() || "-";
-      const firstNameKana = emp.firstNameKana?.trim() || "-";
-      const phone = emp.phone?.trim() || "000-0000-0000";
+      const lastNameKana = getCleanValue(emp.lastNameKana) || "-";
+      const firstNameKana = getCleanValue(emp.firstNameKana) || "-";
+      const phone = getCleanValue(emp.phone) || "000-0000-0000";
       
-      let email = emp.email?.trim().toLowerCase();
+      let email = getCleanValue(emp.email)?.toLowerCase();
       if (!email) {
         // Safe auto-generated email: e.g. nguyenvantuan.nv001@company.com
         const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -142,23 +145,25 @@ export async function POST(request: NextRequest) {
       }
       importedEmails.add(email);
 
-      const rawHireDateStr = emp.hireDate?.trim() || new Date().toISOString().split('T')[0];
+      const rawHireDateStr = getCleanValue(emp.hireDate) || new Date().toISOString().split('T')[0];
       if (isNaN(Date.parse(rawHireDateStr))) {
         errors.push(`行 ${rowNum}: 入社日「${rawHireDateStr}」の形式が不正です (Invalid hire date format)`);
         continue;
       }
       const hireDate = new Date(rawHireDateStr);
 
-      const salary = emp.salary !== undefined ? Number(emp.salary) : 280000;
+      const salaryVal = getCleanValue(emp.salary);
+      const salary = salaryVal !== null ? Number(salaryVal) : 280000;
       if (isNaN(salary) || salary < 0) {
         errors.push(`行 ${rowNum}: 給与は0以上である必要があります (Salary must be >= 0)`);
         continue;
       }
 
       // Resolve departmentId (ID-based, name-based lookup, or fallback to first department)
-      let departmentId = emp.departmentId?.trim();
-      if (!departmentId && emp.department?.trim()) {
-        departmentId = deptMap.get(emp.department.trim().toLowerCase());
+      let departmentId = getCleanValue(emp.departmentId);
+      const deptNameClean = getCleanValue(emp.department);
+      if (!departmentId && deptNameClean) {
+        departmentId = deptMap.get(deptNameClean.toLowerCase()) || null;
       }
       if (!departmentId) {
         if (departments.length > 0) {
@@ -173,9 +178,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Resolve positionId (ID-based, name-based lookup, or fallback to first position)
-      let positionId = emp.positionId?.trim();
-      if (!positionId && emp.position?.trim()) {
-        positionId = posMap.get(emp.position.trim().toLowerCase());
+      let positionId = getCleanValue(emp.positionId);
+      const posNameClean = getCleanValue(emp.position);
+      if (!positionId && posNameClean) {
+        positionId = posMap.get(posNameClean.toLowerCase()) || null;
       }
       if (!positionId) {
         if (positions.length > 0) {
@@ -190,9 +196,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Resolve contractTypeId (ID-based, name-based lookup, or fallback to first contract type)
-      let contractTypeId = emp.contractTypeId?.trim();
-      if (!contractTypeId && emp.contractType?.trim()) {
-        contractTypeId = ctMap.get(emp.contractType.trim().toLowerCase());
+      let contractTypeId = getCleanValue(emp.contractTypeId);
+      const ctNameClean = getCleanValue(emp.contractType);
+      if (!contractTypeId && ctNameClean) {
+        contractTypeId = ctMap.get(ctNameClean.toLowerCase()) || null;
       }
       if (!contractTypeId) {
         if (contractTypes.length > 0) {
@@ -207,35 +214,35 @@ export async function POST(request: NextRequest) {
       }
 
       // Parse other optional dates
-      const birthDateStr = emp.birthDate?.trim();
+      const birthDateStr = getCleanValue(emp.birthDate);
       if (birthDateStr && isNaN(Date.parse(birthDateStr))) {
         errors.push(`行 ${rowNum}: 生年月日「${birthDateStr}」の形式が不正です (Invalid birth date format)`);
         continue;
       }
       const birthDate = birthDateStr ? new Date(birthDateStr) : null;
 
-      const residenceExpiryStr = emp.residenceExpiry?.trim();
+      const residenceExpiryStr = getCleanValue(emp.residenceExpiry);
       if (residenceExpiryStr && isNaN(Date.parse(residenceExpiryStr))) {
         errors.push(`行 ${rowNum}: 在留期限「${residenceExpiryStr}」の形式が不正です (Invalid residence expiry format)`);
         continue;
       }
       const residenceExpiry = residenceExpiryStr ? new Date(residenceExpiryStr) : null;
 
-      const residenceCardIssueDateStr = emp.residenceCardIssueDate?.trim();
+      const residenceCardIssueDateStr = getCleanValue(emp.residenceCardIssueDate);
       if (residenceCardIssueDateStr && isNaN(Date.parse(residenceCardIssueDateStr))) {
         errors.push(`行 ${rowNum}: 在留カード交付日「${residenceCardIssueDateStr}」の形式が不正です (Invalid residence card issue date format)`);
         continue;
       }
       const residenceCardIssueDate = residenceCardIssueDateStr ? new Date(residenceCardIssueDateStr) : null;
 
-      const contractStartDateStr = emp.contractStartDate?.trim();
+      const contractStartDateStr = getCleanValue(emp.contractStartDate);
       if (contractStartDateStr && isNaN(Date.parse(contractStartDateStr))) {
         errors.push(`行 ${rowNum}: 契約開始日「${contractStartDateStr}」の形式が不正です (Invalid contract start date format)`);
         continue;
       }
       const contractStartDate = contractStartDateStr ? new Date(contractStartDateStr) : hireDate;
 
-      const contractEndDateStr = emp.contractEndDate?.trim();
+      const contractEndDateStr = getCleanValue(emp.contractEndDate);
       if (contractEndDateStr && isNaN(Date.parse(contractEndDateStr))) {
         errors.push(`行 ${rowNum}: 契約終了日「${contractEndDateStr}」の形式が不正です (Invalid contract end date format)`);
         continue;
@@ -262,27 +269,27 @@ export async function POST(request: NextRequest) {
         contractTypeId,
         hireDate,
         salary,
-        salaryType: emp.salaryType || '月給',
-        status: emp.status || 'ACTIVE',
-        nationality: emp.nationality || '日本',
-        residenceStatus: emp.residenceStatus || null,
-        residenceCardNumber: emp.residenceCardNumber || null,
+        salaryType: getCleanValue(emp.salaryType) || '月給',
+        status: getCleanValue(emp.status) || 'ACTIVE',
+        nationality: getCleanValue(emp.nationality) || '日本',
+        residenceStatus: getCleanValue(emp.residenceStatus),
+        residenceCardNumber: getCleanValue(emp.residenceCardNumber),
         residenceCardIssueDate,
         residenceExpiry,
-        role: emp.role || 'EMPLOYEE',
+        role: getCleanValue(emp.role) || 'EMPLOYEE',
         password: hashedPassword,
-        address: emp.address || '',
-        avatar: emp.avatar || '',
-        language: emp.language || 'ja',
-        workRestriction: emp.workRestriction || null,
-        residenceCardImage: emp.residenceCardImage || null,
+        address: getCleanValue(emp.address) || '',
+        avatar: getCleanValue(emp.avatar) || '',
+        language: getCleanValue(emp.language) || 'ja',
+        workRestriction: getCleanValue(emp.workRestriction),
+        residenceCardImage: getCleanValue(emp.residenceCardImage),
         contractStartDate,
         contractEndDate,
-        contractEndDateType: emp.contractEndDateType || 'none',
-        hourlyRate: emp.hourlyRate !== undefined ? Number(emp.hourlyRate) : 0,
-        dailyRate: emp.dailyRate !== undefined ? Number(emp.dailyRate) : 0,
-        baseSalaryAtHire: emp.baseSalaryAtHire !== undefined ? Number(emp.baseSalaryAtHire) : salary,
-        insuranceSalary: emp.insuranceSalary !== undefined ? Number(emp.insuranceSalary) : null,
+        contractEndDateType: getCleanValue(emp.contractEndDateType) || 'none',
+        hourlyRate: emp.hourlyRate !== undefined && getCleanValue(emp.hourlyRate) !== null ? Number(emp.hourlyRate) : 0,
+        dailyRate: emp.dailyRate !== undefined && getCleanValue(emp.dailyRate) !== null ? Number(emp.dailyRate) : 0,
+        baseSalaryAtHire: emp.baseSalaryAtHire !== undefined && getCleanValue(emp.baseSalaryAtHire) !== null ? Number(emp.baseSalaryAtHire) : salary,
+        insuranceSalary: emp.insuranceSalary !== undefined && getCleanValue(emp.insuranceSalary) !== null ? Number(emp.insuranceSalary) : null,
         benefits: emp.benefits || {
           healthInsurance: true,
           pension: true,
