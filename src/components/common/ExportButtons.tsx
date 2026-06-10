@@ -5,7 +5,7 @@ import { useI18n } from '@/lib/i18n';
 
 interface ExportButtonsProps {
   data: Record<string, unknown>[];
-  columns: { header: string; key: string }[];
+  columns: { header: string; key: string; show?: boolean }[];
   fileName: string;
   tableRef?: RefObject<HTMLTableElement | null>;
   rowsPerPage?: number;
@@ -16,6 +16,8 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
   const [showModal, setShowModal] = useState(false);
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [pageCount, setPageCount] = useState(0);
+
+  const activeCols = columns.filter(c => c.show !== false);
 
   const getRowsPerPage = () => rowsPerPageProp ?? 10;
   const getTotalPages = () => Math.max(1, Math.ceil(data.length / getRowsPerPage()));
@@ -42,7 +44,7 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
   const exportToExcel = async () => {
     const XLSX = await import('xlsx');
     const rows = data.map(row =>
-      columns.reduce((acc, col) => {
+      activeCols.reduce((acc, col) => {
         acc[col.header] = row[col.key] ?? '';
         return acc;
       }, {} as Record<string, unknown>)
@@ -92,9 +94,9 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       }
     }
 
-    const headerHtml = `<tr style="background:#334155;color:white;">${columns.map(c => `<th style="padding:8px 12px;text-align:left;border:1px solid #475569;">${c.header}</th>`).join('')}</tr>`;
+    const headerHtml = `<tr style="background:#334155;color:white;">${activeCols.map(c => `<th style="padding:8px 12px;text-align:left;border:1px solid #475569;">${c.header}</th>`).join('')}</tr>`;
     const rowHtml = (row: Record<string, unknown>, i: number) =>
-      `<tr style="background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'};">${columns.map(c => `<td style="padding:6px 12px;border:1px solid #e2e8f0;">${row[c.key] ?? ''}</td>`).join('')}</tr>`;
+      `<tr style="background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'};">${activeCols.map(c => `<td style="padding:6px 12px;border:1px solid #e2e8f0;">${row[c.key] ?? ''}</td>`).join('')}</tr>`;
 
     const rpp = getRowsPerPage();
     const total = pages.length;
