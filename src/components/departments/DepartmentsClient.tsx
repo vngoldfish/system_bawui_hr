@@ -72,6 +72,7 @@ export default function DepartmentsClient({
 
   const exportData = useMemo(() => {
     return departments.map(d => ({
+      id: d.id,
       name: d.name,
       nameKana: d.nameKana,
       description: d.description || '',
@@ -296,6 +297,7 @@ export default function DepartmentsClient({
           <ExportButtons
             data={exportData}
             columns={[
+              { header: 'ID', key: 'id' },
               { header: t('departments.colName') || 'Name', key: 'name' },
               { header: (t('departments.colName') || 'Name') + ' (Kana)', key: 'nameKana' },
               { header: t('departments.colDesc') || 'Description', key: 'description' },
@@ -358,6 +360,20 @@ export default function DepartmentsClient({
                   {dept.description}
                 </p>
               )}
+              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                <span className="font-mono text-slate-400 truncate select-all">ID: {dept.id}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(dept.id);
+                    alert('Department ID copied!');
+                  }}
+                  className="text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                  title="Copy Department ID"
+                >
+                  📋
+                </button>
+              </div>
             </div>
           );
         })}

@@ -127,64 +127,28 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Resolve departmentId
-      let departmentId = emp.departmentId?.trim();
-      if (departmentId) {
-        if (!deptIdSet.has(departmentId)) {
-          rowDetails.push(`部署ID「${departmentId}」が見つかりません (Department ID not found)`);
-        }
-      } else {
-        const deptName = emp.department?.trim().toLowerCase();
-        if (deptName) {
-          const matchedId = deptMap.get(deptName);
-          if (matchedId) {
-            departmentId = matchedId;
-          } else {
-            rowDetails.push(`部署名「${emp.department}」が見つかりません (Department name not found)`);
-          }
-        } else {
-          rowDetails.push('部署名（department）または部署ID（departmentId）が必要です (Department name or ID is required)');
-        }
+      // Resolve departmentId (strictly ID-based)
+      const departmentId = emp.departmentId?.trim();
+      if (!departmentId) {
+        rowDetails.push('部署ID (departmentId) が必要です (Department ID is required)');
+      } else if (!deptIdSet.has(departmentId)) {
+        rowDetails.push(`部署ID「${departmentId}」が見つかりません (Department ID not found)`);
       }
 
-      // Resolve positionId
-      let positionId = emp.positionId?.trim();
-      if (positionId) {
-        if (!posIdSet.has(positionId)) {
-          rowDetails.push(`役職ID「${positionId}」が見つかりません (Position ID not found)`);
-        }
-      } else {
-        const posName = emp.position?.trim().toLowerCase();
-        if (posName) {
-          const matchedId = posMap.get(posName);
-          if (matchedId) {
-            positionId = matchedId;
-          } else {
-            rowDetails.push(`役職名「${emp.position}」が見つかりません (Position name not found)`);
-          }
-        } else {
-          rowDetails.push('役職名（position）または役職ID（positionId）が必要です (Position name or ID is required)');
-        }
+      // Resolve positionId (strictly ID-based)
+      const positionId = emp.positionId?.trim();
+      if (!positionId) {
+        rowDetails.push('役職ID (positionId) が必要です (Position ID is required)');
+      } else if (!posIdSet.has(positionId)) {
+        rowDetails.push(`役職ID「${positionId}」が見つかりません (Position ID not found)`);
       }
 
-      // Resolve contractTypeId
-      let contractTypeId = emp.contractTypeId?.trim();
-      if (contractTypeId) {
-        if (!ctIdSet.has(contractTypeId)) {
-          rowDetails.push(`雇用形態ID「${contractTypeId}」が見つかりません (Contract Type ID not found)`);
-        }
-      } else {
-        const ctName = emp.contractType?.trim().toLowerCase();
-        if (ctName) {
-          const matchedId = ctMap.get(ctName);
-          if (matchedId) {
-            contractTypeId = matchedId;
-          } else {
-            rowDetails.push(`雇用形態「${emp.contractType}」が見つかりません (Contract Type not found)`);
-          }
-        } else {
-          rowDetails.push('雇用形態（contractType）または雇用形態ID（contractTypeId）が必要です (Contract Type name or ID is required)');
-        }
+      // Resolve contractTypeId (strictly ID-based)
+      const contractTypeId = emp.contractTypeId?.trim();
+      if (!contractTypeId) {
+        rowDetails.push('雇用形態ID (contractTypeId) が必要です (Contract Type ID is required)');
+      } else if (!ctIdSet.has(contractTypeId)) {
+        rowDetails.push(`雇用形態ID「${contractTypeId}」が見つかりません (Contract Type ID not found)`);
       }
 
       // Validate employeeCode

@@ -182,8 +182,25 @@ export default function ManagementModal({
           <div className="space-y-2.5">
             {items.map(item => (
               <div key={item.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200/50 hover:bg-slate-50/80 transition-colors">
-                <div className="min-w-0 pr-4">
-                  <p className="text-sm font-extrabold text-slate-800 tracking-wide">{item.name}</p>
+                <div className="min-w-0 pr-4 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-extrabold text-slate-800 tracking-wide">{item.name}</p>
+                    <span className="text-[9px] font-mono bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-500 flex items-center gap-1">
+                      ID: {item.id}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(item.id);
+                          alert('ID copied to clipboard');
+                        }}
+                        className="hover:text-blue-600 transition-colors font-bold ml-1 cursor-pointer"
+                        title="Copy ID"
+                      >
+                        📋
+                      </button>
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-450 mt-1 font-semibold">{item.nameKana}{item.description ? ` — ${item.description}` : ''}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">

@@ -697,13 +697,14 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
       }
     }
     return {
-      no: true, code: true, name: true, department: true, position: true,
+      no: true, id: true, code: true, name: true, department: true, position: true,
       birthDate: true, nationality: true, visa: true, hireDate: true, card: true, expiry: true,
     };
   });
 
   const allColumns = [
     { key: 'no', label: 'No.' },
+    { key: 'id', label: 'ID' },
     { key: 'code', label: t('client.colCode') },
     { key: 'name', label: t('client.colName') },
     { key: 'department', label: t('client.colDept') },
@@ -735,6 +736,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
     }
     return {
       no: 50,
+      id: 120,
       code: 90,
       name: 155,
       department: 125,
@@ -1182,10 +1184,15 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
             </div>
             <ExportButtons
               data={filtered.map(e => ({
+                id: e.id,
                 code: e.employeeCode || '-',
                 name: `${e.lastName} ${e.firstName}`,
+                departmentId: e.departmentId || '-',
                 department: e.department?.name || '-',
+                positionId: e.positionId || '-',
                 position: e.position?.name || '-',
+                contractTypeId: e.contractTypeId || '-',
+                contractType: e.contractType?.name || '-',
                 birthDate: e.birthDate ? formatDate(e.birthDate) : '-',
                 nationality: e.nationality || '-',
                 visaType: e.nationality && e.nationality !== '\u65e5\u672c' ? e.residenceStatus || '-' : '-',
@@ -1194,10 +1201,15 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                 expiry: e.nationality && e.nationality !== '\u65e5\u672c' && e.residenceExpiry ? formatDate(e.residenceExpiry) : '-',
               }))}
               columns={[
+                { header: 'ID', key: 'id' },
                 { header: t('client.colCode'), key: 'code' },
                 { header: t('client.colName'), key: 'name' },
+                { header: 'Department ID', key: 'departmentId' },
                 { header: t('client.colDept'), key: 'department' },
+                { header: 'Position ID', key: 'positionId' },
                 { header: t('client.colPos'), key: 'position' },
+                { header: 'Contract Type ID', key: 'contractTypeId' },
+                { header: t('form.contractType'), key: 'contractType' },
                 { header: t('client.colBirth'), key: 'birthDate' },
                 { header: t('client.colNation'), key: 'nationality' },
                 { header: t('client.colVisa'), key: 'visaType' },
@@ -1296,6 +1308,24 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                           style={{ position: 'sticky', left: 0 }}
                         >
                           {(currentPage - 1) * PAGE_SIZE + idx + 1}
+                        </td>
+                      )}
+                      {visibleColumns.id && (
+                        <td className="px-4 py-3.5 text-xs font-mono text-slate-650">
+                          <div className="flex items-center justify-between gap-1 min-w-0">
+                            <span className="truncate" title={employee.id}>{employee.id}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(employee.id);
+                                alert('Employee ID copied!');
+                              }}
+                              className="hover:text-blue-600 transition-colors font-bold flex-shrink-0 cursor-pointer"
+                              title="Copy Employee ID"
+                            >
+                              📋
+                            </button>
+                          </div>
                         </td>
                       )}
                       {visibleColumns.code && (

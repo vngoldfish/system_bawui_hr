@@ -47,6 +47,7 @@ export default function ShitensClient({
 
   const exportData = useMemo(() => {
     return shitens.map(s => ({
+      id: s.id,
       name: s.name,
       nameKana: s.nameKana || '',
       address: s.address || '',
@@ -291,6 +292,7 @@ export default function ShitensClient({
           <ExportButtons
             data={exportData}
             columns={[
+              { header: 'ID', key: 'id' },
               { header: t('shitens.labelName') || 'Name', key: 'name' },
               { header: (t('shitens.labelName') || 'Name') + ' (Kana)', key: 'nameKana' },
               { header: t('shitens.labelAddress') || 'Address', key: 'address' },
@@ -372,6 +374,20 @@ export default function ShitensClient({
                   </div>
 
                   <div className="mt-3 space-y-1 ml-7 text-xs text-slate-600">
+                    <div className="flex items-center justify-between text-[10px] bg-slate-100/80 px-2 py-0.5 rounded text-slate-500 font-mono mb-2">
+                      <span className="truncate">ID: {shiten.id}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(shiten.id);
+                          alert('Branch ID copied!');
+                        }}
+                        className="hover:text-indigo-600 transition-colors font-bold ml-1 cursor-pointer"
+                        title="Copy Branch ID"
+                      >
+                        📋
+                      </button>
+                    </div>
                     {shiten.phone && <p>📞 {shiten.phone}</p>}
                     {shiten.address && <p>🏠 {shiten.address}</p>}
                     <p className="mt-2 text-xxs inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">

@@ -27,14 +27,12 @@ export async function POST(request: NextRequest) {
 
     // Fetch meta data for lookup
     const [employees, contractTypes] = await Promise.all([
-      prisma.employee.findMany({ select: { id: true, email: true, employeeCode: true } }),
-      prisma.contractType.findMany({ select: { id: true, name: true } }),
+      prisma.employee.findMany({ select: { id: true } }),
+      prisma.contractType.findMany({ select: { id: true } }),
     ]);
 
-    // Build lookup maps
-    const empByCode = new Map(employees.map(e => [e.employeeCode.toLowerCase().trim(), e.id]));
-    const empByEmail = new Map(employees.map(e => [e.email.toLowerCase().trim(), e.id]));
-    const ctMap = new Map(contractTypes.map(c => [c.name.toLowerCase().trim(), c.id]));
+    const employeeIdSet = new Set(employees.map(e => e.id));
+    const contractTypeIdSet = new Set(contractTypes.map(c => c.id));
 
     const errors: string[] = [];
     const validatedContracts: any[] = [];
@@ -48,9 +46,8 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const employeeCode = contract.employeeCode?.trim();
-      const employeeEmail = contract.employeeEmail?.trim().toLowerCase();
-      const contractTypeName = contract.contractType?.trim().toLowerCase();
+      const employeeId = contract.employeeId?.trim();
+      const contractTypeId = contract.contractTypeId?.trim();
       const name = contract.name?.trim();
       const startDate = contract.startDate?.trim();
       const endDate = contract.endDate?.trim() || null;
@@ -59,26 +56,18 @@ export async function POST(request: NextRequest) {
 
       const rowDetails: string[] = [];
 
-      // Resolve employeeId
-      let employeeId = '';
-      if (employeeCode) {
-        employeeId = empByCode.get(employeeCode.toLowerCase()) || '';
-      } else if (employeeEmail) {
-        employeeId = empByEmail.get(employeeEmail) || '';
-      }
-
+      // Resolve employeeId (strictly ID-based)
       if (!employeeId) {
-        rowDetails.push('Employee not found (must provide valid employeeCode or employeeEmail)');
+        rowDetails.push('employeeId (Employee ID) is required');
+      } else if (!employeeIdSet.has(employeeId)) {
+        rowDetails.push(`Employee ID "${employeeId}" not found`);
       }
 
-      // Resolve contractTypeId
-      let contractTypeId = '';
-      if (contractTypeName) {
-        contractTypeId = ctMap.get(contractTypeName) || '';
-      }
-
+      // Resolve contractTypeId (strictly ID-based)
       if (!contractTypeId) {
-        rowDetails.push(`Contract Type "${contract.contractType}" not found`);
+        rowDetails.push('contractTypeId (Contract Type ID) is required');
+      } else if (!contractTypeIdSet.has(contractTypeId)) {
+        rowDetails.push(`Contract Type ID "${contractTypeId}" not found`);
       }
 
       if (!name) rowDetails.push('Contract Name is required');

@@ -599,22 +599,39 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
               {contractTypes.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
             <ExportButtons
-              data={filtered.map(e => ({
-                name: `${e.lastName} ${e.firstName}`,
-                kana: `${e.lastNameKana} ${e.firstNameKana}`,
-                department: e.department?.name || '',
-                position: e.position?.name || '',
-                status: e.status === 'ACTIVE' ? t('client.statusActive') : e.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive'),
-                contractType: e.contractType?.name || '',
-                contractStart: e.contractStartDate ? formatDate(e.contractStartDate) : '-',
-                contractEnd: e.contractEndDate ? formatDate(e.contractEndDate) : t('contracts.indefiniteLabel'),
-                salary: formatCurrency(e.salary),
-              }))}
+              data={filtered.map(e => {
+                const activeContract = getActiveEmployeeContract(e);
+                return {
+                  contractId: activeContract?.id || '',
+                  employeeId: e.id,
+                  employeeName: `${e.lastName} ${e.firstName}`,
+                  employeeKana: `${e.lastNameKana} ${e.firstNameKana}`,
+                  departmentId: e.departmentId || '',
+                  department: e.department?.name || '',
+                  positionId: e.positionId || '',
+                  position: e.position?.name || '',
+                  status: e.status === 'ACTIVE' ? t('client.statusActive') : e.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive'),
+                  contractTypeId: e.contractTypeId || '',
+                  contractType: e.contractType?.name || '',
+                  contractStart: e.contractStartDate ? formatDate(e.contractStartDate) : '-',
+                  contractEnd: e.contractEndDate ? formatDate(e.contractEndDate) : t('contracts.indefiniteLabel'),
+                  salary: formatCurrency(e.salary),
+                };
+              })}
               columns={[
-                { header: t('client.colName'), key: 'name' }, { header: t('form.lastNameKana'), key: 'kana' },
-                { header: t('client.colDept'), key: 'department' }, { header: t('client.colPos'), key: 'position' },
-                { header: t('common.status'), key: 'status' }, { header: t('form.contractType'), key: 'contractType' },
-                { header: t('form.contractStart'), key: 'contractStart' }, { header: t('form.contractPeriod'), key: 'contractEnd' },
+                { header: 'Contract ID', key: 'contractId' },
+                { header: 'Employee ID', key: 'employeeId' },
+                { header: t('client.colName'), key: 'employeeName' },
+                { header: t('form.lastNameKana'), key: 'employeeKana' },
+                { header: 'Department ID', key: 'departmentId' },
+                { header: t('client.colDept'), key: 'department' },
+                { header: 'Position ID', key: 'positionId' },
+                { header: t('client.colPos'), key: 'position' },
+                { header: t('common.status'), key: 'status' },
+                { header: 'Contract Type ID', key: 'contractTypeId' },
+                { header: t('form.contractType'), key: 'contractType' },
+                { header: t('form.contractStart'), key: 'contractStart' },
+                { header: t('form.contractPeriod'), key: 'contractEnd' },
                 { header: t('form.salaryTitle'), key: 'salary' },
               ]}
               fileName={t('contracts.cardTitle')}
@@ -730,17 +747,56 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                         <div className="min-w-0">
                           <span className="font-bold text-slate-800 block truncate">{emp.lastName} {emp.firstName}</span>
                           <span className="text-[10px] text-slate-400 font-semibold block mt-0.5 truncate">{emp.lastNameKana} {emp.firstNameKana}</span>
+                          <span className="text-[9px] font-mono text-indigo-650 bg-indigo-50/50 px-1 py-0.5 rounded border border-indigo-100/30 w-fit select-all flex items-center gap-1 mt-1 font-semibold">
+                            Emp ID: {emp.id}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(emp.id);
+                                alert('Employee ID copied!');
+                              }}
+                              className="hover:text-blue-600 transition-colors font-bold ml-1 cursor-pointer"
+                              title="Copy Employee ID"
+                            >
+                              📋
+                            </button>
+                          </span>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 w-[130px] min-w-[130px] truncate"><span className="px-2.5 py-0.5 bg-slate-50 border border-slate-200/80 text-slate-700 text-xs rounded-lg font-bold block truncate max-w-full text-center">{emp.department?.name || '-'}</span></td>
+                    <td className="px-5 py-4 w-[130px] min-w-[130px] truncate">
+                      <span className="px-2.5 py-0.5 bg-slate-50 border border-slate-200/80 text-slate-700 text-xs rounded-lg font-bold block truncate max-w-full text-center">{emp.department?.name || '-'}</span>
+                      {emp.department?.id && (
+                        <span className="text-[8px] font-mono text-slate-400 block text-center mt-1 select-all" title={`Dept ID: ${emp.department.id}`}>
+                          ID: {emp.department.id.substring(0, 8)}...
+                        </span>
+                      )}
+                    </td>
                     <td className="px-5 py-4 text-slate-650 font-semibold text-xs w-[110px] min-w-[110px] truncate">{emp.position.name}</td>
                     <td className="px-5 py-4 w-[90px] min-w-[90px]">
                       <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-lg border ${statusColor(emp.status)} block text-center`}>
                         {emp.status === 'ACTIVE' ? t('client.statusActive') : emp.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive')}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-slate-800 text-xs font-extrabold w-[115px] min-w-[115px] truncate">{emp.contractType?.name || '-'}</td>
+                    <td className="px-5 py-4 text-slate-805 text-xs font-extrabold w-[115px] min-w-[115px] truncate flex flex-col justify-center gap-1">
+                      <span>{emp.contractType?.name || '-'}</span>
+                      {emp.contractType?.id && (
+                        <span className="text-[9px] font-mono text-indigo-650 bg-indigo-50/50 px-1 py-0.5 rounded border border-indigo-100/30 w-fit select-all flex items-center gap-1 mt-1 font-normal">
+                          CT ID: {emp.contractType.id}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(emp.contractType.id);
+                              alert('Contract Type ID copied!');
+                            }}
+                            className="hover:text-blue-600 transition-colors font-bold ml-1 cursor-pointer"
+                            title="Copy Contract Type ID"
+                          >
+                            📋
+                          </button>
+                        </span>
+                      )}
+                    </td>
                     <td className="px-5 py-4 text-xs w-[220px] min-w-[220px]">
                       <div className="flex flex-col gap-1.5 min-w-[150px]">
                         <span className="font-black text-slate-750 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 w-fit">
@@ -935,8 +991,8 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
         description="JSON形式 của hợp đồng để tải lên và nhập dữ liệu hàng loạt."
         templateJson={JSON.stringify([
           {
-            "employeeCode": "NV001",
-            "contractType": "正社員",
+            "employeeId": "cui-employee-id-here",
+            "contractTypeId": "cui-contract-type-id-here",
             "name": "鈴木 健二 勤務契約",
             "startDate": "2026-06-01",
             "endDate": "",

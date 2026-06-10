@@ -482,7 +482,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                   <div className="flex gap-2">
                     <select name="departmentId" value={formData.departmentId} onChange={handleChange} className={inputCls + ' flex-1'} required>
                       <option value="">{t('form.deptSelect')}</option>
-                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      {departments.map(d => <option key={d.id} value={d.id}>{d.name} (ID: {d.id})</option>)}
                     </select>
                     <button type="button" onClick={() => setManageDeptOpen(true)} className="px-3 py-2 text-xs bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200 whitespace-nowrap">{t('form.manage')}</button>
                   </div>
@@ -492,7 +492,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                   <div className="flex gap-2">
                     <select name="positionId" value={formData.positionId} onChange={handleChange} className={inputCls + ' flex-1'} required>
                       <option value="">{t('form.posSelect')}</option>
-                      {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {positions.map(p => <option key={p.id} value={p.id}>{p.name} (ID: {p.id})</option>)}
                     </select>
                     <button type="button" onClick={() => setManagePosOpen(true)} className="px-3 py-2 text-xs bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200 whitespace-nowrap">{t('form.manage')}</button>
                   </div>
@@ -530,7 +530,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                             }}
                             className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                           />
-                          <span>{locale === 'ja' ? (s.nameKana ? `${s.name} (${s.nameKana})` : s.name) : s.name}</span>
+                          <span>{locale === 'ja' ? (s.nameKana ? `${s.name} (${s.nameKana})` : s.name) : s.name} <span className="text-[10px] text-slate-400 font-mono">(ID: {s.id})</span></span>
                         </label>
                       );
                     })}
@@ -548,7 +548,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                   <div className="flex gap-2">
                     <select name="contractTypeId" value={formData.contractTypeId} onChange={handleChange} className={inputCls + ' flex-1'} required>
                       <option value="">{t('form.contractTypeSelect')}</option>
-                      {contractTypes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {contractTypes.map(c => <option key={c.id} value={c.id}>{c.name} (ID: {c.id})</option>)}
                     </select>
                     <button type="button" onClick={() => setManageContractOpen(true)} className="px-3 py-2 text-xs bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200 whitespace-nowrap">{t('form.manage')}</button>
                   </div>
