@@ -5,6 +5,7 @@ import Card from '@/components/common/Card';
 import ExportButtons from '@/components/common/ExportButtons';
 import EmployeeFormModal from '@/components/employees/EmployeeFormModal';
 import Portal from '@/components/common/Portal';
+import GenericImportModal from '@/components/common/GenericImportModal';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { generateContractPDF, generateResignationPDF } from '@/lib/documents';
 import type { Employee } from '@/types';
@@ -128,6 +129,7 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [resignTarget, setResignTarget] = useState<Employee | null>(null);
   const [resignReason, setResignReason] = useState('');
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
   const [sortField, setSortField] = useState<string>('createdAt');
@@ -533,9 +535,22 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
         ))}
       </div>
 
-      <Card title={t('contracts.cardTitle')}>
+      <Card 
+        title={t('contracts.cardTitle')}
+        action={
+          <button 
+            onClick={() => setImportModalOpen(true)} 
+            className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
+          >
+            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            JSONインポート (Import JSON)
+          </button>
+        }
+      >
         {/* Search & Export */}
-        <div className="flex flex-col lg:flex-row gap-3 mb-6 bg-slate-50/50 p-4 border border-slate-200/60 rounded-2xl">
+        <div className="flex flex-col xl:flex-row gap-3 mb-6 bg-slate-50/50 p-4 border border-slate-200/60 rounded-2xl">
           <div className="flex flex-col sm:flex-row gap-2.5 flex-1">
             <div className="relative">
               <select
@@ -567,7 +582,7 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
               />
             </div>
           </div>
-          <div className="flex flex-wrap sm:flex-nowrap gap-2.5 items-center">
+          <div className="flex flex-wrap gap-2.5 items-center">
             <select value={columnFilters.department?.[0] || ''} onChange={e => handleColumnFilter('department', e.target.value ? [e.target.value] : [])}
               className="px-3 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs outline-none">
               <option value="">{t('client.allDepts')}</option>
@@ -613,18 +628,18 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200/60">
-          <table className="w-full table-fixed text-sm border-collapse" style={{ minWidth: '1325px' }}>
+          <table className="w-full table-fixed text-sm border-collapse" style={{ minWidth: '1070px' }}>
             <colgroup>
-              <col style={{ width: '50px' }} />
-              <col style={{ width: '180px' }} />
-              <col style={{ width: '130px' }} />
+              <col style={{ width: '45px' }} />
+              <col style={{ width: '140px' }} />
               <col style={{ width: '110px' }} />
+              <col style={{ width: '105px' }} />
+              <col style={{ width: '85px' }} />
+              <col style={{ width: '95px' }} />
+              <col style={{ width: '130px' }} />
+              <col style={{ width: '155px' }} />
               <col style={{ width: '90px' }} />
               <col style={{ width: '115px' }} />
-              <col style={{ width: '220px' }} />
-              <col style={{ width: '190px' }} />
-              <col style={{ width: '100px' }} />
-              <col style={{ width: '140px' }} />
             </colgroup>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-left text-xs text-slate-500 font-extrabold uppercase tracking-wider">
@@ -907,6 +922,29 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
           </div>
         </Portal>
       )}
+
+      <GenericImportModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onSuccess={() => {
+          window.location.reload();
+        }}
+        apiPath="/api/contracts/import"
+        payloadKey="contracts"
+        title="契約情報のインポート (Import Contracts)"
+        description="JSON形式 của hợp đồng để tải lên và nhập dữ liệu hàng loạt."
+        templateJson={JSON.stringify([
+          {
+            "employeeCode": "NV001",
+            "contractType": "正社員",
+            "name": "鈴木 健二 勤務契約",
+            "startDate": "2026-06-01",
+            "endDate": "",
+            "standardHoursPerDay": 8,
+            "notes": "試用期間"
+          }
+        ], null, 2)}
+      />
     </div>
   );
 }

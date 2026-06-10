@@ -8,6 +8,8 @@ import { formatDate } from '@/lib/utils';
 import type { Employee } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import Portal from '@/components/common/Portal';
+import ExportButtons from '@/components/common/ExportButtons';
+
 
 type ExpiryLevel = 'expired' | 'expiring' | 'valid';
 
@@ -187,6 +189,21 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
     return Array.from(set).sort();
   }, [foreignEmployees]);
 
+  const exportData = useMemo(() => {
+    return filteredEmployees.map(emp => {
+      const expiryStatus = emp.residenceExpiry ? getExpiryStatus(emp.residenceExpiry, t) : null;
+      return {
+        code: emp.employeeCode,
+        name: `${emp.lastName} ${emp.firstName}`,
+        nationality: emp.nationality ? getNationalityLabel(emp.nationality, t) : '',
+        visa: emp.residenceStatus ? getVisaStatusLabel(emp.residenceStatus, t) : '',
+        cardNo: emp.residenceCardNumber || '',
+        expiry: emp.residenceExpiry ? formatDate(emp.residenceExpiry) : '',
+        status: expiryStatus ? expiryStatus.label : '',
+      };
+    });
+  }, [filteredEmployees, t]);
+
   const handleUpdate = (emp: Employee) => {
     setEditingEmployee(emp);
     setModalOpen(true);
@@ -277,7 +294,21 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
       </Card>
 
       {/* Table - Spacious, elegant details */}
-      <Card className="overflow-hidden">
+      <Card title={t('residenceCards.title') || 'Residence Cards'} action={
+        <ExportButtons
+          data={exportData}
+          columns={[
+            { header: t('residenceCards.colCode') || 'Code', key: 'code' },
+            { header: t('residenceCards.colName') || 'Name', key: 'name' },
+            { header: t('residenceCards.colNation') || 'Nationality', key: 'nationality' },
+            { header: t('residenceCards.colVisa') || 'Visa Status', key: 'visa' },
+            { header: t('residenceCards.colCardNo') || 'Card Number', key: 'cardNo' },
+            { header: t('residenceCards.colExpiry') || 'Expiry Date', key: 'expiry' },
+            { header: t('residenceCards.colTimeline') || 'Status', key: 'status' },
+          ]}
+          fileName="residence_cards_list"
+        />
+      } className="overflow-hidden">
         {filteredEmployees.length === 0 ? (
           <div className="py-16 text-center text-slate-400 bg-slate-50/20">
             {t('residenceCards.noEmployees')}

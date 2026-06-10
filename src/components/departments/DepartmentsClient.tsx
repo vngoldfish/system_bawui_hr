@@ -5,6 +5,9 @@ import Card from '@/components/common/Card';
 import ManagementModal from '@/components/common/ManagementModal';
 import { formatCurrency } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
+import ExportButtons from '@/components/common/ExportButtons';
+import GenericImportModal from '@/components/common/GenericImportModal';
+
 
 interface Department {
   id: string;
@@ -61,10 +64,21 @@ export default function DepartmentsClient({
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
   const [deptStats, setDeptStats] = useState<DeptStats | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [loadingEmps, setLoadingEmps] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'name' | 'salary' | 'position'>('name');
+
+  const exportData = useMemo(() => {
+    return departments.map(d => ({
+      name: d.name,
+      nameKana: d.nameKana,
+      description: d.description || '',
+      employeesCount: d._count?.employees || 0,
+    }));
+  }, [departments]);
+
 
   const fetchDepartments = async () => {
     try {
@@ -278,12 +292,30 @@ export default function DepartmentsClient({
             {t('departments.activeStaff').replace('{depts}', String(departments.length)).replace('{staff}', String(totalEmployees))}
           </p>
         </div>
-        <button
-          onClick={() => setManageOpen(true)}
-          className="px-4.5 py-2.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-sm self-start sm:self-center cursor-pointer hover:shadow-md"
-        >
-          {t('departments.manageBtn')}
-        </button>
+        <div className="flex flex-wrap gap-2 items-center self-start sm:self-center">
+          <ExportButtons
+            data={exportData}
+            columns={[
+              { header: t('departments.colName') || 'Name', key: 'name' },
+              { header: (t('departments.colName') || 'Name') + ' (Kana)', key: 'nameKana' },
+              { header: t('departments.colDesc') || 'Description', key: 'description' },
+              { header: t('departments.colEmployeesCount') || 'Employees Count', key: 'employeesCount' },
+            ]}
+            fileName="departments_list"
+          />
+          <button
+            onClick={() => setImportModalOpen(true)}
+            className="px-4.5 py-2.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer hover:shadow-md"
+          >
+            📥 {t('common.import') || 'Import'}
+          </button>
+          <button
+            onClick={() => setManageOpen(true)}
+            className="px-4.5 py-2.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-sm cursor-pointer hover:shadow-md"
+          >
+            {t('departments.manageBtn')}
+          </button>
+        </div>
       </div>
 
       {/* Departments Grid - Redesigned Cards */}
@@ -674,6 +706,28 @@ export default function DepartmentsClient({
         onClose={() => { setManageOpen(false); fetchDepartments(); }}
         title={t('form.dept')}
         apiPath="/api/departments"
+      />
+
+      <GenericImportModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onSuccess={fetchDepartments}
+        apiPath="/api/departments/import"
+        payloadKey="departments"
+        templateJson={JSON.stringify([
+          {
+            name: "開発部",
+            nameKana: "カイハツブ",
+            description: "システム開発と技術研究を行う部門"
+          },
+          {
+            name: "営業部",
+            nameKana: "エイギョウブ",
+            description: "新規顧客開拓および既存顧客対応"
+          }
+        ], null, 2)}
+        title={t('common.importDepartments') || 'Import Departments'}
+        description={t('common.importDepartmentsDesc') || 'Upload a JSON file containing a list of departments to import them all at once.'}
       />
     </div>
   );

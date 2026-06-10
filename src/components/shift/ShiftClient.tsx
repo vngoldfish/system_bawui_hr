@@ -1,8 +1,11 @@
 'use client';
-import { useI18n } from '@/lib/i18n';
 
+import { useI18n } from '@/lib/i18n';
 import { useState, useMemo } from 'react';
+
 import Card from '@/components/common/Card';
+import ExportButtons from '@/components/common/ExportButtons';
+
 
 interface Employee {
   id: string; firstName: string; lastName: string; firstNameKana: string;
@@ -111,6 +114,26 @@ export default function ShiftClient({ employees, isReadOnly = false }: { employe
     const localeCode = localeMap[locale] || 'ja-JP';
     return new Intl.DateTimeFormat(localeCode, { weekday: 'short' }).format(d);
   };
+
+  const exportData = useMemo(() => {
+    return filteredEmployees.map(emp => {
+      const empShifts = shifts.filter(s => s.employeeId === emp.id && s.date.startsWith(currentMonth));
+      const counts = shiftTypes.reduce((acc, st) => {
+        acc[st.key] = empShifts.filter(s => s.type === st.key).length;
+        return acc;
+      }, {} as Record<string, number>);
+      const workDays = empShifts.filter(s => s.type !== 'off').length;
+      return {
+        name: `${emp.lastName} ${emp.firstName}`,
+        day: counts.day || 0,
+        night: counts.night || 0,
+        early: counts.early || 0,
+        late: counts.late || 0,
+        off: counts.off || 0,
+        total: workDays,
+      };
+    });
+  }, [filteredEmployees, shifts, currentMonth, shiftTypes]);
 
   return (
     <>
@@ -225,7 +248,21 @@ export default function ShiftClient({ employees, isReadOnly = false }: { employe
       </Card>
 
       {/* Monthly Summary per Employee */}
-      <Card title={t('shift.summary')}>
+      <Card title={t('shift.summary')} action={
+        <ExportButtons
+          data={exportData}
+          columns={[
+            { header: t('shift.employee') || 'Employee', key: 'name' },
+            { header: t('shift.dayShift') || 'Day Shift', key: 'day' },
+            { header: t('shift.nightShift') || 'Night Shift', key: 'night' },
+            { header: t('shift.earlyShift') || 'Early Shift', key: 'early' },
+            { header: t('shift.lateShift') || 'Late Shift', key: 'late' },
+            { header: t('shift.daysOff') || 'Days Off', key: 'off' },
+            { header: t('shift.totalShifts') || 'Total Work Days', key: 'total' },
+          ]}
+          fileName={`shift_summary_${currentMonth}`}
+        />
+      }>
         <div className="overflow-x-auto">
           <table className="w-full table-fixed border-collapse" style={{ minWidth: '800px' }}>
             <thead>

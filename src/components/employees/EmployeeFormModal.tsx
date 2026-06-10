@@ -786,12 +786,33 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
         onClose={() => { setManageDeptOpen(false); fetchDepartments(); }}
         title={t('form.dept')}
         apiPath="/api/departments"
+        enableImport={true}
+        importPayloadKey="departments"
+        importTemplateJson={JSON.stringify([
+          {
+            "name": "開発部",
+            "nameKana": "カイハツブ",
+            "description": "システム開発と技術研究を行う部門"
+          }
+        ], null, 2)}
       />
       <ManagementModal
         isOpen={managePosOpen}
         onClose={() => { setManagePosOpen(false); fetchPositions(); }}
         title={t('form.pos')}
         apiPath="/api/positions"
+        enableImport={true}
+        importPayloadKey="positions"
+        importTemplateJson={JSON.stringify([
+          {
+            "name": "マネージャー",
+            "description": "部門統括者"
+          },
+          {
+            "name": "一般社員",
+            "description": "担当業務の遂行"
+          }
+        ], null, 2)}
       />
       <ManagementModal
         isOpen={manageContractOpen}

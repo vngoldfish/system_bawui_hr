@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
+import ExportButtons from '@/components/common/ExportButtons';
+
 
 interface Employee {
   id: string;
@@ -143,6 +145,21 @@ export default function EvaluationClient({ employees }: { employees: Employee[] 
   }, [evaluations, selectedPeriod]);
 
   const periods = ['2026-\u4e0a\u671f', '2025-\u4e0b\u671f', '2025-\u4e0a\u671f', '2024-\u4e0b\u671f'];
+
+  const exportData = useMemo(() => {
+    return filtered.map(ev => {
+      const emp = employees.find(e => e.id === ev.employeeId);
+      return {
+        employee: emp ? `${emp.lastName} ${emp.firstName}` : '',
+        department: emp ? getDepartmentLabel(emp.department, t) : '',
+        totalScore: ev.totalScore,
+        grade: ev.grade,
+        comment: ev.comment,
+        evaluatedDate: ev.evaluatedDate,
+        evaluatedBy: ev.evaluatedBy === '管理者' || ev.evaluatedBy === '\u7ba1\u7406\u8005' ? t('evaluation.evaluatedByAdmin') : ev.evaluatedBy,
+      };
+    });
+  }, [filtered, employees, t]);
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -290,7 +307,21 @@ export default function EvaluationClient({ employees }: { employees: Employee[] 
       </Card>
 
       {/* Evaluations Table */}
-      <Card title={t('evaluation.cardList')} className="">
+      <Card title={t('evaluation.cardList')} action={
+        <ExportButtons
+          data={exportData}
+          columns={[
+            { header: t('evaluation.colEmployee') || 'Employee', key: 'employee' },
+            { header: t('evaluation.colDept') || 'Department', key: 'department' },
+            { header: t('evaluation.colTotalScore') || 'Total Score', key: 'totalScore' },
+            { header: t('evaluation.colGrade') || 'Grade', key: 'grade' },
+            { header: t('evaluation.colComment') || 'Comment', key: 'comment' },
+            { header: t('evaluation.colDate') || 'Evaluated Date', key: 'evaluatedDate' },
+            { header: t('evaluation.colEvaluator') || 'Evaluator', key: 'evaluatedBy' },
+          ]}
+          fileName={`evaluations_list_${selectedPeriod}`}
+        />
+      } className="">
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

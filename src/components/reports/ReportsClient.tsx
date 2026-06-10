@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
+import ExportButtons from '@/components/common/ExportButtons';
+
 
 interface Employee {
   id: string; firstName: string; lastName: string; department: string; position: string;
@@ -132,6 +134,19 @@ export default function ReportsClient({ employees }: { employees: Employee[] }) 
   const { t, locale } = useI18n();
   const [selectedReport, setSelectedReport] = useState('overview');
 
+  const employeeExportData = useMemo(() => {
+    return employees.map(e => ({
+      name: `${e.lastName} ${e.firstName}`,
+      department: getDepartmentLabel(e.department, t),
+      position: getPositionLabel(e.position, t),
+      salary: e.salary,
+      salaryType: e.salaryType,
+      joinDate: e.joinDate || '',
+      age: e.age || '',
+    }));
+  }, [employees, t]);
+
+
   const reports = [
     { key: 'overview', icon: '📊' },
     { key: 'department', icon: '🏬' },
@@ -176,6 +191,23 @@ export default function ReportsClient({ employees }: { employees: Employee[] }) 
 
     return { total, totalSalary, avgSalary, maxSalary, minSalary, byDept, byPosition, salaryRanges };
   }, [employees]);
+
+  const positionSalaryExportData = useMemo(() => {
+    return stats.byPosition.map(pos => {
+      const posEmps = employees.filter(e => e.position === pos.position);
+      const maxSalary = posEmps.length > 0 ? Math.max(...posEmps.map(e => e.salary)) : 0;
+      const minSalary = posEmps.length > 0 ? Math.min(...posEmps.map(e => e.salary)) : 0;
+      return {
+        position: getPositionLabel(pos.position, t),
+        count: pos.count,
+        avgSalary: pos.avgSalary,
+        maxSalary,
+        minSalary,
+        totalSalary: pos.avgSalary * pos.count,
+      };
+    });
+  }, [stats.byPosition, employees, t]);
+
 
   const deptColors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500', 'bg-indigo-500'];
   const posColors = ['bg-blue-400', 'bg-green-400', 'bg-purple-400', 'bg-orange-400', 'bg-pink-400'];
@@ -291,8 +323,24 @@ export default function ReportsClient({ employees }: { employees: Employee[] }) 
               label: d.label, value: d.count, color: ['bg-blue-400', 'bg-blue-500', 'bg-blue-600', 'bg-blue-700', 'bg-blue-800', 'bg-blue-900'][i],
             }))} maxVal={Math.max(...stats.salaryRanges.map(d => d.count))} />
           </Card>
-
-          <Card title={isVi ? 'Phân tích lương theo chức vụ' : isEn ? 'Salary Analytics by Position' : isZh ? '各职位薪资分析' : isTh ? 'วิเคราะห์เงินเดือนแบ่งตามตำแหน่ง' : '役職別 給与分析'} className="">
+          <Card
+            title={isVi ? 'Phân tích lương theo chức vụ' : isEn ? 'Salary Analytics by Position' : isZh ? '各职位薪资分析' : isTh ? 'วิเคราะห์เงินเดือนแบ่งตามตำแหน่ง' : '役職別 給与分析'}
+            action={
+              <ExportButtons
+                data={positionSalaryExportData}
+                columns={[
+                  { header: isVi ? 'Chức vụ' : isEn ? 'Position' : isZh ? '职位' : isTh ? 'ตำแหน่ง' : '役職', key: 'position' },
+                  { header: isVi ? 'Nhân sự' : isEn ? 'Headcount' : isZh ? '人数' : isTh ? 'จำนวนคน' : '人数', key: 'count' },
+                  { header: t('reports.avgSalary') || 'Average Salary', key: 'avgSalary' },
+                  { header: isVi ? 'Cao nhất' : isEn ? 'Max' : isZh ? '最高' : isTh ? 'สูงสุด' : '最高', key: 'maxSalary' },
+                  { header: isVi ? 'Thấp nhất' : isEn ? 'Min' : isZh ? '最低' : isTh ? 'ต่ำสุด' : '最低', key: 'minSalary' },
+                  { header: isVi ? 'Tổng cộng' : isEn ? 'Total' : isZh ? '薪资合计' : isTh ? 'รวมจ่าย' : '給与合計', key: 'totalSalary' },
+                ]}
+                fileName="salary_by_position"
+              />
+            }
+            className=""
+          >
             <div className="overflow-x-auto rounded-xl border border-slate-200/60">
               <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '750px' }}>
                 <colgroup>
@@ -371,14 +419,19 @@ export default function ReportsClient({ employees }: { employees: Employee[] }) 
           </div>
 
           <Card title={isVi ? 'Tải xuống danh sách nhân viên' : isEn ? 'Download Employee List' : isZh ? '员工名册/数据导出' : isTh ? 'ดาวน์โหลดรายชื่อพนักงาน' : '従業員一覧 ダウンロード'} className="">
-            <div className="flex gap-3">
-              <button className="px-4.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow-md cursor-pointer">
-                {t('reports.exportExcel')}
-              </button>
-              <button className="px-4.5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow-md cursor-pointer">
-                {t('reports.exportPdf')}
-              </button>
-            </div>
+            <ExportButtons
+              data={employeeExportData}
+              columns={[
+                { header: t('reports.colName') || 'Name', key: 'name' },
+                { header: t('reports.colDept') || 'Department', key: 'department' },
+                { header: t('reports.colPos') || 'Position', key: 'position' },
+                { header: t('reports.colSalary') || 'Salary', key: 'salary' },
+                { header: t('reports.colSalaryType') || 'Salary Type', key: 'salaryType' },
+                { header: t('reports.colJoinDate') || 'Join Date', key: 'joinDate' },
+                { header: t('reports.colAge') || 'Age', key: 'age' },
+              ]}
+              fileName="employee_list_report"
+            />
           </Card>
         </>
       )}

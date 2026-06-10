@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
+import ExportButtons from '@/components/common/ExportButtons';
+
 
 interface Employee {
   id: string;
@@ -119,6 +121,7 @@ export default function RolesClient({ employees: initialEmployees, initialRolePe
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [search, setSearch] = useState('');
   const [loadingRowId, setLoadingRowId] = useState<string | null>(null);
+
   const [editedValues, setEditedValues] = useState<Record<string, { role: string; password: string }>>({});
   
   // Permissions List state (Dynamic)
@@ -182,6 +185,20 @@ export default function RolesClient({ employees: initialEmployees, initialRolePe
       );
     });
   }, [employees, search]);
+
+  const exportData = useMemo(() => {
+    return filteredEmployees.map(emp => {
+      return {
+        code: emp.employeeCode,
+        name: `${emp.lastName} ${emp.firstName}`,
+        department: getDepartmentLabel(emp.department, t),
+        position: getPositionLabel(emp.position, t),
+        email: emp.email,
+        role: emp.role,
+        password: emp.password,
+      };
+    });
+  }, [filteredEmployees, t]);
 
   const handleRoleChange = (id: string, newRole: string) => {
     setEditedValues(prev => {
@@ -526,7 +543,21 @@ export default function RolesClient({ employees: initialEmployees, initialRolePe
           </Card>
 
           {/* Accounts Table Card */}
-          <Card className="overflow-hidden p-0">
+          <Card title={isVi ? 'Danh sách tài khoản' : isEn ? 'Account List' : isZh ? '账号列表' : isTh ? 'รายชื่อผู้ใช้' : 'アカウント一覧'} action={
+            <ExportButtons
+              data={exportData}
+              columns={[
+                { header: isVi ? 'Mã NV' : isEn ? 'Code' : isZh ? '工号' : isTh ? 'รหัส' : 'コード', key: 'code' },
+                { header: isVi ? 'Họ và tên' : isEn ? 'Full Name' : isZh ? '姓名' : isTh ? 'ชื่อ-นามสกุล' : '氏名', key: 'name' },
+                { header: isVi ? 'Bộ phận' : isEn ? 'Department' : isZh ? '部门' : isTh ? 'แผนก' : '部署', key: 'department' },
+                { header: isVi ? 'Chức vụ' : isEn ? 'Position' : isZh ? '职位' : isTh ? 'ตำแหน่ง' : '役職', key: 'position' },
+                { header: isVi ? 'Tên đăng nhập (Email)' : isEn ? 'Login ID (Email)' : isZh ? '登录ID (Email)' : isTh ? 'บัญชีผู้ dùng (อีเมล)' : 'ログインID (Email)', key: 'email' },
+                { header: isVi ? 'Quyền hệ thống (Role)' : isEn ? 'System Role' : isZh ? '系统角色' : isTh ? 'สิทธิ์ระบบ (Role)' : 'システム権限 (Role)', key: 'role' },
+                { header: isVi ? 'Mật khẩu' : isEn ? 'Password' : isZh ? '密码' : isTh ? 'รหัสผ่าน' : 'パスワード', key: 'password' },
+              ]}
+              fileName="accounts_list"
+            />
+          } className="overflow-hidden p-0">
             <div className="overflow-x-auto">
               <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: '1000px' }}>
                 <colgroup>

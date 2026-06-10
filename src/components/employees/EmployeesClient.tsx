@@ -735,16 +735,16 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
     }
     return {
       no: 50,
-      code: 100,
-      name: 185,
-      department: 140,
-      position: 120,
-      birthDate: 120,
-      nationality: 100,
-      visa: 155,
-      hireDate: 120,
-      card: 150,
-      expiry: 120,
+      code: 90,
+      name: 155,
+      department: 125,
+      position: 115,
+      birthDate: 105,
+      nationality: 95,
+      visa: 135,
+      hireDate: 110,
+      card: 130,
+      expiry: 110,
     };
   });
 
@@ -1111,7 +1111,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
         }
       >
         {/* Search & Export */}
-        <div className="flex flex-col lg:flex-row gap-3 mb-6 bg-slate-50/30 p-4 border border-slate-200/40 rounded-3xl">
+        <div className="flex flex-col xl:flex-row gap-3 mb-6 bg-slate-50/30 p-4 border border-slate-200/40 rounded-3xl">
           <div className="flex flex-col sm:flex-row gap-2.5 flex-1">
             <div className="relative">
               <select
@@ -1150,7 +1150,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
               />
             </div>
           </div>
-          <div className="flex flex-wrap sm:flex-nowrap gap-2.5 items-center">
+          <div className="flex flex-wrap gap-2.5 items-center">
             <select value={columnFilters.department?.[0] || ''} onChange={e => handleColumnFilter('department', e.target.value ? [e.target.value] : [])}
               className="px-3 py-2.5 premium-input rounded-xl text-xs font-bold bg-white cursor-pointer">
               <option value="">{t('client.allDepts')}</option>

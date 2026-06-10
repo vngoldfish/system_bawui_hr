@@ -4,7 +4,7 @@ set -e
 # Run Prisma migrations in production (apply any pending migrations)
 if [ -f ./node_modules/.bin/prisma ]; then
   echo "⏳ Applying Prisma migrations..."
-  npx prisma migrate deploy
+  npx prisma migrate deploy || echo "⚠️ Prisma migration failed (possibly offline or no database connection), continuing..."
 else
   echo "⚠️ Prisma binary not found, skipping migrations."
 fi
@@ -13,7 +13,7 @@ fi
 if [ "$SEED_DB" = "true" ]; then
   if [ -f ./node_modules/.bin/prisma ]; then
     echo "🌱 Seeding database..."
-    npx prisma db seed
+    npx prisma db seed || echo "⚠️ Prisma seeding failed, continuing..."
   else
     echo "⚠️ Prisma binary not found, skipping database seed."
   fi

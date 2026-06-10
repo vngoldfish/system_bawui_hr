@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
+import ExportButtons from '@/components/common/ExportButtons';
+
 
 interface AuditLogEntry {
   timestamp: string;
@@ -233,6 +235,17 @@ export default function AuditLogsClient({
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const exportData = useMemo(() => {
+    return logs.map(l => ({
+      timestamp: formatLocalTimestamp(l.timestamp),
+      operator: typeof l.user === 'object' ? `${l.user.name} (${l.user.email})` : l.user,
+      action: l.action,
+      model: l.model,
+      recordId: l.recordId,
+    }));
+  }, [logs]);
+
+
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
@@ -359,6 +372,17 @@ export default function AuditLogsClient({
           <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-800">{tLocal.title}</h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1 font-semibold">{tLocal.subtitle}</p>
         </div>
+        <ExportButtons
+          data={exportData}
+          columns={[
+            { header: tLocal.colTimestamp || 'Timestamp', key: 'timestamp' },
+            { header: tLocal.colUser || 'Operator', key: 'operator' },
+            { header: tLocal.colAction || 'Action', key: 'action' },
+            { header: tLocal.colModel || 'Target Model', key: 'model' },
+            { header: tLocal.colRecordId || 'Record ID', key: 'recordId' },
+          ]}
+          fileName="audit_logs"
+        />
       </div>
 
       {/* Filter controls */}

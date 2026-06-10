@@ -1,8 +1,11 @@
 'use client';
-import { useI18n } from '@/lib/i18n';
 
+import { useI18n } from '@/lib/i18n';
 import { useState, useMemo } from 'react';
+
 import Card from '@/components/common/Card';
+import ExportButtons from '@/components/common/ExportButtons';
+
 
 interface Employee {
   id: string; firstName: string; lastName: string; firstNameKana: string;
@@ -109,6 +112,22 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
     return t('common.pending');
   };
 
+  const exportData = useMemo(() => {
+    return filtered.map(c => {
+      const emp = employees.find(e => e.id === c.employeeId);
+      const cat = categories.find(ct => ct.value === c.category);
+      return {
+        applicant: emp ? `${emp.lastName} ${emp.firstName}` : '',
+        date: c.date,
+        category: cat ? cat.label : c.category,
+        description: c.description,
+        amount: c.amount,
+        receipt: c.receipt ? 'Yes' : 'No',
+        status: statusLabel(c.status),
+      };
+    });
+  }, [filtered, employees, categories, t]);
+
   return (
     <>
       {/* Stats */}
@@ -210,7 +229,21 @@ export default function ExpensesClient({ employees }: { employees: Employee[] })
       )}
 
       {/* Claims Table */}
-      <Card title={t('expenses.title')}>
+      <Card title={t('expenses.title')} action={
+        <ExportButtons
+          data={exportData}
+          columns={[
+            { header: t('expenses.applicant') || 'Applicant', key: 'applicant' },
+            { header: t('common.date') || 'Date', key: 'date' },
+            { header: t('expenses.category') || 'Category', key: 'category' },
+            { header: t('expenses.desc') || 'Description', key: 'description' },
+            { header: t('expenses.amount') || 'Amount', key: 'amount' },
+            { header: t('expenses.receipt') || 'Receipt', key: 'receipt' },
+            { header: t('common.status') || 'Status', key: 'status' },
+          ]}
+          fileName={`expenses_list_${selectedMonth}`}
+        />
+      }>
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1212,16 +1212,16 @@ export default function PayrollClient({
       }
     }
     return {
-      name: 170,
-      salaryType: 110,
-      baseSalary: 110,
-      overtimePay: 100,
-      allowances: 100,
-      bonus: 100,
-      deductions: 110,
-      netSalary: 115,
-      companyCost: 105,
-      status: 95,
+      name: 140,
+      salaryType: 90,
+      baseSalary: 100,
+      overtimePay: 90,
+      allowances: 95,
+      bonus: 90,
+      deductions: 95,
+      netSalary: 105,
+      companyCost: 95,
+      status: 85,
     };
   });
 
@@ -1775,7 +1775,7 @@ export default function PayrollClient({
                 className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg border border-red-200">{t('payroll.filterClear')} ({activeFilterCount})</button>
             )}
             
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
               {/* Column Settings */}
               <div className="relative">
                 <button

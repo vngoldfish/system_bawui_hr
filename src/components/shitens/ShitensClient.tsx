@@ -4,6 +4,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
 import Portal from '@/components/common/Portal';
+import ExportButtons from '@/components/common/ExportButtons';
+import GenericImportModal from '@/components/common/GenericImportModal';
+
 
 interface Shiten {
   id: string;
@@ -40,6 +43,18 @@ export default function ShitensClient({
   const [editingShiten, setEditingShiten] = useState<Shiten | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedEmployeeIdsToAssign, setSelectedEmployeeIdsToAssign] = useState<string[]>([]);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+
+  const exportData = useMemo(() => {
+    return shitens.map(s => ({
+      name: s.name,
+      nameKana: s.nameKana || '',
+      address: s.address || '',
+      phone: s.phone || '',
+      employeesCount: s._count?.employees || 0,
+    }));
+  }, [shitens]);
+
   
   // Form fields
   const [shitenForm, setShitenForm] = useState({
@@ -263,9 +278,39 @@ export default function ShitensClient({
   }, [assignableEmployees, searchTerm]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Left side: Branch Cards grid */}
-      <div className="lg:col-span-1 space-y-4">
+    <div className="space-y-6 animate-fadeIn">
+      {/* Header Stat Board - Redesigned to look extremely premium */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-md p-5 rounded-2xl border border-slate-200/80 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+        <div>
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t('shitens.title') || 'Branches'}</h2>
+          <p className="text-xl font-black text-slate-800 mt-1">
+            {(t('shitens.activeBranchesCount') || '{count} branches').replace('{count}', String(shitens.length))}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 items-center self-start sm:self-center">
+          <ExportButtons
+            data={exportData}
+            columns={[
+              { header: t('shitens.labelName') || 'Name', key: 'name' },
+              { header: (t('shitens.labelName') || 'Name') + ' (Kana)', key: 'nameKana' },
+              { header: t('shitens.labelAddress') || 'Address', key: 'address' },
+              { header: t('shitens.labelPhone') || 'Phone', key: 'phone' },
+              { header: t('shitens.colEmployeesCount') || 'Employees Count', key: 'employeesCount' },
+            ]}
+            fileName="branches_list"
+          />
+          <button
+            onClick={() => setImportModalOpen(true)}
+            className="px-4.5 py-2.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer hover:shadow-md"
+          >
+            📥 {t('common.import') || 'Import'}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left side: Branch Cards grid */}
+        <div className="lg:col-span-1 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{t('shitens.title')}</h2>
           <button
@@ -598,6 +643,31 @@ export default function ShitensClient({
           </div>
         </Portal>
       )}
+
+      <GenericImportModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onSuccess={fetchShitens}
+        apiPath="/api/shitens/import"
+        payloadKey="shitens"
+        templateJson={JSON.stringify([
+          {
+            name: "東京本社",
+            nameKana: "トウキョウホンシャ",
+            address: "東京都千代田区1-1",
+            phone: "03-1234-5678"
+          },
+          {
+            name: "大阪支店",
+            nameKana: "オオサカシテン",
+            address: "大阪府大阪市北区2-2",
+            phone: "06-9876-5432"
+          }
+        ], null, 2)}
+        title={t('common.importBranches') || 'Import Branches'}
+        description={t('common.importBranchesDesc') || 'Upload a JSON file containing a list of branches to import them all at once.'}
+      />
     </div>
-  );
+  </div>
+);
 }

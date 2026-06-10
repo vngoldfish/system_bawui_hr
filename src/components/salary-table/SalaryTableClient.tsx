@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
 import BulkSalaryUpdate from './BulkSalaryUpdate';
+import ExportButtons from '@/components/common/ExportButtons';
+
 
 interface RateItem {
   id: string; name: string; nameKana: string;
@@ -615,6 +617,7 @@ export default function SalaryTableClient() {
   const [changeLog, setChangeLog] = useState<ChangeLog[]>([]);
   const [editingItem, setEditingItem] = useState<RateItem | null>(null);
   const [showLog, setShowLog] = useState(false);
+
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [saved, setSaved] = useState(false);
 
@@ -640,6 +643,21 @@ export default function SalaryTableClient() {
     const insEm = rates.filter(r => r.category === 'insurance').reduce((s, r) => s + r.employeeRate, 0) + health.baseRate / 2 + pension.employeeRate;
     return { insCo, insEm, total: rates.length + 3, changes: changeLog.length };
   }, [rates, health, pension, changeLog]);
+
+  const exportData = useMemo(() => {
+    return filtered.map(item => {
+      const trans = getItemTranslation(item.id, item.name, item.description, t);
+      return {
+        name: trans.name,
+        category: t('salaryTable.' + item.category),
+        companyRate: item.companyRate > 0 ? `${item.companyRate}%` : '-',
+        employeeRate: item.employeeRate > 0 ? `${item.employeeRate}%` : '-',
+        companyFixed: item.companyFixed > 0 ? `¥${item.companyFixed.toLocaleString()}` : '-',
+        employeeFixed: item.employeeFixed > 0 ? `¥${item.employeeFixed.toLocaleString()}` : '-',
+        description: trans.desc,
+      };
+    });
+  }, [filtered, t]);
 
   return (
     <>
@@ -715,7 +733,21 @@ export default function SalaryTableClient() {
 
       {/* Other Rates Table */}
       <div className="mt-6">
-        <Card title={t('salaryTable.otherRatesTitle')}>
+        <Card title={t('salaryTable.otherRatesTitle')} action={
+          <ExportButtons
+            data={exportData}
+            columns={[
+              { header: t('salaryTable.itemName') || 'Name', key: 'name' },
+              { header: t('salaryTable.itemType') || 'Type', key: 'category' },
+              { header: t('salaryTable.companyRate') || 'Company Rate', key: 'companyRate' },
+              { header: t('salaryTable.employeeRate') || 'Employee Rate', key: 'employeeRate' },
+              { header: t('salaryTable.companyFixed') || 'Company Fixed', key: 'companyFixed' },
+              { header: t('salaryTable.employeeFixed') || 'Employee Fixed', key: 'employeeFixed' },
+              { header: t('salaryTable.memo') || 'Memo', key: 'description' },
+            ]}
+            fileName="salary_rates_list"
+          />
+        }>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

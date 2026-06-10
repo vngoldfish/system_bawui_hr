@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
+import ExportButtons from '@/components/common/ExportButtons';
 
 interface Employee {
   id: string; firstName: string; lastName: string; firstNameKana: string;
@@ -115,6 +116,21 @@ export default function DocumentsClient({ employees }: { employees: Employee[] }
     return { total, thisMonth, byType };
   }, [records]);
 
+  const exportData = useMemo(() => {
+    return filtered.map(r => {
+      const emp = employees.find(e => e.id === r.employeeId);
+      const dt = docTypes.find(tItem => tItem.value === r.type);
+      return {
+        documentName: dt ? getDocTypeLabel(dt.value, t) : '',
+        employee: emp ? `${emp.lastName} ${emp.firstName}` : '',
+        department: emp ? getDepartmentLabel(emp.department, t) : '',
+        issueDate: r.issuedDate,
+        purpose: getPurposeLabel(r.purpose, t),
+        status: r.status === 'issued' ? t('documents.statusIssued') : t('documents.statusProcessing'),
+      };
+    });
+  }, [filtered, employees, t]);
+
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Stats */}
@@ -132,8 +148,20 @@ export default function DocumentsClient({ employees }: { employees: Employee[] }
         ))}
       </div>
 
-      {/* Generate Button */}
-      <div className="flex justify-end">
+      {/* Generate Button & Export */}
+      <div className="flex justify-end items-center gap-3">
+        <ExportButtons
+          data={exportData}
+          columns={[
+            { header: t('documents.colDocName') || 'Document Name', key: 'documentName' },
+            { header: t('documents.colEmployee') || 'Employee', key: 'employee' },
+            { header: t('documents.colDept') || 'Department', key: 'department' },
+            { header: t('documents.colIssueDate') || 'Issue Date', key: 'issueDate' },
+            { header: t('documents.colPurpose') || 'Purpose', key: 'purpose' },
+            { header: t('documents.colStatus') || 'Status', key: 'status' },
+          ]}
+          fileName="issued_documents"
+        />
         <button onClick={() => setShowGenerate(true)}
           className="px-4.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow-md cursor-pointer hover:scale-[1.01] active:scale-95">
           {t('documents.generateBtn')}

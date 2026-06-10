@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
+import ExportButtons from '@/components/common/ExportButtons';
+
 
 interface JobPosting {
   id: string;
@@ -177,6 +179,23 @@ export default function RecruitmentClient() {
     return { total, inProcess, hired, openPositions };
   }, [applicants, postings]);
 
+  const exportData = useMemo(() => {
+    return filteredApplicants.map(a => {
+      const posting = postings.find(p => p.id === a.jobPostingId);
+      return {
+        name: a.name,
+        nameKana: a.nameKana,
+        age: a.age,
+        position: posting ? getMockTranslation(posting.title, t) : '',
+        education: getMockTranslation(a.education, t),
+        experience: getMockTranslation(a.experience, t),
+        appliedDate: a.appliedDate,
+        status: getPhaseLabel(a.status, t),
+        memo: getMockTranslation(a.memo, t),
+      };
+    });
+  }, [filteredApplicants, postings, t]);
+
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Stats */}
@@ -298,7 +317,20 @@ export default function RecruitmentClient() {
       )}
 
       {/* Applicants List Table */}
-      <Card title={t('recruitment.cardApplicants')} className="">
+      <Card title={t('recruitment.cardApplicants')} action={
+        <ExportButtons
+          data={exportData}
+          columns={[
+            { header: t('recruitment.colApplicant') || 'Applicant', key: 'name' },
+            { header: t('recruitment.colPosition') || 'Job Title', key: 'position' },
+            { header: t('recruitment.colEducation') || 'Education', key: 'education' },
+            { header: t('recruitment.colExperience') || 'Experience', key: 'experience' },
+            { header: t('recruitment.colPhase') || 'Phase', key: 'status' },
+            { header: t('recruitment.colMemo') || 'Memo', key: 'memo' },
+          ]}
+          fileName={`applicants_list_${selectedPosting}`}
+        />
+      } className="">
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

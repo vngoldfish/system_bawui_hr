@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Portal from './Portal';
 import { useI18n } from '@/lib/i18n';
+import GenericImportModal from './GenericImportModal';
+
 
 interface ManageableItem {
   id: string;
@@ -17,13 +19,25 @@ interface ManagementModalProps {
   onClose: () => void;
   title: string;
   apiPath: string;
+  enableImport?: boolean;
+  importPayloadKey?: string;
+  importTemplateJson?: string;
 }
 
-export default function ManagementModal({ isOpen, onClose, title, apiPath }: ManagementModalProps) {
+export default function ManagementModal({
+  isOpen,
+  onClose,
+  title,
+  apiPath,
+  enableImport = false,
+  importPayloadKey = 'data',
+  importTemplateJson = '[]'
+}: ManagementModalProps) {
   const { t } = useI18n();
   const [items, setItems] = useState<ManageableItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: '', nameKana: '', description: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -114,14 +128,24 @@ export default function ManagementModal({ isOpen, onClose, title, apiPath }: Man
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Add button */}
+          {/* Add/Import buttons */}
           {!showAdd && (
-            <button
-              onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', nameKana: '', description: '' }); }}
-              className="w-full px-4 py-3 border-2 border-dashed border-slate-200/80 rounded-xl text-xs font-bold text-slate-500 hover:border-blue-500 hover:text-blue-600 transition-all hover:bg-slate-50/50 cursor-pointer"
-            >
-              {t('common.addNew')}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', nameKana: '', description: '' }); }}
+                className="flex-1 px-4 py-3 border-2 border-dashed border-slate-200/80 rounded-xl text-xs font-bold text-slate-500 hover:border-blue-500 hover:text-blue-600 transition-all hover:bg-slate-50/50 cursor-pointer"
+              >
+                {t('common.addNew')}
+              </button>
+              {enableImport && (
+                <button
+                  onClick={() => setImportOpen(true)}
+                  className="px-4 py-3 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-655 hover:text-blue-600 transition-all hover:shadow-xs cursor-pointer flex items-center justify-center gap-1"
+                >
+                  📥 {t('common.import') || 'Import'}
+                </button>
+              )}
+            </div>
           )}
 
           {/* Add/Edit form */}
@@ -181,6 +205,18 @@ export default function ManagementModal({ isOpen, onClose, title, apiPath }: Man
           </div>
         </div>
       </div>
+      {enableImport && (
+        <GenericImportModal
+          isOpen={importOpen}
+          onClose={() => setImportOpen(false)}
+          onSuccess={fetchItems}
+          apiPath={`${apiPath}/import`}
+          payloadKey={importPayloadKey}
+          templateJson={importTemplateJson}
+          title={t('common.importItemsTitle')?.replace('{title}', title) || `Import ${title}`}
+          description={t('common.importItemsDesc')?.replace('{title}', title) || `Upload a JSON file containing a list of ${title} to import them.`}
+        />
+      )}
     </div>
     </Portal>
   );

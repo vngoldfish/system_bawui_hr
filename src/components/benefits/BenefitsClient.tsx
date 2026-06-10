@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
+import ExportButtons from '@/components/common/ExportButtons';
+
 
 interface Employee {
   id: string; firstName: string; lastName: string; firstNameKana: string;
@@ -76,6 +78,7 @@ export default function BenefitsClient({ employees }: { employees: Employee[] })
   const [editingEmp, setEditingEmp] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<Benefit>>({});
   const [search, setSearch] = useState('');
+
   const [saved, setSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -165,6 +168,23 @@ export default function BenefitsClient({ employees }: { employees: Employee[] })
     };
   };
 
+  const exportData = useMemo(() => {
+    return filtered.map(b => {
+      const emp = employees.find(e => e.id === b.employeeId);
+      const companyIns = calcCompanyInsurance(emp?.salary || 0);
+      return {
+        name: emp ? `${emp.lastName} ${emp.firstName}` : '',
+        department: emp?.department || '',
+        socialInsurance: b.healthInsurance ? t('benefits.joined') : t('benefits.notJoined'),
+        familyAllowance: b.familyAllowance,
+        housingAllowance: b.housingAllowance,
+        commutingAllowance: b.commutingAllowance,
+        mealAllowance: b.mealAllowance,
+        companyBurden: companyIns.total,
+      };
+    });
+  }, [filtered, employees, t]);
+
   return (
     <>
       {saved && (
@@ -218,7 +238,22 @@ export default function BenefitsClient({ employees }: { employees: Employee[] })
 
       {/* Benefits Table */}
       <div className="mt-6">
-        <Card title={t('benefits.title')}>
+        <Card title={t('benefits.title')} action={
+          <ExportButtons
+            data={exportData}
+            columns={[
+              { header: t('benefits.colName') || 'Name', key: 'name' },
+              { header: t('benefits.colDept') || 'Department', key: 'department' },
+              { header: t('benefits.colSocialIns') || 'Social Insurance', key: 'socialInsurance' },
+              { header: t('benefits.colFamily') || 'Family Allowance', key: 'familyAllowance' },
+              { header: t('benefits.colHousing') || 'Housing Allowance', key: 'housingAllowance' },
+              { header: t('benefits.colCommuting') || 'Commuting Allowance', key: 'commutingAllowance' },
+              { header: t('benefits.colMeal') || 'Meal Allowance', key: 'mealAllowance' },
+              { header: t('benefits.colCompanyBurden') || 'Company Burden', key: 'companyBurden' },
+            ]}
+            fileName="benefits_list"
+          />
+        }>
           <div className="flex flex-col sm:flex-row gap-3 mb-5">
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
