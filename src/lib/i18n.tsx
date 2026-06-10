@@ -42,6 +42,8 @@ export const translations: Record<string, Record<string, unknown>> = {
       auditLogs: '操作ログ',
       myAccount: 'マイアカウント',
       logout: 'ログアウト',
+      positions: '役職管理',
+      contractTypes: '雇用形態管理',
     },
     navSubtitle: {
       dashboard: '人事管理システムの概要',
@@ -445,6 +447,8 @@ export const translations: Record<string, Record<string, unknown>> = {
       auditLogs: 'Audit Logs',
       myAccount: 'My Account',
       logout: 'Logout',
+      positions: 'Positions',
+      contractTypes: 'Contract Types',
     },
     navSubtitle: {
       dashboard: 'HR Management System Overview',
@@ -842,6 +846,8 @@ export const translations: Record<string, Record<string, unknown>> = {
       auditLogs: 'Lịch sử hoạt động',
       myAccount: 'Tài khoản của tôi',
       logout: 'Đăng xuất',
+      positions: 'Chức vụ',
+      contractTypes: 'Loại hợp đồng',
     },
     navSubtitle: {
       dashboard: 'Tổng quan hệ thống quản lý nhân sự',
@@ -1245,6 +1251,8 @@ export const translations: Record<string, Record<string, unknown>> = {
       auditLogs: '操作日志',
       myAccount: '我的账号',
       logout: '退出登录',
+      positions: '职位管理',
+      contractTypes: '雇佣形式管理',
     },
     navSubtitle: {
       dashboard: '人事管理系统概览',
@@ -1621,6 +1629,8 @@ export const translations: Record<string, Record<string, unknown>> = {
       auditLogs: 'ประวัติการใช้งาน',
       myAccount: 'บัญชีของฉัน',
       logout: 'ออกจากระบบ',
+      positions: 'จัดการตำแหน่ง',
+      contractTypes: 'จัดการประเภทสัญญา',
     },
     navSubtitle: {
       dashboard: 'ภาพรวมระบบบริหารจัดการงานบุคคล',

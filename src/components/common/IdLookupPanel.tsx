@@ -99,7 +99,7 @@ export default function IdLookupPanel() {
           <option value="departments">🏢 {t('nav.departments') || 'Departments'}</option>
           <option value="positions">💼 {t('nav.positions') || 'Positions'}</option>
           <option value="contract-types">📄 {t('nav.contractTypes') || 'Contract Types'}</option>
-          <option value="shitens">📍 {t('shitens.title') || 'Branches'}</option>
+          <option value="shitens">📍 {t('nav.shitens') || 'Branches'}</option>
           <option value="employees">👥 {t('nav.employees') || 'Employees'}</option>
         </select>
 
