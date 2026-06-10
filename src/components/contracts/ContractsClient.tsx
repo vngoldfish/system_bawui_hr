@@ -961,11 +961,11 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">{t('contracts.resignReasonLabel')}</label>
                 <select value={resignReason} onChange={e => setResignReason(e.target.value)} className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer font-semibold">
                   <option value="">{t('common.select')}</option>
-                  <option value="\u81ea\u5df1\u90fd\u5408\u9000\u8077">{t('contracts.resignReasonPersonal')}</option>
-                  <option value="\u4f1a\u793a\u90fd\u5408\u9000\u8077">{t('contracts.resignReasonCompany')}</option>
-                  <option value="\u5951\u7d04\u6e80\u4e86">{t('contracts.resignReasonExpiry')}</option>
-                  <option value="\u5b9a\u5e74\u9000\u8077">{t('contracts.resignReasonRetired')}</option>
-                  <option value="\u305d\u306e\u4ed6">{t('contracts.resignReasonOther')}</option>
+                  <option value="自己都合退職">{t('contracts.resignReasonPersonal')}</option>
+                  <option value="会社都合退職">{t('contracts.resignReasonCompany')}</option>
+                  <option value="契約満了">{t('contracts.resignReasonExpiry')}</option>
+                  <option value="定年退職">{t('contracts.resignReasonRetired')}</option>
+                  <option value="その他">{t('contracts.resignReasonOther')}</option>
                 </select>
               </div>
               <div className="flex justify-end gap-2.5 border-t border-slate-100 pt-4">

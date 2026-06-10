@@ -583,9 +583,9 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.salaryType')}</label>
                   <select name="salaryType" value={formData.salaryType} onChange={handleChange} className={inputCls} required>
-                    <option value="\u6708\u7d66">{t('form.salaryTypeMonthly')}</option>
-                    <option value="\u65e5\u7d66">{t('form.salaryTypeDaily')}</option>
-                    <option value="\u6642\u7d66">{t('form.salaryTypeHourly')}</option>
+                    <option value="月給">{t('form.salaryTypeMonthly')}</option>
+                    <option value="日給">{t('form.salaryTypeDaily')}</option>
+                    <option value="時給">{t('form.salaryTypeHourly')}</option>
                   </select>
                 </div>
                 {formData.salaryType === '\u6708\u7d66' && (
@@ -721,13 +721,13 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                   <input type="date" value={dep.birthDate} onChange={e => updateDependent(idx, 'birthDate', e.target.value)} className={inputCls} />
                   <select value={dep.gender} onChange={e => updateDependent(idx, 'gender', e.target.value)} className={inputCls}>
                     <option value="">{t('form.gender')}</option>
-                    <option value="\u7537\u6027">{t('form.genderMale')}</option>
-                    <option value="\u5973\u6027">{t('form.genderFemale')}</option>
+                    <option value="男性">{t('form.genderMale')}</option>
+                    <option value="女性">{t('form.genderFemale')}</option>
                   </select>
                   <div className="flex gap-2">
                     <select value={dep.cohabitation} onChange={e => updateDependent(idx, 'cohabitation', e.target.value)} className={inputCls}>
-                      <option value="\u540c\u5c45">{t('form.cohabitYes')}</option>
-                      <option value="\u5225\u5c45">{t('form.cohabitNo')}</option>
+                      <option value="同居">{t('form.cohabitYes')}</option>
+                      <option value="別居">{t('form.cohabitNo')}</option>
                     </select>
                     <button type="button" onClick={() => removeDependent(idx)} className="px-3 text-red-500 hover:text-red-700">×</button>
                   </div>

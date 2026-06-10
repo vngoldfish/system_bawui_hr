@@ -262,7 +262,7 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
               {editing ? (
                 <select value={data.salaryCutoffDay} onChange={e => handleChange('salaryCutoffDay', e.target.value)}
                   className="flex-1 px-3 py-2 border border-slate-350 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-semibold cursor-pointer">
-                  <option value="\u672b\u65e5">{t('company.cutoffEnd')}</option>
+                  <option value="末日">{t('company.cutoffEnd')}</option>
                   {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
                     <option key={d} value={String(d)}>{t('company.cutoffDayUnit').replace('{day}', String(d))}</option>
                   ))}
