@@ -108,10 +108,12 @@ export default function GenericImportModal({
         if (body.details && Array.isArray(body.details)) {
           setServerErrors(body.details);
         } else {
-          setServerErrors([body.error || 'Import failed']);
+          setServerErrors([body.error || t('client.saveFailed') || 'Import failed']);
         }
       } else {
-        const successMsg = `Successfully imported ${body.data?.count || dataArray.length} items.`;
+        const successMsg = (t('common.importSuccess') || 'Successfully imported {count} {title}.')
+          .replace('{count}', String(body.data?.count || dataArray.length))
+          .replace('{title}', title);
         setSuccessMessage(successMsg);
         setJsonText('');
         onSuccess();
@@ -121,7 +123,7 @@ export default function GenericImportModal({
         }, 2000);
       }
     } catch (err: any) {
-      setServerErrors([err.message || 'Network error']);
+      setServerErrors([err.message || t('profile.networkError') || 'Network error']);
     } finally {
       setLoading(false);
     }
@@ -164,7 +166,7 @@ export default function GenericImportModal({
                   <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Upload JSON File
+                  {t('client.importJsonBtn') || 'Upload JSON'}
                   <input 
                     type="file" 
                     accept=".json" 
@@ -185,7 +187,7 @@ export default function GenericImportModal({
                       : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                   }`}
                 >
-                  🆔 {showLookup ? 'Hide ID Lookup' : 'ID Lookup'}
+                  🆔 {showLookup ? t('common.hideLookup') : t('common.showLookup')}
                 </button>
                 <button
                   type="button"
@@ -195,7 +197,7 @@ export default function GenericImportModal({
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                   </svg>
-                  {copied ? 'Copied!' : 'Copy Template'}
+                  {copied ? (t('client.copied') || 'Copied!') : (t('client.copyTemplate') || 'Copy Template')}
                 </button>
               </div>
             </div>
@@ -221,7 +223,7 @@ export default function GenericImportModal({
               {serverErrors.length > 0 && (
                 <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl text-xs font-bold animate-fadeIn space-y-2 flex-shrink-0">
                   <p className="font-extrabold text-sm border-b border-rose-200 pb-1">
-                    ⚠️ Import validation errors:
+                    ⚠️ {t('client.importJsonValidationError') || 'Import validation errors:'}
                   </p>
                   <div className="max-h-[120px] overflow-y-auto space-y-1 font-semibold pr-1">
                     {serverErrors.map((err, idx) => (
@@ -246,7 +248,7 @@ export default function GenericImportModal({
                   disabled={loading}
                   className="px-4 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-350 dark:hover:bg-slate-800 rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer transition-all active:scale-98"
                 >
-                  Close
+                  {t('client.importJsonClose') || 'Close'}
                 </button>
                 <button
                   type="submit"
@@ -259,7 +261,7 @@ export default function GenericImportModal({
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                   )}
-                  {loading ? 'Importing...' : 'Execute Import'}
+                  {loading ? (t('client.importJsonImporting') || 'Importing...') : (t('client.importJsonSubmit') || 'Execute Import')}
                 </button>
               </div>
             </form>

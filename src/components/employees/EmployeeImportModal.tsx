@@ -169,7 +169,7 @@ export default function EmployeeImportModal({ isOpen, onClose, onSuccess }: Empl
                   <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  JSONファイルを選択 (Upload JSON)
+                  {t('client.importJsonBtn') || 'Upload JSON'}
                   <input 
                     type="file" 
                     accept=".json" 
@@ -190,7 +190,7 @@ export default function EmployeeImportModal({ isOpen, onClose, onSuccess }: Empl
                       : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                   }`}
                 >
-                  🆔 {showLookup ? 'ID検索を閉じる (Hide ID Lookup)' : 'ID検索 (ID Lookup)'}
+                  🆔 {showLookup ? t('common.hideLookup') : t('common.showLookup')}
                 </button>
                 <button
                   type="button"
@@ -200,7 +200,7 @@ export default function EmployeeImportModal({ isOpen, onClose, onSuccess }: Empl
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                   </svg>
-                  {copied ? (t('copied') || 'Copied!') : (t('copyTemplate') || 'Copy Template')}
+                  {copied ? (t('client.copied') || 'Copied!') : (t('client.copyTemplate') || 'Copy Template')}
                 </button>
               </div>
             </div>
