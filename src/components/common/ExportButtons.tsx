@@ -19,7 +19,12 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
 
   const activeCols = columns.filter(c => c.show !== false);
 
-  const getRowsPerPage = () => rowsPerPageProp ?? 10;
+  const getRowsPerPage = () => {
+    if (rowsPerPageProp) {
+      return Math.min(rowsPerPageProp, 25);
+    }
+    return 15;
+  };
   const getTotalPages = () => Math.max(1, Math.ceil(data.length / getRowsPerPage()));
 
   const openPdfModal = () => {
@@ -94,12 +99,16 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       }
     }
 
-    const headerHtml = `<tr style="background:#334155;color:white;">${activeCols.map(c => `<th style="padding:8px 12px;text-align:left;border:1px solid #475569;">${c.header}</th>`).join('')}</tr>`;
-    const rowHtml = (row: Record<string, unknown>, i: number) =>
-      `<tr style="background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'};">${activeCols.map(c => `<td style="padding:6px 12px;border:1px solid #e2e8f0;">${row[c.key] ?? ''}</td>`).join('')}</tr>`;
-
     const rpp = getRowsPerPage();
     const total = pages.length;
+
+    const fontSize = rpp <= 15 ? '12px' : '10px';
+    const cellPadding = rpp <= 15 ? '6px 12px' : '4px 8px';
+    const headerPadding = rpp <= 15 ? '8px 12px' : '6px 8px';
+
+    const headerHtml = `<tr style="background:#334155;color:white;">${activeCols.map(c => `<th style="padding:${headerPadding};text-align:left;border:1px solid #475569;">${c.header}</th>`).join('')}</tr>`;
+    const rowHtml = (row: Record<string, unknown>, i: number) =>
+      `<tr style="background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'};">${activeCols.map(c => `<td style="padding:${cellPadding};border:1px solid #e2e8f0;">${row[c.key] ?? ''}</td>`).join('')}</tr>`;
 
     for (let i = 0; i < pages.length; i++) {
       if (i > 0) pdf.addPage();
@@ -112,7 +121,7 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;background:white;padding:20px;font-family:sans-serif;width:1000px;';
       wrapper.innerHTML = `
         <h2 style="font-size:18px;margin-bottom:12px;color:#1e293b;">${fileName}</h2>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <table style="width:100%;border-collapse:collapse;font-size:${fontSize};">
           <thead>${headerHtml}</thead>
           <tbody>${pageRows.map((row, idx) => rowHtml(row, idx)).join('')}</tbody>
         </table>
@@ -126,8 +135,14 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true });
       document.body.removeChild(wrapper);
 
-      const imgH = (canvas.height * imgW) / canvas.width;
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, imgH);
+      let finalW = imgW;
+      let finalH = (canvas.height * imgW) / canvas.width;
+      const maxH = pdfH - margin * 2;
+      if (finalH > maxH) {
+        finalH = maxH;
+        finalW = (canvas.width * finalH) / canvas.height;
+      }
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, finalW, finalH);
     }
 
     pdf.save(`${fileName}.pdf`);

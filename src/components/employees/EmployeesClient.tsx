@@ -13,8 +13,6 @@ import { getExpiryStatus, statusColor } from '@/lib/employee-helpers';
 import { useI18n } from '@/lib/i18n';
 import type { Employee } from '@/types';
 
-const PAGE_SIZE = 8;
-
 function ResidenceAlertBanner({
   employees,
   onUpdate,
@@ -678,6 +676,13 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(15);
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
   const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -937,8 +942,8 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
       .replace('{end}', String(end))
       .replace('{total}', String(total));
   };
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const refetchEmployees = async () => {
     try {
@@ -1273,7 +1278,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                 { header: t('form.workRestriction') || 'Work Restriction', key: 'workRestriction', show: false },
               ]}
               fileName={t('client.listTitle')}
-              rowsPerPage={PAGE_SIZE}
+              rowsPerPage={pageSize}
             />
           </div>
         </div>
@@ -1362,7 +1367,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                           className="px-4 py-3.5 text-xs text-slate-450 font-bold font-mono text-center sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10"
                           style={{ position: 'sticky', left: 0 }}
                         >
-                          {(currentPage - 1) * PAGE_SIZE + idx + 1}
+                          {(currentPage - 1) * pageSize + idx + 1}
                         </td>
                       )}
                       {visibleColumns.id && (
@@ -1465,10 +1470,24 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-200/60">
-          <p className="text-xs text-slate-500 font-bold">
-            {getPaginationText((currentPage - 1) * PAGE_SIZE + 1, Math.min(currentPage * PAGE_SIZE, filtered.length), filtered.length)}
-          </p>
+        <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-200/60 flex-wrap gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <p className="text-xs text-slate-550 font-bold">
+              {getPaginationText((currentPage - 1) * pageSize + 1, Math.min(currentPage * pageSize, filtered.length), filtered.length)}
+            </p>
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-bold bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-150 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]">
+              <span className="text-slate-550 font-extrabold">{t('common.pageSize')}:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                className="bg-transparent focus:outline-none cursor-pointer font-extrabold text-indigo-600 pr-1 py-0.5"
+              >
+                {[8, 15, 25, 50, 100].map(size => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="flex gap-1.5 font-mono">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
