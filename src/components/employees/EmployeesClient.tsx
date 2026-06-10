@@ -691,14 +691,26 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('employee_visible_columns');
+      const saved = localStorage.getItem('employee_visible_columns_v2');
       if (saved) {
         try { return JSON.parse(saved); } catch (e) {}
       }
     }
+    // Clean default view: Hide long ID, BirthDate, Visa Card Number, and Expiry by default.
+    // They can be easily toggled on using the Column Settings button.
     return {
-      no: true, id: true, code: true, name: true, department: true, position: true,
-      birthDate: true, nationality: true, visa: true, hireDate: true, card: true, expiry: true,
+      no: true,
+      id: false,
+      code: true,
+      name: true,
+      department: true,
+      position: true,
+      birthDate: false,
+      nationality: true,
+      visa: true,
+      hireDate: true,
+      card: false,
+      expiry: false,
     };
   });
 
@@ -720,7 +732,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev => {
       const updated = { ...prev, [key]: !prev[key] };
-      localStorage.setItem('employee_visible_columns', JSON.stringify(updated));
+      localStorage.setItem('employee_visible_columns_v2', JSON.stringify(updated));
       return updated;
     });
   };
@@ -729,24 +741,25 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
 
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('employee_column_widths');
+      const saved = localStorage.getItem('employee_column_widths_v2');
       if (saved) {
         try { return JSON.parse(saved); } catch (e) {}
       }
     }
+    // Optimized default column widths for tighter, cleaner table rendering without unnecessary scrolls
     return {
       no: 50,
-      id: 120,
-      code: 90,
-      name: 155,
-      department: 125,
-      position: 115,
-      birthDate: 105,
-      nationality: 95,
-      visa: 135,
-      hireDate: 110,
-      card: 130,
-      expiry: 110,
+      id: 95,
+      code: 80,
+      name: 140,
+      department: 110,
+      position: 100,
+      birthDate: 95,
+      nationality: 85,
+      visa: 115,
+      hireDate: 95,
+      card: 110,
+      expiry: 95,
     };
   });
 
@@ -761,7 +774,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
       const newWidth = Math.max(40, startWidth + deltaX);
       setColumnWidths(prev => {
         const updated = { ...prev, [colKey]: newWidth };
-        localStorage.setItem('employee_column_widths', JSON.stringify(updated));
+        localStorage.setItem('employee_column_widths_v2', JSON.stringify(updated));
         return updated;
       });
     };
