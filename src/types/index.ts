@@ -136,6 +136,9 @@ export interface Employee {
   hireDate: string;
   salary: number;
   status: 'ACTIVE' | 'INACTIVE' | 'ON_LEAVE';
+  role: string;
+  address: string | null;
+  language: string;
   nationality: string;
   residenceStatus: string | null;
   residenceCardNumber: string | null;
@@ -151,6 +154,7 @@ export interface Employee {
   salaryType: string;
   hourlyRate: number;
   dailyRate: number;
+  baseSalaryAtHire: number;
   benefits: EmployeeBenefits | null;
   insuranceSalary?: number | null;
   employeeContracts?: EmployeeContract[];

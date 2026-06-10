@@ -90,137 +90,209 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Check required names and emails
-      const firstName = emp.firstName?.trim();
+      // Check required name fields
       const lastName = emp.lastName?.trim();
-      const firstNameKana = emp.firstNameKana?.trim();
-      const lastNameKana = emp.lastNameKana?.trim();
-      const email = emp.email?.trim().toLowerCase();
-      const phone = emp.phone?.trim();
-      const hireDate = emp.hireDate?.trim();
-      const salary = Number(emp.salary);
+      const firstName = emp.firstName?.trim();
 
       const rowDetails: string[] = [];
 
       if (!lastName) rowDetails.push('姓は必須です (Last name is required)');
       if (!firstName) rowDetails.push('名は必須です (First name is required)');
-      if (!lastNameKana) rowDetails.push('姓（カナ）は必須です (Last name Kana is required)');
-      if (!firstNameKana) rowDetails.push('名（カナ）は必須です (First name Kana is required)');
-      if (!email) rowDetails.push('メールアドレスは必須です (Email is required)');
-      if (!phone) rowDetails.push('電話番号は必須です (Phone number is required)');
-      if (!hireDate || isNaN(Date.parse(hireDate))) rowDetails.push('有効な入社日は必須です (Valid hire date is required)');
-      if (isNaN(salary) || salary < 0) rowDetails.push('給与は0以上である必要があります (Salary must be >= 0)');
 
-      // Validate email format
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        rowDetails.push('有効なメールアドレスを入力してください (Invalid email format)');
+      if (rowDetails.length > 0) {
+        errors.push(`行 ${rowNum}: ${rowDetails.join(', ')}`);
+        continue;
       }
 
-      // Check email duplicate in DB or current import batch
-      if (email) {
-        if (dbEmails.has(email)) {
-          rowDetails.push(`メールアドレス「${email}」は既に使用されています (Email already registered)`);
-        } else if (importedEmails.has(email)) {
-          rowDetails.push(`インポートデータ内でメールアドレス「${email}」が重複しています (Email duplicate in import)`);
-        } else {
-          importedEmails.add(email);
-        }
-      }
-
-      // Resolve departmentId (strictly ID-based)
-      const departmentId = emp.departmentId?.trim();
-      if (!departmentId) {
-        rowDetails.push('部署ID (departmentId) が必要です (Department ID is required)');
-      } else if (!deptIdSet.has(departmentId)) {
-        rowDetails.push(`部署ID「${departmentId}」が見つかりません (Department ID not found)`);
-      }
-
-      // Resolve positionId (strictly ID-based)
-      const positionId = emp.positionId?.trim();
-      if (!positionId) {
-        rowDetails.push('役職ID (positionId) が必要です (Position ID is required)');
-      } else if (!posIdSet.has(positionId)) {
-        rowDetails.push(`役職ID「${positionId}」が見つかりません (Position ID not found)`);
-      }
-
-      // Resolve contractTypeId (strictly ID-based)
-      const contractTypeId = emp.contractTypeId?.trim();
-      if (!contractTypeId) {
-        rowDetails.push('雇用形態ID (contractTypeId) が必要です (Contract Type ID is required)');
-      } else if (!ctIdSet.has(contractTypeId)) {
-        rowDetails.push(`雇用形態ID「${contractTypeId}」が見つかりません (Contract Type ID not found)`);
-      }
-
-      // Validate employeeCode
+      // Resolve employeeCode first to use in email generation
       let employeeCode = emp.employeeCode?.trim();
       if (employeeCode) {
         const lowerCode = employeeCode.toLowerCase();
-        if (dbCodes.has(lowerCode)) {
-          rowDetails.push(`従業員コード「${employeeCode}」は既に登録されています (Employee code already exists)`);
-        } else if (importedCodes.has(lowerCode)) {
-          rowDetails.push(`インポートデータ内で従業員コード「${employeeCode}」が重複しています (Employee code duplicate in import)`);
-        } else {
-          importedCodes.add(lowerCode);
+        if (dbCodes.has(lowerCode) || importedCodes.has(lowerCode)) {
+          errors.push(`行 ${rowNum}: 従業員コード「${employeeCode}」は既に登録されているか重複しています (Employee code exists/duplicate)`);
+          continue;
         }
+        importedCodes.add(lowerCode);
       } else {
-        // Auto-generate employeeCode and register it to avoid duplicate generations in this batch
         employeeCode = generateCode();
         importedCodes.add(employeeCode.toLowerCase());
       }
 
-      // Validate birthDate and dates
-      const birthDate = emp.birthDate?.trim();
-      if (birthDate && isNaN(Date.parse(birthDate))) {
-        rowDetails.push('生年月日の形式が不正です (Invalid birth date format)');
+      // Default values for optional fields
+      const lastNameKana = emp.lastNameKana?.trim() || "-";
+      const firstNameKana = emp.firstNameKana?.trim() || "-";
+      const phone = emp.phone?.trim() || "000-0000-0000";
+      
+      let email = emp.email?.trim().toLowerCase();
+      if (!email) {
+        // Safe auto-generated email: e.g. nguyenvantuan.nv001@company.com
+        const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanFirst = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        email = `${cleanLast}${cleanFirst}.${employeeCode.toLowerCase()}@company.com`;
       }
 
-      const residenceExpiry = emp.residenceExpiry?.trim();
-      if (residenceExpiry && isNaN(Date.parse(residenceExpiry))) {
-        rowDetails.push('在留期限の形式が不正です (Invalid residence expiry format)');
+      // Validate email format and check duplicate
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errors.push(`行 ${rowNum}: 有効なメールアドレスを入力してください (Invalid email format: ${email})`);
+        continue;
+      }
+      if (dbEmails.has(email) || importedEmails.has(email)) {
+        errors.push(`行 ${rowNum}: メールアドレス「${email}」は既に使用されているか重複しています (Email exists/duplicate)`);
+        continue;
+      }
+      importedEmails.add(email);
+
+      const rawHireDateStr = emp.hireDate?.trim() || new Date().toISOString().split('T')[0];
+      if (isNaN(Date.parse(rawHireDateStr))) {
+        errors.push(`行 ${rowNum}: 入社日「${rawHireDateStr}」の形式が不正です (Invalid hire date format)`);
+        continue;
+      }
+      const hireDate = new Date(rawHireDateStr);
+
+      const salary = emp.salary !== undefined ? Number(emp.salary) : 280000;
+      if (isNaN(salary) || salary < 0) {
+        errors.push(`行 ${rowNum}: 給与は0以上である必要があります (Salary must be >= 0)`);
+        continue;
       }
 
-      if (rowDetails.length > 0) {
-        errors.push(`行 ${rowNum}: ${rowDetails.join(', ')}`);
-      } else {
-        // Format birthDate password YYYYMMDD or default '123456'
-        const rawBirthDate = birthDate ? new Date(birthDate) : null;
-        const passwordSuffix = birthDate ? birthDate.replace(/-/g, '') : '123456';
-        const password = emp.password || (employeeCode + passwordSuffix);
-        const hashedPassword = hashPassword(password);
-
-        validatedEmployees.push({
-          employeeCode,
-          firstName,
-          lastName,
-          firstNameKana,
-          lastNameKana,
-          email,
-          phone,
-          birthDate: rawBirthDate,
-          departmentId,
-          positionId,
-          contractTypeId,
-          hireDate: new Date(hireDate),
-          salary,
-          salaryType: emp.salaryType || '月給',
-          status: emp.status || 'ACTIVE',
-          nationality: emp.nationality || '日本',
-          residenceStatus: emp.residenceStatus || null,
-          residenceCardNumber: emp.residenceCardNumber || null,
-          residenceExpiry: residenceExpiry ? new Date(residenceExpiry) : null,
-          role: emp.role || 'EMPLOYEE',
-          password: hashedPassword,
-          benefits: emp.benefits || {
-            healthInsurance: true,
-            pension: true,
-            employmentInsurance: true,
-            workersComp: true,
-            transportation: 0,
-            housing: 0,
-            meal: 0,
-          },
-        });
+      // Resolve departmentId (ID-based, name-based lookup, or fallback to first department)
+      let departmentId = emp.departmentId?.trim();
+      if (!departmentId && emp.department?.trim()) {
+        departmentId = deptMap.get(emp.department.trim().toLowerCase());
       }
+      if (!departmentId) {
+        if (departments.length > 0) {
+          departmentId = departments[0].id;
+        } else {
+          errors.push(`行 ${rowNum}: 部署 (departmentId/department) が指定されておらず、デフォルト値もありません (No departments in DB)`);
+          continue;
+        }
+      } else if (!deptIdSet.has(departmentId)) {
+        errors.push(`行 ${rowNum}: 部署「${departmentId}」が見つかりません (Department not found)`);
+        continue;
+      }
+
+      // Resolve positionId (ID-based, name-based lookup, or fallback to first position)
+      let positionId = emp.positionId?.trim();
+      if (!positionId && emp.position?.trim()) {
+        positionId = posMap.get(emp.position.trim().toLowerCase());
+      }
+      if (!positionId) {
+        if (positions.length > 0) {
+          positionId = positions[0].id;
+        } else {
+          errors.push(`行 ${rowNum}: 役職 (positionId/position) が指定されておらず、デフォルト値もありません (No positions in DB)`);
+          continue;
+        }
+      } else if (!posIdSet.has(positionId)) {
+        errors.push(`行 ${rowNum}: 役職「${positionId}」が見つかりません (Position not found)`);
+        continue;
+      }
+
+      // Resolve contractTypeId (ID-based, name-based lookup, or fallback to first contract type)
+      let contractTypeId = emp.contractTypeId?.trim();
+      if (!contractTypeId && emp.contractType?.trim()) {
+        contractTypeId = ctMap.get(emp.contractType.trim().toLowerCase());
+      }
+      if (!contractTypeId) {
+        if (contractTypes.length > 0) {
+          contractTypeId = contractTypes[0].id;
+        } else {
+          errors.push(`行 ${rowNum}: 雇用形態 (contractTypeId/contractType) が指定されておらず、デフォルト値もありません (No contract types in DB)`);
+          continue;
+        }
+      } else if (!ctIdSet.has(contractTypeId)) {
+        errors.push(`行 ${rowNum}: 雇用形態「${contractTypeId}」が見つかりません (Contract Type not found)`);
+        continue;
+      }
+
+      // Parse other optional dates
+      const birthDateStr = emp.birthDate?.trim();
+      if (birthDateStr && isNaN(Date.parse(birthDateStr))) {
+        errors.push(`行 ${rowNum}: 生年月日「${birthDateStr}」の形式が不正です (Invalid birth date format)`);
+        continue;
+      }
+      const birthDate = birthDateStr ? new Date(birthDateStr) : null;
+
+      const residenceExpiryStr = emp.residenceExpiry?.trim();
+      if (residenceExpiryStr && isNaN(Date.parse(residenceExpiryStr))) {
+        errors.push(`行 ${rowNum}: 在留期限「${residenceExpiryStr}」の形式が不正です (Invalid residence expiry format)`);
+        continue;
+      }
+      const residenceExpiry = residenceExpiryStr ? new Date(residenceExpiryStr) : null;
+
+      const residenceCardIssueDateStr = emp.residenceCardIssueDate?.trim();
+      if (residenceCardIssueDateStr && isNaN(Date.parse(residenceCardIssueDateStr))) {
+        errors.push(`行 ${rowNum}: 在留カード交付日「${residenceCardIssueDateStr}」の形式が不正です (Invalid residence card issue date format)`);
+        continue;
+      }
+      const residenceCardIssueDate = residenceCardIssueDateStr ? new Date(residenceCardIssueDateStr) : null;
+
+      const contractStartDateStr = emp.contractStartDate?.trim();
+      if (contractStartDateStr && isNaN(Date.parse(contractStartDateStr))) {
+        errors.push(`行 ${rowNum}: 契約開始日「${contractStartDateStr}」の形式が不正です (Invalid contract start date format)`);
+        continue;
+      }
+      const contractStartDate = contractStartDateStr ? new Date(contractStartDateStr) : hireDate;
+
+      const contractEndDateStr = emp.contractEndDate?.trim();
+      if (contractEndDateStr && isNaN(Date.parse(contractEndDateStr))) {
+        errors.push(`行 ${rowNum}: 契約終了日「${contractEndDateStr}」の形式が不正です (Invalid contract end date format)`);
+        continue;
+      }
+      const contractEndDate = contractEndDateStr ? new Date(contractEndDateStr) : null;
+
+      // Hash password
+      const passwordSuffix = birthDateStr ? birthDateStr.replace(/-/g, '') : '123456';
+      const password = emp.password || (employeeCode + passwordSuffix);
+      const hashedPassword = hashPassword(password);
+
+      // Map all extra database columns
+      validatedEmployees.push({
+        employeeCode,
+        firstName,
+        lastName,
+        firstNameKana,
+        lastNameKana,
+        email,
+        phone,
+        birthDate,
+        departmentId,
+        positionId,
+        contractTypeId,
+        hireDate,
+        salary,
+        salaryType: emp.salaryType || '月給',
+        status: emp.status || 'ACTIVE',
+        nationality: emp.nationality || '日本',
+        residenceStatus: emp.residenceStatus || null,
+        residenceCardNumber: emp.residenceCardNumber || null,
+        residenceCardIssueDate,
+        residenceExpiry,
+        role: emp.role || 'EMPLOYEE',
+        password: hashedPassword,
+        address: emp.address || '',
+        avatar: emp.avatar || '',
+        language: emp.language || 'ja',
+        workRestriction: emp.workRestriction || null,
+        residenceCardImage: emp.residenceCardImage || null,
+        contractStartDate,
+        contractEndDate,
+        contractEndDateType: emp.contractEndDateType || 'none',
+        hourlyRate: emp.hourlyRate !== undefined ? Number(emp.hourlyRate) : 0,
+        dailyRate: emp.dailyRate !== undefined ? Number(emp.dailyRate) : 0,
+        baseSalaryAtHire: emp.baseSalaryAtHire !== undefined ? Number(emp.baseSalaryAtHire) : salary,
+        insuranceSalary: emp.insuranceSalary !== undefined ? Number(emp.insuranceSalary) : null,
+        benefits: emp.benefits || {
+          healthInsurance: true,
+          pension: true,
+          employmentInsurance: true,
+          workersComp: true,
+          transportation: 0,
+          housing: 0,
+          meal: 0,
+        },
+      });
     }
 
     // 5. Return errors if any validation failed
