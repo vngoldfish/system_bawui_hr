@@ -6,6 +6,7 @@ import ExportButtons from '@/components/common/ExportButtons';
 import EmployeeFormModal from './EmployeeFormModal';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import Portal from '@/components/common/Portal';
+import EmployeeImportModal from './EmployeeImportModal';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { translateStatus } from '@/lib/export';
 import { getExpiryStatus, statusColor } from '@/lib/employee-helpers';
@@ -678,6 +679,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
@@ -1092,12 +1094,20 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
       <Card
         title={t('client.listTitle')}
         action={
-          <button onClick={openCreate} disabled={loading} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 shadow-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-1.5">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-            {t('client.addBtn')}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setImportModalOpen(true)} disabled={loading} className="px-4 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer">
+              <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              {t('client.importJsonBtn')}
+            </button>
+            <button onClick={openCreate} disabled={loading} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 shadow-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              {t('client.addBtn')}
+            </button>
+          </div>
         }
       >
         {/* Search & Export */}
@@ -1412,6 +1422,11 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
         employee={editingEmployee}
+      />
+      <EmployeeImportModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onSuccess={refetchEmployees}
       />
       <DeleteConfirmDialog
         isOpen={!!deleteTarget}

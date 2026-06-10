@@ -1,8 +1,18 @@
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import DepartmentsClient from '@/components/departments/DepartmentsClient';
 import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+
+export const dynamic = 'force-dynamic';
 
 export default async function DepartmentsPage() {
+  const cookieStore = await cookies();
+  const sessionUserCookie = cookieStore.get('session_user');
+  if (!sessionUserCookie) {
+    redirect('/login');
+  }
+
   const departments = await prisma.department.findMany({
     include: {
       _count: {

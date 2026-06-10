@@ -1,8 +1,18 @@
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ShitensClient from '@/components/shitens/ShitensClient';
 import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+
+export const dynamic = 'force-dynamic';
 
 export default async function ShitensPage() {
+  const cookieStore = await cookies();
+  const sessionUserCookie = cookieStore.get('session_user');
+  if (!sessionUserCookie) {
+    redirect('/login');
+  }
+
   const shitens = await prisma.shiten.findMany({
     include: {
       _count: {
