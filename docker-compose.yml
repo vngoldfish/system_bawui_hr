@@ -12,6 +12,7 @@ services:
       - SEED_DB=false
       - PORT=3000
       - NODE_ENV=production
+      - TZ=Asia/Tokyo
     depends_on:
       db:
         condition: service_healthy
@@ -23,6 +24,7 @@ services:
       - POSTGRES_USER=${DB_USER:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres_password}
       - POSTGRES_DB=${DB_NAME:-hr_db}
+      - TZ=Asia/Tokyo
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -44,6 +46,7 @@ services:
       - SCHEDULE=@daily
       - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-7}
       - BACKUP_ON_START=TRUE
+      - TZ=Asia/Tokyo
     volumes:
       - ./backups:/backups
     depends_on:

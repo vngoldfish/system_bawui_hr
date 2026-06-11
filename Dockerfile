@@ -21,8 +21,8 @@ RUN npm run build
 
 # --- Stage 3: Production Runner ---
 FROM node:20-alpine AS runner
-# Install libc6-compat and openssl for Prisma compatibility
-RUN apk add --no-cache libc6-compat openssl
+# Install libc6-compat, openssl, and tzdata for compatibility and timezone configuration
+RUN apk add --no-cache libc6-compat openssl tzdata
 WORKDIR /app
 
 ENV NODE_ENV production
