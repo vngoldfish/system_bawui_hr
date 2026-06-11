@@ -9,6 +9,13 @@ const updateContractTypeSchema = z.object({
   description: z.string().optional().nullable(),
   defaultEndDateType: z.enum(['none', 'fixed']).optional(),
   defaultSalaryType: z.enum(['月給', '日給', '時給']).optional(),
+  defaultWorkDays: z.array(z.number().int().min(0).max(6)).optional(),
+  defaultStandardHoursPerDay: z.coerce.number().min(0).max(24).optional(),
+  defaultCheckIn: z.string().optional(),
+  defaultCheckOut: z.string().optional(),
+  defaultBreakStart: z.string().optional(),
+  defaultBreakEnd: z.string().optional(),
+  defaultHolidayWorkCountsAsOvertime: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
 

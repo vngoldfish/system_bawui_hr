@@ -19,6 +19,9 @@ const employeeInclude = {
   certifications: true,
   residenceCardHistory: true,
   shitens: true,
+  salaryAdjustments: {
+    orderBy: { effectiveFrom: 'desc' as const },
+  },
 } satisfies Prisma.EmployeeInclude;
 
 // GET single employee
@@ -80,7 +83,21 @@ export async function PUT(
       return errorResponse('従業員が見つかりません', 404);
     }
 
-    const { dependents, education, certifications, shitenIds, contractTypeId, ...employeeData } = data;
+    const {
+      dependents,
+      education,
+      certifications,
+      shitenIds,
+      contractTypeId,
+      workDays,
+      standardHoursPerDay,
+      defaultCheckIn,
+      defaultCheckOut,
+      defaultBreakStart,
+      defaultBreakEnd,
+      holidayWorkCountsAsOvertime,
+      ...employeeData
+    } = data;
 
     // Build update data with date conversions
     const updateData: Prisma.EmployeeUpdateInput = {};
@@ -196,6 +213,94 @@ export async function PUT(
           residenceCardImage: historicalImage,
         },
       });
+    }
+
+    // Manage contract lifecycle when a resigned employee is rehired
+    let isRehired = false;
+    if (existing.status === 'INACTIVE' && updateData.status === 'ACTIVE') {
+      isRehired = true;
+      // Deactivate all existing active contracts
+      await prisma.employeeContract.updateMany({
+        where: { employeeId: id, isActive: true },
+        data: { isActive: false },
+      });
+
+      // Create new contract using updated contract details or defaults
+      const resolvedContractTypeId = contractTypeId || existing.contractTypeId;
+      const finalStartDate = employeeData.contractStartDate ? new Date(employeeData.contractStartDate) : (employeeData.hireDate ? new Date(employeeData.hireDate) : new Date());
+      const finalEndDate = employeeData.contractEndDate ? new Date(employeeData.contractEndDate) : null;
+      const firstName = employeeData.firstName || existing.firstName;
+      const lastName = employeeData.lastName || existing.lastName;
+
+      await prisma.employeeContract.create({
+        data: {
+          employeeId: id,
+          contractTypeId: resolvedContractTypeId,
+          name: `${lastName} ${firstName} 勤務契約`,
+          startDate: finalStartDate,
+          endDate: finalEndDate,
+          workDays: (workDays ?? [1, 2, 3, 4, 5]) as any,
+          standardHoursPerDay: standardHoursPerDay ?? 8,
+          defaultCheckIn: defaultCheckIn ?? '08:00',
+          defaultCheckOut: defaultCheckOut ?? '17:00',
+          defaultBreakStart: defaultBreakStart ?? '12:00',
+          defaultBreakEnd: defaultBreakEnd ?? '13:00',
+          holidayWorkCountsAsOvertime: holidayWorkCountsAsOvertime ?? true,
+          isActive: true,
+        }
+      });
+    }
+
+    // Update active contract details if updated and not rehired
+    if (!isRehired) {
+      const hasContractScheduleUpdates =
+        workDays !== undefined ||
+        standardHoursPerDay !== undefined ||
+        defaultCheckIn !== undefined ||
+        defaultCheckOut !== undefined ||
+        defaultBreakStart !== undefined ||
+        defaultBreakEnd !== undefined ||
+        holidayWorkCountsAsOvertime !== undefined;
+
+      if (hasContractScheduleUpdates) {
+        const activeContract = await prisma.employeeContract.findFirst({
+          where: { employeeId: id, isActive: true },
+        });
+
+        if (activeContract) {
+          await prisma.employeeContract.update({
+            where: { id: activeContract.id },
+            data: {
+              ...(workDays !== undefined && workDays !== null && { workDays: workDays as any }),
+              ...(standardHoursPerDay !== undefined && standardHoursPerDay !== null && { standardHoursPerDay }),
+              ...(defaultCheckIn !== undefined && defaultCheckIn !== null && { defaultCheckIn }),
+              ...(defaultCheckOut !== undefined && defaultCheckOut !== null && { defaultCheckOut }),
+              ...(defaultBreakStart !== undefined && defaultBreakStart !== null && { defaultBreakStart }),
+              ...(defaultBreakEnd !== undefined && defaultBreakEnd !== null && { defaultBreakEnd }),
+              ...(holidayWorkCountsAsOvertime !== undefined && holidayWorkCountsAsOvertime !== null && { holidayWorkCountsAsOvertime }),
+            },
+          });
+        } else {
+          // Fallback create active contract if none exists
+          await prisma.employeeContract.create({
+            data: {
+              employeeId: id,
+              contractTypeId: contractTypeId || existing.contractTypeId,
+              name: `${employeeData.lastName || existing.lastName} ${employeeData.firstName || existing.firstName} 勤務契約`,
+              startDate: employeeData.contractStartDate ? new Date(employeeData.contractStartDate) : (employeeData.hireDate ? new Date(employeeData.hireDate) : new Date()),
+              endDate: employeeData.contractEndDate ? new Date(employeeData.contractEndDate) : null,
+              workDays: (workDays ?? [1, 2, 3, 4, 5]) as any,
+              standardHoursPerDay: standardHoursPerDay ?? 8,
+              defaultCheckIn: defaultCheckIn ?? '08:00',
+              defaultCheckOut: defaultCheckOut ?? '17:00',
+              defaultBreakStart: defaultBreakStart ?? '12:00',
+              defaultBreakEnd: defaultBreakEnd ?? '13:00',
+              holidayWorkCountsAsOvertime: holidayWorkCountsAsOvertime ?? true,
+              isActive: true,
+            },
+          });
+        }
+      }
     }
 
     // Update employee with nested operations

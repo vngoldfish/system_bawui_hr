@@ -158,6 +158,7 @@ export interface Employee {
   benefits: EmployeeBenefits | null;
   insuranceSalary?: number | null;
   employeeContracts?: EmployeeContract[];
+  salaryAdjustments?: SalaryAdjustment[];
   dependents: Dependent[];
   education: Education[];
   certifications: Certification[];
@@ -266,4 +267,19 @@ export interface ApiResponse<T> {
     totalPages: number;
   };
   error?: string;
+}
+
+export interface SalaryAdjustment {
+  id: string;
+  employeeId: string;
+  effectiveFrom: string;
+  oldBaseSalary: number;
+  newBaseSalary: number;
+  oldHourlyRate: number;
+  newHourlyRate: number;
+  oldDailyRate: number;
+  newDailyRate: number;
+  reason: string;
+  adjustedBy?: string | null;
+  adjustedAt: string;
 }

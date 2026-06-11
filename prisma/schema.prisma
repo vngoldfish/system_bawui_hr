@@ -38,15 +38,22 @@ model Position {
 
 // ContractType model
 model ContractType {
-  id                 String   @id @default(cuid())
-  name               String
-  nameKana           String
-  description        String?
-  defaultEndDateType String   @default("none")
-  defaultSalaryType  String   @default("月給")
-  isActive           Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                                 String   @id @default(cuid())
+  name                               String
+  nameKana                           String
+  description                        String?
+  defaultEndDateType                 String   @default("none")
+  defaultSalaryType                  String   @default("月給")
+  defaultWorkDays                    Json     @default("[1,2,3,4,5]")
+  defaultStandardHoursPerDay         Float    @default(8)
+  defaultCheckIn                     String   @default("08:00")
+  defaultCheckOut                    String   @default("17:00")
+  defaultBreakStart                  String   @default("12:00")
+  defaultBreakEnd                    String   @default("13:00")
+  defaultHolidayWorkCountsAsOvertime Boolean  @default(true)
+  isActive                           Boolean  @default(true)
+  createdAt                          DateTime @default(now())
+  updatedAt                          DateTime @updatedAt
 
   employees         Employee[]
   employeeContracts EmployeeContract[]

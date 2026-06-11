@@ -128,7 +128,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
 
   // Filter foreign employees only
   const foreignEmployees = useMemo(() => {
-    return employees.filter(emp => emp.nationality && emp.nationality !== '日本' && emp.residenceExpiry);
+    return employees.filter(emp => emp.status !== 'INACTIVE' && emp.nationality && emp.nationality !== '日本' && emp.residenceExpiry);
   }, [employees]);
 
   // Apply filters and sort

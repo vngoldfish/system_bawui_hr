@@ -16,6 +16,9 @@ const employeeInclude = {
   certifications: true,
   residenceCardHistory: true,
   shitens: true,
+  salaryAdjustments: {
+    orderBy: { effectiveFrom: 'desc' as const },
+  },
 } satisfies Prisma.EmployeeInclude;
 
 // GET all employees with pagination, search, filter
@@ -98,7 +101,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = createEmployeeSchema.parse(body);
 
-    const { dependents, education, certifications, shitenIds, employeeCode: inputCode, contractTypeId, departmentId, positionId, ...employeeData } = data;
+    const {
+      dependents,
+      education,
+      certifications,
+      shitenIds,
+      employeeCode: inputCode,
+      contractTypeId,
+      departmentId,
+      positionId,
+      workDays,
+      standardHoursPerDay,
+      defaultCheckIn,
+      defaultCheckOut,
+      defaultBreakStart,
+      defaultBreakEnd,
+      holidayWorkCountsAsOvertime,
+      ...employeeData
+    } = data;
 
     // Auto-generate employeeCode if not provided
     let employeeCode = inputCode?.trim() || '';
@@ -165,13 +185,13 @@ export async function POST(request: NextRequest) {
             name: `${employeeData.lastName} ${employeeData.firstName} 勤務契約`,
             startDate: employeeData.contractStartDate ? new Date(employeeData.contractStartDate) : new Date(employeeData.hireDate),
             endDate: employeeData.contractEndDate ? new Date(employeeData.contractEndDate) : null,
-            workDays: [1, 2, 3, 4, 5],
-            standardHoursPerDay: 8,
-            defaultCheckIn: '08:00',
-            defaultCheckOut: '17:00',
-            defaultBreakStart: '12:00',
-            defaultBreakEnd: '13:00',
-            holidayWorkCountsAsOvertime: true,
+            workDays: (workDays ?? [1, 2, 3, 4, 5]) as any,
+            standardHoursPerDay: standardHoursPerDay ?? 8,
+            defaultCheckIn: defaultCheckIn ?? '08:00',
+            defaultCheckOut: defaultCheckOut ?? '17:00',
+            defaultBreakStart: defaultBreakStart ?? '12:00',
+            defaultBreakEnd: defaultBreakEnd ?? '13:00',
+            holidayWorkCountsAsOvertime: holidayWorkCountsAsOvertime ?? true,
             isActive: true,
           }
         },

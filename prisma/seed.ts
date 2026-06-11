@@ -396,7 +396,7 @@ async function main() {
   
   const allEmployees = await prisma.employee.findMany();
   const now = new Date();
-  const hrManager = allEmployees.find(e => e.role === 'HR_MANAGER') || allEmployees[0];
+  const hrManager = allEmployees.find((e: any) => e.role === 'HR_MANAGER') || allEmployees[0];
   
   // Define leave types
   const leaveTypes = ['ANNUAL', 'SICK', 'PERSONAL', 'OTHER'] as const;

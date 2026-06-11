@@ -314,7 +314,19 @@ export async function POST(request: NextRequest) {
     // 6. Execute bulk transaction
     await prisma.$transaction(async (tx) => {
       for (const empData of validatedEmployees) {
-        const { departmentId, positionId, contractTypeId, ...dbData } = empData;
+        const {
+          departmentId,
+          positionId,
+          contractTypeId,
+          workDays,
+          standardHoursPerDay,
+          defaultCheckIn,
+          defaultCheckOut,
+          defaultBreakStart,
+          defaultBreakEnd,
+          holidayWorkCountsAsOvertime,
+          ...dbData
+        } = empData;
         const employee = await tx.employee.create({
           data: {
             ...dbData,
@@ -326,13 +338,13 @@ export async function POST(request: NextRequest) {
                 contractTypeId,
                 name: `${dbData.lastName} ${dbData.firstName} 勤務契約`,
                 startDate: dbData.hireDate,
-                workDays: [1, 2, 3, 4, 5],
-                standardHoursPerDay: 8,
-                defaultCheckIn: '08:00',
-                defaultCheckOut: '17:00',
-                defaultBreakStart: '12:00',
-                defaultBreakEnd: '13:00',
-                holidayWorkCountsAsOvertime: true,
+                workDays: workDays ?? [1, 2, 3, 4, 5],
+                standardHoursPerDay: standardHoursPerDay ?? 8,
+                defaultCheckIn: defaultCheckIn ?? '08:00',
+                defaultCheckOut: defaultCheckOut ?? '17:00',
+                defaultBreakStart: defaultBreakStart ?? '12:00',
+                defaultBreakEnd: defaultBreakEnd ?? '13:00',
+                holidayWorkCountsAsOvertime: holidayWorkCountsAsOvertime ?? true,
                 isActive: true,
               }
             }

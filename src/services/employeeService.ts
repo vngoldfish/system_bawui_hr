@@ -15,6 +15,9 @@ const employeeIncludeFull = {
     include: { contractType: true },
     orderBy: { startDate: 'desc' as const },
   },
+  salaryAdjustments: {
+    orderBy: { effectiveFrom: 'desc' as const },
+  },
 };
 
 // Optimized relation includes for contracts listing

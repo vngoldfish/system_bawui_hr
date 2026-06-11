@@ -331,17 +331,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     setDefaultHasBreak(hasBreak);
   };
 
-  // Live Clock State
-  const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
-  // Initialize clock on mount
-  useEffect(() => {
-    setCurrentTime(new Date());
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Save viewMode to local storage
   useEffect(() => {
@@ -474,26 +464,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     return d === 0 ? 6 : d - 1;
   }, [selectedYear, selectedMonth]);
 
-  // Today's record for Selected Employee
-  const todayRecord = useMemo(() => {
-    if (!selectedEmployee) return null;
-    return records.find(r => r.employeeId === selectedEmployee.id && dateOnly(r.date) === todayStr);
-  }, [records, selectedEmployee, todayStr]);
 
-  // Today's real-time state for Clock panel
-  const clockStatus = useMemo(() => {
-    if (!todayRecord) return 'NOT_CLOCKED_IN';
-    if (todayRecord.checkIn && !todayRecord.checkOut) {
-      if (todayRecord.breakStart && !todayRecord.breakEnd) {
-        return 'ON_BREAK';
-      }
-      return 'WORKING';
-    }
-    if (todayRecord.checkIn && todayRecord.checkOut) {
-      return 'CLOCKED_OUT';
-    }
-    return 'NOT_CLOCKED_IN';
-  }, [todayRecord]);
 
   // Automated Compliance alerts scanner
   const complianceAlerts = useMemo(() => {
@@ -812,108 +783,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     }
   };
 
-  // Quick Action Clock Punch
-  const handleQuickClock = async (action: 'CLOCK_IN' | 'BREAK_START' | 'BREAK_END' | 'CLOCK_OUT') => {
-    if (!selectedEmployee) return;
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
-    const dateISO = `${todayStr}T00:00:00.000Z`;
 
-    const data: any = {
-      employeeId: selectedEmployee.id,
-      date: dateISO,
-    };
-
-    if (action === 'CLOCK_IN') {
-      const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0);
-      data.checkIn = timeStr;
-      data.status = isLate ? 'LATE' : 'PRESENT';
-      data.notes = isLate ? getAttendanceText('autoLateReason', locale) : '';
-    } else if (action === 'BREAK_START') {
-      data.checkIn = todayRecord?.checkIn ? new Date(todayRecord.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '09:00';
-      data.breakStart = timeStr;
-      data.status = todayRecord?.status || 'PRESENT';
-    } else if (action === 'BREAK_END') {
-      data.checkIn = todayRecord?.checkIn ? new Date(todayRecord.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '09:00';
-      data.breakStart = todayRecord?.breakStart ? new Date(todayRecord.breakStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '12:00';
-      data.breakEnd = timeStr;
-      data.status = todayRecord?.status || 'PRESENT';
-    } else if (action === 'CLOCK_OUT') {
-      const checkInTime = todayRecord?.checkIn ? new Date(todayRecord.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '09:00';
-      const breakStartTime = todayRecord?.breakStart ? new Date(todayRecord.breakStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null;
-      const breakEndTime = todayRecord?.breakEnd ? new Date(todayRecord.breakEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null;
-      
-      data.checkIn = checkInTime;
-      data.breakStart = breakStartTime;
-      data.breakEnd = breakEndTime;
-      data.checkOut = `${todayStr}T${timeStr}:00`;
-      
-      // Calculate overtime hours using rounding policy
-      const rStart = todayRecord?.checkIn ? applyRounding(new Date(todayRecord.checkIn), roundingPolicy, true) : applyRounding(new Date(`${todayStr}T09:00:00`), roundingPolicy, true);
-      const rEnd = applyRounding(now, roundingPolicy, false);
-      
-      let workMinutes = 0;
-      if (rStart && rEnd) {
-        workMinutes = (rEnd.getTime() - rStart.getTime()) / (1000 * 60);
-        
-        let breakMinutes = 0;
-        if (todayRecord?.breakStart && todayRecord?.breakEnd) {
-          const rBStart = applyRounding(new Date(todayRecord.breakStart), roundingPolicy, true);
-          const rBEnd = applyRounding(new Date(todayRecord.breakEnd), roundingPolicy, false);
-          if (rBStart && rBEnd) {
-            breakMinutes = (rBEnd.getTime() - rBStart.getTime()) / (1000 * 60);
-          }
-        } else if (todayRecord?.breakStart || todayRecord?.breakEnd) {
-          breakMinutes = 60;
-        }
-        workMinutes -= breakMinutes;
-      }
-      
-      const ot = Math.max(0, (workMinutes - 8 * 60) / 60);
-      data.overtimeHours = Math.round(ot * 10) / 10;
-      data.status = todayRecord?.status || 'PRESENT';
-    }
-
-    try {
-      let resSave;
-      if (isEmployeeMode) {
-        const actionMap: Record<string, string> = {
-          CLOCK_IN: 'checkIn',
-          BREAK_START: 'breakStart',
-          BREAK_END: 'breakEnd',
-          CLOCK_OUT: 'checkOut'
-        };
-        resSave = await fetch('/api/attendance/punch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: actionMap[action] }),
-        });
-      } else {
-        const method = todayRecord ? 'PUT' : 'POST';
-        const bodyData = todayRecord ? { ...data, id: todayRecord.id } : data;
-
-        resSave = await fetch('/api/attendance', {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bodyData),
-        });
-      }
-
-      if (!resSave.ok) throw new Error('Save failed');
-
-      // Refresh records
-      const res = await fetch(`/api/attendance?employeeId=${selectedEmployee.id}`);
-      const updatedRecords = await res.json();
-
-      setRecords(prev => {
-        const others = prev.filter(r => r.employeeId !== selectedEmployee.id);
-        return [...others, ...updatedRecords];
-      });
-    } catch (e) {
-      console.error(e);
-      alert(getAttendanceText('punchSaveError', locale));
-    }
-  };
 
   const getDayColor = (record: AttendanceRecord | undefined, holiday: Holiday | null, contractWorkDay: boolean, dateStr: string) => {
     const dObj = new Date(`${dateStr}T00:00:00`);
@@ -1533,92 +1403,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
         {!rightSidebarCollapsed && (
           <div className="space-y-6 animate-fadeIn">
           
-          {/* Live Punch Console */}
-          <Card className="bg-slate-900 text-white border-0 shadow-[0_10px_35px_rgba(0,0,0,0.15)] rounded-3xl p-5 relative overflow-hidden">
-            {/* Background glowing halo */}
-            <div className="absolute -right-16 -top-16 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -left-16 -bottom-16 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="text-center relative">
-              <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase">
-                {getAttendanceText('punchStation', locale)}
-              </span>
-              
-              {/* Digital Clock */}
-              <div className="my-4">
-                <p className="text-3xl font-black tracking-widest font-mono tabular-nums leading-none">
-                  {currentTime ? currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '00:00:00'}
-                </p>
-                <p className="text-[10px] text-slate-450 mt-1">
-                  {currentTime ? currentTime.toLocaleDateString(locale === 'vi' ? 'vi-VN' : locale === 'zh' ? 'zh-CN' : locale === 'th' ? 'th-TH' : locale === 'en' ? 'en-US' : 'ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }) : '---'}
-                </p>
-              </div>
-
-              {/* Status Ring */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 mb-6 transition-all duration-300">
-                <span className={`w-2 h-2 rounded-full ${
-                  clockStatus === 'WORKING' ? 'bg-emerald-500 animate-ping' :
-                  clockStatus === 'ON_BREAK' ? 'bg-sky-500 animate-pulse' :
-                  clockStatus === 'CLOCKED_OUT' ? 'bg-slate-400' :
-                  'bg-rose-500'
-                }`} />
-                <span className="text-[10px] font-black tracking-wide uppercase">
-                  {clockStatus === 'WORKING' ? getAttendanceText('statusWorking', locale) :
-                   clockStatus === 'ON_BREAK' ? getAttendanceText('statusOnBreak', locale) :
-                   clockStatus === 'CLOCKED_OUT' ? getAttendanceText('statusClockedOut', locale) :
-                   getAttendanceText('statusNotClockedIn', locale)}
-                </span>
-              </div>
-
-              {/* Action Buttons Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => handleQuickClock('CLOCK_IN')}
-                  disabled={clockStatus !== 'NOT_CLOCKED_IN'}
-                  className={`py-3.5 rounded-2xl text-xs font-black shadow transition-all duration-200 cursor-pointer ${
-                    clockStatus === 'NOT_CLOCKED_IN'
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-95 text-white'
-                      : 'bg-white/5 text-slate-550 border border-white/5 cursor-not-allowed'
-                  }`}
-                >
-                  {getAttendanceText('btnClockIn', locale)}
-                </button>
-                <button
-                  onClick={() => handleQuickClock('CLOCK_OUT')}
-                  disabled={clockStatus !== 'WORKING'}
-                  className={`py-3.5 rounded-2xl text-xs font-black shadow transition-all duration-200 cursor-pointer ${
-                    clockStatus === 'WORKING'
-                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white'
-                      : 'bg-white/5 text-slate-550 border border-white/5 cursor-not-allowed'
-                  }`}
-                >
-                  {getAttendanceText('btnClockOut', locale)}
-                </button>
-                <button
-                  onClick={() => handleQuickClock('BREAK_START')}
-                  disabled={clockStatus !== 'WORKING'}
-                  className={`py-3.5 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${
-                    clockStatus === 'WORKING'
-                      ? 'bg-white/10 hover:bg-white/15 active:scale-95 text-white border border-white/10'
-                      : 'bg-white/5 text-slate-550 border border-white/5 cursor-not-allowed'
-                  }`}
-                >
-                  {getAttendanceText('btnBreakStart', locale)}
-                </button>
-                <button
-                  onClick={() => handleQuickClock('BREAK_END')}
-                  disabled={clockStatus !== 'ON_BREAK'}
-                  className={`py-3.5 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${
-                    clockStatus === 'ON_BREAK'
-                      ? 'bg-white/10 hover:bg-white/15 active:scale-95 text-white border border-white/10'
-                      : 'bg-white/5 text-slate-550 border border-white/5 cursor-not-allowed'
-                  }`}
-                >
-                  {getAttendanceText('btnBreakEnd', locale)}
-                </button>
-              </div>
-            </div>
-          </Card>
 
           {/* 36 Agreement Limit Gauge */}
           <Card title={getAttendanceText('otLimitTitle', locale)} className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-5">

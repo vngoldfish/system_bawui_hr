@@ -7,8 +7,8 @@ import EmployeeFormModal from './EmployeeFormModal';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import Portal from '@/components/common/Portal';
 import EmployeeImportModal from './EmployeeImportModal';
+import NewSalaryAdjustmentModal from './NewSalaryAdjustmentModal';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { translateStatus } from '@/lib/export';
 import { getExpiryStatus, statusColor } from '@/lib/employee-helpers';
 import { useI18n } from '@/lib/i18n';
 import type { Employee } from '@/types';
@@ -23,7 +23,7 @@ function ResidenceAlertBanner({
   const { t } = useI18n();
   const alerts = useMemo(() => {
     return employees
-      .filter(e => e.nationality && e.nationality !== '\u65e5\u672c' && e.residenceExpiry)
+      .filter(e => e.status !== 'INACTIVE' && e.nationality && e.nationality !== '\u65e5\u672c' && e.residenceExpiry)
       .map(e => ({ employee: e, status: getExpiryStatus(e.residenceExpiry!) }))
       .filter(a => a.status.level === 'expired' || a.status.level === 'expiring')
       .sort((a, b) => a.status.daysLeft - b.status.daysLeft);
@@ -105,11 +105,27 @@ function ResidenceAlertBanner({
   );
 }
 
-function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee; onClose: () => void; onEdit: () => void }) {
+function EmployeeDetailModal({ employee: initialEmployee, onClose, onEdit, onSave }: { employee: Employee; onClose: () => void; onEdit: () => void; onSave?: () => void }) {
   const { t, locale } = useI18n();
-  const [activeTab, setActiveTab] = useState<'basic' | 'contract' | 'visa' | 'background' | 'dependents'>('basic');
+  const [employee, setEmployee] = useState<Employee>(initialEmployee);
+  const [activeTab, setActiveTab] = useState<'basic' | 'contract' | 'visa' | 'background' | 'dependents' | 'salary'>('basic');
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
   const expiry = employee.residenceExpiry ? getExpiryStatus(employee.residenceExpiry) : null;
   const isForeigner = employee.nationality && employee.nationality !== '\u65e5\u672c';
+
+  const refreshEmployeeData = async () => {
+    try {
+      const res = await fetch(`/api/employees/${employee.id}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.data) {
+          setEmployee(json.data);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Fallback to basic tab if visa tab is selected for Japanese employees
   useEffect(() => {
@@ -226,6 +242,11 @@ function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee
     { id: 'dependents', label: t('client.tabDependents'), icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ) },
+    { id: 'salary', label: t('client.tabSalary'), icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ) },
   ];
@@ -599,6 +620,106 @@ function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee
             </div>
           )}
 
+          {/* TAB 6: Salary History */}
+          {activeTab === 'salary' && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="bg-slate-50/50 border border-slate-200/60 rounded-2xl p-5 shadow-xs">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {t('client.salaryHistoryTitle')}
+                  </h3>
+                  <button
+                    onClick={() => setShowAdjustModal(true)}
+                    className="px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-1.5"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    {t('client.adjustSalaryBtn')}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 mb-6 bg-white p-4 rounded-xl border border-slate-200/60">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-xs text-slate-500 font-bold">{t('form.salaryType')}</span>
+                    <span className="text-sm font-bold text-slate-800">{employee.salaryType || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-xs text-slate-500 font-bold">{t('client.currentSalaryLabel')}</span>
+                    <span className="text-sm font-extrabold text-emerald-600 font-mono">
+                      {employee.salaryType === '月給' ? formatCurrency(employee.salary) :
+                       employee.salaryType === '時給' ? `${formatCurrency(employee.hourlyRate || 0)}/h` :
+                       `${formatCurrency(employee.dailyRate || 0)}/d`}
+                    </span>
+                  </div>
+                </div>
+
+                {employee.salaryAdjustments && employee.salaryAdjustments.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-[10px] text-slate-450 font-bold uppercase tracking-wider">
+                          <th className="py-2.5 px-3">{t('client.effectiveMonth')}</th>
+                          <th className="py-2.5 px-3 text-right">{t('client.newSalary')}</th>
+                          <th className="py-2.5 px-3 text-right">{t('client.newHourlyRate')}</th>
+                          <th className="py-2.5 px-3 text-right">{t('client.newDailyRate')}</th>
+                          <th className="py-2.5 px-3">{t('client.changeReason')}</th>
+                          <th className="py-2.5 px-3 text-right">{t('client.adjustedDate')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {employee.salaryAdjustments.map((adj) => (
+                          <tr key={adj.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors text-xs text-slate-700">
+                            <td className="py-3 px-3 font-semibold text-slate-850">{adj.effectiveFrom}</td>
+                            <td className="py-3 px-3 text-right font-mono font-medium">
+                              {adj.oldBaseSalary !== adj.newBaseSalary ? (
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[10px] text-slate-400 line-through">{formatCurrency(adj.oldBaseSalary)}</span>
+                                  <span className="text-emerald-600 font-bold">{formatCurrency(adj.newBaseSalary)}</span>
+                                </div>
+                              ) : (
+                                <span>{formatCurrency(adj.newBaseSalary)}</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-medium">
+                              {adj.oldHourlyRate !== adj.newHourlyRate ? (
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[10px] text-slate-400 line-through">{formatCurrency(adj.oldHourlyRate)}</span>
+                                  <span className="text-emerald-600 font-bold">{formatCurrency(adj.newHourlyRate)}</span>
+                                </div>
+                              ) : (
+                                <span>{formatCurrency(adj.newHourlyRate)}</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-medium">
+                              {adj.oldDailyRate !== adj.newDailyRate ? (
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[10px] text-slate-400 line-through">{formatCurrency(adj.oldDailyRate)}</span>
+                                  <span className="text-emerald-600 font-bold">{formatCurrency(adj.newDailyRate)}</span>
+                                </div>
+                              ) : (
+                                <span>{formatCurrency(adj.newDailyRate)}</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 max-w-[150px] truncate" title={adj.reason}>{adj.reason || '-'}</td>
+                            <td className="py-3 px-3 text-right text-[10px] text-slate-450 font-mono">{formatDate(adj.adjustedAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 border border-dashed border-slate-200 rounded-2xl bg-slate-50/30">
+                    <p className="text-xs text-slate-400">{t('client.salaryHistoryNone')}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Hidden complete sheet for PDF Printing */}
@@ -662,6 +783,17 @@ function EmployeeDetailModal({ employee, onClose, onEdit }: { employee: Employee
 
       </div>
     </div>
+      {showAdjustModal && (
+        <NewSalaryAdjustmentModal
+          isOpen={showAdjustModal}
+          onClose={() => setShowAdjustModal(false)}
+          onSuccess={() => {
+            refreshEmployeeData();
+            onSave?.();
+          }}
+          employee={employee}
+        />
+      )}
     </Portal>
   );
 }
@@ -698,7 +830,15 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('employee_visible_columns_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') {
+            return {
+              status: true,
+              ...parsed
+            };
+          }
+        } catch (e) {}
       }
     }
     // Clean default view: Hide long ID, BirthDate, Visa Card Number, and Expiry by default.
@@ -716,6 +856,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
       hireDate: true,
       card: false,
       expiry: false,
+      status: true,
     };
   });
 
@@ -729,9 +870,10 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
     { key: 'birthDate', label: t('client.colBirth') },
     { key: 'nationality', label: t('client.colNation') },
     { key: 'visa', label: t('client.colVisa') },
-    { key: 'hireDate', label: t('client.colHire') },
     { key: 'card', label: t('client.colCard') },
     { key: 'expiry', label: t('client.colExpiry') },
+    { key: 'hireDate', label: t('client.colHire') },
+    { key: 'status', label: t('common.status') || '状態' },
   ];
 
   const toggleColumn = (key: string) => {
@@ -748,7 +890,15 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('employee_column_widths_v2');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') {
+            return {
+              status: 100,
+              ...parsed
+            };
+          }
+        } catch (e) {}
       }
     }
     // Optimized default column widths for tighter, cleaner table rendering without unnecessary scrolls
@@ -765,6 +915,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
       hireDate: 95,
       card: 110,
       expiry: 95,
+      status: 100,
     };
   });
 
@@ -1201,7 +1352,8 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
               )}
             </div>
             <ExportButtons
-              data={filtered.map(e => ({
+              data={filtered.map((e, idx) => ({
+                no: String(idx + 1),
                 id: e.id,
                 code: e.employeeCode || '-',
                 lastName: e.lastName || '-',
@@ -1225,7 +1377,13 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                 phone: e.phone || '-',
                 address: e.address || '-',
                 role: e.role || '-',
-                status: e.status || '-',
+                status: e.status === 'ACTIVE' 
+                  ? t('client.statusActive') 
+                  : e.status === 'ON_LEAVE' 
+                  ? t('client.statusLeave') 
+                  : e.status === 'INACTIVE' 
+                  ? (e.contractEndDate ? `${t('client.statusInactive')} (${formatDate(e.contractEndDate)})` : t('client.statusInactive'))
+                  : '-',
                 salary: e.salary,
                 salaryType: e.salaryType || '-',
                 hourlyRate: e.hourlyRate || 0,
@@ -1240,6 +1398,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                 workRestriction: e.workRestriction || '-',
               }))}
               columns={[
+                { header: 'No.', key: 'no', show: visibleColumns.no },
                 { header: 'ID', key: 'id', show: visibleColumns.id },
                 { header: t('client.colCode'), key: 'code', show: visibleColumns.code },
                 { header: t('form.lastName') || 'Last Name', key: 'lastName', show: false },
@@ -1257,13 +1416,13 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                 { header: t('client.colBirth'), key: 'birthDate', show: visibleColumns.birthDate },
                 { header: t('client.colNation'), key: 'nationality', show: visibleColumns.nationality },
                 { header: t('client.colVisa'), key: 'visaType', show: visibleColumns.visa },
-                { header: t('client.colHire'), key: 'hireDate', show: visibleColumns.hireDate },
                 { header: t('client.colCard'), key: 'cardNumber', show: visibleColumns.card },
                 { header: t('client.colExpiry'), key: 'expiry', show: visibleColumns.expiry },
+                { header: t('client.colHire'), key: 'hireDate', show: visibleColumns.hireDate },
+                { header: t('common.status') || 'Status', key: 'status', show: visibleColumns.status },
                 { header: t('form.phone') || 'Phone', key: 'phone', show: false },
                 { header: t('form.address') || 'Address', key: 'address', show: false },
                 { header: t('form.role') || 'Role', key: 'role', show: false },
-                { header: t('common.status') || 'Status', key: 'status', show: false },
                 { header: t('form.salary') || 'Salary', key: 'salary', show: false },
                 { header: t('form.salaryType') || 'Salary Type', key: 'salaryType', show: false },
                 { header: t('form.hourlyRate') || 'Hourly Rate', key: 'hourlyRate', show: false },
@@ -1432,7 +1591,6 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                         ) : <span className="text-slate-300 text-xs">-</span>}
                       </td>
                     )}
-                    {visibleColumns.hireDate && <td className="px-4 py-3.5 text-xs font-medium text-slate-650 font-mono truncate">{formatDate(employee.hireDate)}</td>}
                     {visibleColumns.card && (
                       <td className="px-4 py-3.5 text-xs font-mono font-semibold text-slate-650 truncate">
                         {employee.nationality && employee.nationality !== '\u65e5\u672c' ? employee.residenceCardNumber || '-' : <span className="text-slate-300 text-xs">-</span>}
@@ -1445,6 +1603,27 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                             {formatDate(employee.residenceExpiry)}
                           </span>
                         ) : <span className="text-slate-300 text-xs">-</span>}
+                      </td>
+                    )}
+                    {visibleColumns.hireDate && <td className="px-4 py-3.5 text-xs font-medium text-slate-650 font-mono truncate">{formatDate(employee.hireDate)}</td>}
+                    {visibleColumns.status && (
+                      <td className="px-4 py-3.5 text-xs">
+                        <div className="flex flex-col items-center gap-1.5 min-w-0">
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border inline-block text-center ${
+                            employee.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-700 border-emerald-250/20' :
+                            employee.status === 'ON_LEAVE' ? 'bg-blue-500/10 text-blue-700 border-blue-250/20' :
+                            'bg-slate-100 text-slate-650 border-slate-200'
+                          }`}>
+                            {employee.status === 'ACTIVE' ? t('client.statusActive') : 
+                             employee.status === 'ON_LEAVE' ? t('client.statusLeave') : 
+                             t('client.statusInactive')}
+                          </span>
+                          {employee.status === 'INACTIVE' && employee.contractEndDate && (
+                            <span className="text-[10px] text-slate-450 font-mono font-bold whitespace-nowrap block" title={t('form.resignationDate') || '退職日'}>
+                              {formatDate(employee.contractEndDate)}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     )}
                     <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
@@ -1543,6 +1722,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
           employee={viewingEmployee}
           onClose={() => setViewingEmployee(null)}
           onEdit={() => openEdit(viewingEmployee)}
+          onSave={refetchEmployees}
         />
       )}
     </>
