@@ -602,13 +602,13 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     setFormDate(record ? dateOnly(record.date) : date);
     
     if (record) {
-      setFormCheckIn(record.checkIn ? new Date(record.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).substring(0, 5) : '08:00');
+      setFormCheckIn(record.checkIn ? new Date(record.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }).substring(0, 5) : '08:00');
       setFormCheckOutDate(record.checkOut ? dateOnly(record.checkOut) : date);
-      setFormCheckOutTime(record.checkOut ? new Date(record.checkOut).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).substring(0, 5) : '17:00');
+      setFormCheckOutTime(record.checkOut ? new Date(record.checkOut).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }).substring(0, 5) : '17:00');
       
       const hasRecordBreak = !!record.breakStart && !!record.breakEnd;
-      setFormBreakStart(record.breakStart ? new Date(record.breakStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).substring(0, 5) : '12:00');
-      setFormBreakEnd(record.breakEnd ? new Date(record.breakEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).substring(0, 5) : '13:00');
+      setFormBreakStart(record.breakStart ? new Date(record.breakStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }).substring(0, 5) : '12:00');
+      setFormBreakEnd(record.breakEnd ? new Date(record.breakEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }).substring(0, 5) : '13:00');
       setFormHasBreak(hasRecordBreak);
       setFormSplitShift(false);
       setFormNakanukeHours(0);
@@ -1250,9 +1250,9 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                         {record ? (
                           <div className="w-full text-center space-y-1">
                             <div className="text-[11px] md:text-xs text-slate-800 dark:text-slate-200 font-mono font-extrabold leading-tight">
-                              {record.checkIn ? new Date(record.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                              {record.checkIn ? new Date(record.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }) : '--:--'}
                               <div className="text-slate-350 dark:text-slate-650 leading-none my-0.5">↓</div>
-                              {record.checkOut ? new Date(record.checkOut).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                              {record.checkOut ? new Date(record.checkOut).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }) : '--:--'}
                             </div>
                             
                             {record.checkIn && record.checkOut && (
@@ -1347,15 +1347,15 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                           <div className="flex-1 flex flex-wrap items-center gap-4 text-xs">
                             {/* Visual Time Flow */}
                             <div className="flex items-center gap-1.5 font-mono text-slate-650 dark:text-slate-300 bg-white dark:bg-slate-800 px-3 py-1 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm font-semibold">
-                              <span>{record.checkIn ? new Date(record.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
+                              <span>{record.checkIn ? new Date(record.checkIn).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }) : '--:--'}</span>
                               <span className="text-slate-300 dark:text-slate-600">→</span>
                               {record.breakStart && record.breakEnd && (
                                 <span className="text-[10px] text-slate-450 flex items-center gap-0.5 bg-slate-50 dark:bg-slate-850 px-1.5 py-0.2 rounded border border-slate-100 dark:border-slate-700">
-                                  {getAttendanceText('timelineBreak', locale)} ({new Date(record.breakStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}〜{new Date(record.breakEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})
+                                  {getAttendanceText('timelineBreak', locale)} ({new Date(record.breakStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}〜{new Date(record.breakEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })})
                                 </span>
                               )}
                               <span className="text-slate-300 dark:text-slate-600">→</span>
-                              <span>{record.checkOut ? new Date(record.checkOut).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
+                              <span>{record.checkOut ? new Date(record.checkOut).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }) : '--:--'}</span>
                             </div>
 
                             {/* Hours Display (Actual & Overtime) */}

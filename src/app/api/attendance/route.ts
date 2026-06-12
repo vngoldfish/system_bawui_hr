@@ -63,14 +63,16 @@ function parseDateTime(dateStr: string, timeVal: string | null) {
   if (!timeVal) return null;
   // If timeVal already contains full datetime (like YYYY-MM-DDTHH:MM...)
   if (timeVal.includes('T') || timeVal.includes('-')) {
-    const d = new Date(timeVal);
+    const hasOffset = timeVal.endsWith('Z') || timeVal.includes('+') || (timeVal.includes('T') && timeVal.split('T')[1].includes('-'));
+    const d = new Date(hasOffset ? timeVal : `${timeVal}+09:00`);
     if (!isNaN(d.getTime())) return d;
   }
   const baseDate = dateStr.split('T')[0];
   const cleanTime = timeVal.length === 5 ? `${timeVal}:00` : timeVal;
-  const d = new Date(`${baseDate}T${cleanTime}`);
+  const d = new Date(`${baseDate}T${cleanTime}+09:00`);
   return isNaN(d.getTime()) ? null : d;
 }
+
 
 // POST new attendance record
 export async function POST(request: NextRequest) {

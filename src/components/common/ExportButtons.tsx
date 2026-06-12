@@ -263,6 +263,8 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
     const originalMaxHeight = mainEl.style.maxHeight;
     const originalOverflow = mainEl.style.overflow;
     const originalOverflowY = mainEl.style.overflowY;
+    const originalScrollTop = mainEl.scrollTop;
+    const originalScrollLeft = mainEl.scrollLeft;
     
     let affectedElements: { element: HTMLElement; styles: Record<string, string> }[] = [];
 
@@ -270,15 +272,22 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       mainEl.style.maxHeight = 'none';
       mainEl.style.overflow = 'visible';
       mainEl.style.overflowY = 'visible';
+      mainEl.scrollTop = 0;
+      mainEl.scrollLeft = 0;
       
       affectedElements = expandScrollableElements(mainEl);
+
+      let bg = window.getComputedStyle(mainEl).backgroundColor;
+      if (!bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)') {
+        bg = '#f8fafc';
+      }
 
       const canvas = await html2canvas(mainEl as HTMLElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         logging: false,
-        backgroundColor: '#f8fafc',
+        backgroundColor: bg,
         height: mainEl.scrollHeight,
         windowHeight: mainEl.scrollHeight,
         scrollY: 0,
@@ -289,6 +298,8 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       mainEl.style.maxHeight = originalMaxHeight;
       mainEl.style.overflow = originalOverflow;
       mainEl.style.overflowY = originalOverflowY;
+      mainEl.scrollTop = originalScrollTop;
+      mainEl.scrollLeft = originalScrollLeft;
 
       const link = document.createElement('a');
       link.download = `${fileName}_screenshot.png`;
@@ -299,6 +310,8 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       mainEl.style.maxHeight = originalMaxHeight;
       mainEl.style.overflow = originalOverflow;
       mainEl.style.overflowY = originalOverflowY;
+      mainEl.scrollTop = originalScrollTop;
+      mainEl.scrollLeft = originalScrollLeft;
 
       console.error('Failed to capture screenshot:', error);
       alert('Chụp ảnh trang web thất bại. Vui lòng thử lại.');
@@ -317,6 +330,8 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
     const originalMaxHeight = mainEl.style.maxHeight;
     const originalOverflow = mainEl.style.overflow;
     const originalOverflowY = mainEl.style.overflowY;
+    const originalScrollTop = mainEl.scrollTop;
+    const originalScrollLeft = mainEl.scrollLeft;
 
     let affectedElements: { element: HTMLElement; styles: Record<string, string> }[] = [];
 
@@ -324,15 +339,22 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       mainEl.style.maxHeight = 'none';
       mainEl.style.overflow = 'visible';
       mainEl.style.overflowY = 'visible';
+      mainEl.scrollTop = 0;
+      mainEl.scrollLeft = 0;
 
       affectedElements = expandScrollableElements(mainEl);
+
+      let bg = window.getComputedStyle(mainEl).backgroundColor;
+      if (!bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)') {
+        bg = '#f8fafc';
+      }
 
       const canvas = await html2canvas(mainEl as HTMLElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         logging: false,
-        backgroundColor: '#f8fafc',
+        backgroundColor: bg,
         height: mainEl.scrollHeight,
         windowHeight: mainEl.scrollHeight,
         scrollY: 0,
@@ -343,6 +365,8 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       mainEl.style.maxHeight = originalMaxHeight;
       mainEl.style.overflow = originalOverflow;
       mainEl.style.overflowY = originalOverflowY;
+      mainEl.scrollTop = originalScrollTop;
+      mainEl.scrollLeft = originalScrollLeft;
 
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfW = pdf.internal.pageSize.getWidth();
@@ -382,6 +406,8 @@ export default function ExportButtons({ data, columns, fileName, tableRef, rowsP
       mainEl.style.maxHeight = originalMaxHeight;
       mainEl.style.overflow = originalOverflow;
       mainEl.style.overflowY = originalOverflowY;
+      mainEl.scrollTop = originalScrollTop;
+      mainEl.scrollLeft = originalScrollLeft;
 
       console.error('Failed to export full page PDF:', error);
       alert('Xuất PDF trang web thất bại. Vui lòng thử lại.');

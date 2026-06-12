@@ -6,7 +6,7 @@ import ExportButtons from '@/components/common/ExportButtons';
 import EmployeeFormModal from '@/components/employees/EmployeeFormModal';
 import Portal from '@/components/common/Portal';
 import GenericImportModal from '@/components/common/GenericImportModal';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { generateContractPDF, generateResignationPDF } from '@/lib/documents';
 import type { Employee } from '@/types';
 import { useI18n } from '@/lib/i18n';
@@ -119,7 +119,32 @@ function FilterableTh({
 
 const PAGE_SIZE = 10;
 
-export default function ContractsClient({ initialEmployees }: { initialEmployees: Employee[] }) {
+export interface ContractType {
+  id: string;
+  name: string;
+  nameKana: string;
+  description?: string | null;
+  defaultEndDateType: string;
+  defaultSalaryType: string;
+  defaultWorkDays: any;
+  defaultStandardHoursPerDay: number;
+  defaultCheckIn: string;
+  defaultCheckOut: string;
+  defaultBreakStart: string;
+  defaultBreakEnd: string;
+  defaultHolidayWorkCountsAsOvertime: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export default function ContractsClient({ 
+  initialEmployees, 
+  initialContractTypes 
+}: { 
+  initialEmployees: Employee[]; 
+  initialContractTypes: ContractType[]; 
+}) {
   const { t, locale } = useI18n();
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [search, setSearch] = useState('');
@@ -145,6 +170,124 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
     defaultBreakEnd: '13:00',
     holidayWorkCountsAsOvertime: true,
   });
+
+  const [activeTab, setActiveTab] = useState<'contracts' | 'types'>('contracts');
+  const [contractTypes, setContractTypes] = useState<ContractType[]>(initialContractTypes || []);
+  const [ctModalOpen, setCtModalOpen] = useState(false);
+  const [editingCt, setEditingCt] = useState<ContractType | null>(null);
+  const [ctForm, setCtForm] = useState({
+    name: '',
+    nameKana: '',
+    description: '',
+    defaultEndDateType: 'none',
+    defaultSalaryType: '月給',
+    defaultWorkDays: [1, 2, 3, 4, 5] as number[],
+    defaultStandardHoursPerDay: 8,
+    defaultCheckIn: '08:00',
+    defaultCheckOut: '17:00',
+    defaultBreakStart: '12:00',
+    defaultBreakEnd: '13:00',
+    defaultHolidayWorkCountsAsOvertime: true,
+    isActive: true,
+  });
+
+  const openEditCt = (ct: ContractType) => {
+    let parsedWorkdays = [1, 2, 3, 4, 5];
+    if (typeof ct.defaultWorkDays === 'string') {
+      try {
+        parsedWorkdays = JSON.parse(ct.defaultWorkDays);
+      } catch (e) {}
+    } else if (Array.isArray(ct.defaultWorkDays)) {
+      parsedWorkdays = ct.defaultWorkDays;
+    }
+    
+    setEditingCt(ct);
+    setCtForm({
+      name: ct.name,
+      nameKana: ct.nameKana,
+      description: ct.description || '',
+      defaultEndDateType: ct.defaultEndDateType || 'none',
+      defaultSalaryType: ct.defaultSalaryType || '月給',
+      defaultWorkDays: parsedWorkdays,
+      defaultStandardHoursPerDay: ct.defaultStandardHoursPerDay || 8,
+      defaultCheckIn: ct.defaultCheckIn || '08:00',
+      defaultCheckOut: ct.defaultCheckOut || '17:00',
+      defaultBreakStart: ct.defaultBreakStart || '12:00',
+      defaultBreakEnd: ct.defaultBreakEnd || '13:00',
+      defaultHolidayWorkCountsAsOvertime: ct.defaultHolidayWorkCountsAsOvertime ?? true,
+      isActive: ct.isActive ?? true,
+    });
+    setCtModalOpen(true);
+  };
+
+  const openNewCt = () => {
+    setEditingCt(null);
+    setCtForm({
+      name: '',
+      nameKana: '',
+      description: '',
+      defaultEndDateType: 'none',
+      defaultSalaryType: '月給',
+      defaultWorkDays: [1, 2, 3, 4, 5],
+      defaultStandardHoursPerDay: 8,
+      defaultCheckIn: '08:00',
+      defaultCheckOut: '17:00',
+      defaultBreakStart: '12:00',
+      defaultBreakEnd: '13:00',
+      defaultHolidayWorkCountsAsOvertime: true,
+      isActive: true,
+    });
+    setCtModalOpen(true);
+  };
+
+  const handleDeleteCt = async (id: string, name: string) => {
+    if (!confirm(`雇用形態「${name}」を削除してもよろしいですか？\n※この雇用形態に所属する従業員がいる場合は削除できません。`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/contract-types/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || '削除に失敗しました');
+      }
+      alert('雇用形態を削除しました。');
+      setContractTypes(prev => prev.filter(c => c.id !== id));
+    } catch (e: any) {
+      alert(e.message || 'エラーが発生しました');
+    }
+  };
+
+  const handleSaveCt = async () => {
+    if (!ctForm.name || !ctForm.nameKana) {
+      alert('雇用形態名とカタカナ名は必須です。');
+      return;
+    }
+    const method = editingCt ? 'PUT' : 'POST';
+    const url = editingCt ? `/api/contract-types/${editingCt.id}` : '/api/contract-types';
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ctForm),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.details || '保存に失敗しました');
+      }
+      alert(editingCt ? '雇用形態を更新しました。' : '雇用形態を追加しました。');
+      if (editingCt) {
+        setContractTypes(prev => prev.map(c => c.id === data.id ? data : c));
+      } else {
+        setContractTypes(prev => [...prev, data]);
+      }
+      setCtModalOpen(false);
+    } catch (e: any) {
+      alert(e.message || 'エラーが発生しました');
+    }
+  };
+
 
 
   const weekdayNames: Record<string, string[]> = {
@@ -194,11 +337,6 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
     setColumnFilters(prev => ({ ...prev, [key]: values }));
     setCurrentPage(1);
   };
-
-  const contractTypes = useMemo(() => {
-    const unique = [...new Set(employees.map(e => e.contractType?.name).filter(Boolean))];
-    return unique.map(t => ({ value: t, label: t }));
-  }, [employees]);
 
   const departments = useMemo(() => {
     const unique = [...new Set(employees.map(e => e.department?.name).filter(Boolean))];
@@ -465,404 +603,553 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Alert Banner - Redesigned to look premium */}
-      {alerts.length > 0 && (
-        <div className="bg-gradient-to-r from-rose-50/80 to-amber-50/80 border border-rose-250/60 rounded-2xl p-5 mb-6 shadow-[0_4px_24px_rgba(244,63,94,0.04)] backdrop-blur-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-200/10 rounded-full blur-2xl -mr-10 -mt-10" />
-          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-rose-100/80">
-            <div className="w-9 h-9 bg-rose-500/10 border border-rose-200 rounded-xl flex items-center justify-center shadow-sm">
-              <svg className="w-5 h-5 text-rose-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-850">{t('contracts.alertTitle').replace('{count}', String(alerts.length))}</h3>
-              <p className="text-xs text-rose-600 font-bold mt-0.5">{t('contracts.alertDesc')}</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {alerts.map(({ employee: emp, status }) => (
-              <div key={emp.id} className={`flex items-center justify-between gap-3.5 px-4.5 py-3.5 rounded-2xl border bg-white transition-all hover:shadow-sm ${status.level === 'expired' ? 'border-red-200 shadow-[0_2px_10px_-4px_rgba(239,68,68,0.05)]' : 'border-amber-200 shadow-[0_2px_10px_-4px_rgba(245,158,11,0.05)]'}`}>
-                <div className="flex items-center gap-3 min-w-0">
-                  {emp.avatar ? (
-                    <img src={emp.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
-                  ) : (
-                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-650 border border-slate-200">
-                      {emp.firstNameKana?.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-800 truncate">
-                      {emp.lastName} {emp.firstName}
-                      <span className="text-xs text-slate-450 font-semibold ml-2">({emp.contractType.name})</span>
-                    </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {emp.department?.name || '-'} | {t('form.contractPeriod')}: {formatDate(emp.contractStartDate)} ～ {formatDate(emp.contractEndDate)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <span className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border ${status.colorClasses}`}>
-                    {getExpiryLabel(status)}
-                  </span>
-                  <button onClick={() => openEdit(emp)} className="px-2.5 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer">{t('client.updateBtn')}</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Stats - Redesigned to look premium */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: t('contracts.totalStats'), value: stats.total, color: 'text-slate-800', bg: 'bg-white border-slate-200/60 shadow-sm' },
-          { label: t('contracts.expiredStats'), value: stats.expired, color: 'text-red-650 font-black', bg: 'bg-red-50/40 border-red-100 shadow-[0_4px_20px_-4px_rgba(239,68,68,0.06)]' },
-          { label: t('contracts.expiringStats'), value: stats.expiring, color: 'text-orange-600 font-black', bg: 'bg-orange-50/40 border-orange-100 shadow-[0_4px_20px_-4px_rgba(245,158,11,0.06)]' },
-          { label: t('contracts.indefiniteStats'), value: stats.indefinite, color: 'text-green-600 font-black', bg: 'bg-green-50/40 border-green-100 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.06)]' },
-        ].map((s, idx) => (
-          <div key={idx} className={`${s.bg} border rounded-2xl p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.06)] flex justify-between items-start relative overflow-hidden group`}>
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-transparent to-transparent group-hover:from-blue-500 group-hover:to-indigo-600 transition-all duration-300" />
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{s.label}</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className={`text-3xl font-extrabold ${s.color} tracking-tight`}>{s.value}</span>
-                <span className="text-xs text-slate-400 font-bold">{t('common.personUnit')}</span>
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 gap-1 mb-4 bg-white/50 p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setActiveTab('contracts')}
+          className={cn(
+            "px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer",
+            activeTab === 'contracts'
+              ? "bg-blue-600 text-white shadow-xs"
+              : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+          )}
+        >
+          雇用契約一覧 (Employee Contracts)
+        </button>
+        <button
+          onClick={() => setActiveTab('types')}
+          className={cn(
+            "px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer",
+            activeTab === 'types'
+              ? "bg-blue-600 text-white shadow-xs"
+              : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+          )}
+        >
+          雇用形態設定 (Contract Type Settings)
+        </button>
       </div>
 
-      <Card 
-        title={t('contracts.cardTitle')}
-        action={
-          <button 
-            onClick={() => setImportModalOpen(true)} 
-            className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
-          >
-            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            JSONインポート (Import JSON)
-          </button>
-        }
-      >
-        {/* Search & Export */}
-        <div className="flex flex-col xl:flex-row gap-3 mb-6 bg-slate-50/50 p-4 border border-slate-200/60 rounded-2xl">
-          <div className="flex flex-col sm:flex-row gap-2.5 flex-1">
-            <div className="relative">
-              <select
-                value={searchField}
-                onChange={e => { setSearchField(e.target.value); setCurrentPage(1); }}
-                className="pl-3 pr-8 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer select-none appearance-none shadow-xs w-full sm:w-[140px]"
-              >
-                <option value="all">{t('client.searchAll')}</option>
-                <option value="name">{t('client.colName')}</option>
-                <option value="email">{t('form.email')}</option>
-                <option value="department">{t('client.colDept')}</option>
-                <option value="position">{t('client.colPos')}</option>
-                <option value="contractType">{t('form.contractType')}</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
-                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+      {activeTab === 'contracts' ? (
+        <>
+          {/* Alert Banner - Redesigned to look premium */}
+          {alerts.length > 0 && (
+            <div className="bg-gradient-to-r from-rose-50/80 to-amber-50/80 border border-rose-250/60 rounded-2xl p-5 mb-6 shadow-[0_4px_24px_rgba(244,63,94,0.04)] backdrop-blur-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-rose-200/10 rounded-full blur-2xl -mr-10 -mt-10" />
+              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-rose-100/80">
+                <div className="w-9 h-9 bg-rose-500/10 border border-rose-200 rounded-xl flex items-center justify-center shadow-sm">
+                  <svg className="w-5 h-5 text-rose-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-850">{t('contracts.alertTitle').replace('{count}', String(alerts.length))}</h3>
+                  <p className="text-xs text-rose-600 font-bold mt-0.5">{t('contracts.alertDesc')}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {alerts.map(({ employee: emp, status }) => (
+                  <div key={emp.id} className={`flex items-center justify-between gap-3.5 px-4.5 py-3.5 rounded-2xl border bg-white transition-all hover:shadow-sm ${status.level === 'expired' ? 'border-red-200 shadow-[0_2px_10px_-4px_rgba(239,68,68,0.05)]' : 'border-amber-200 shadow-[0_2px_10px_-4px_rgba(245,158,11,0.05)]'}`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      {emp.avatar ? (
+                        <img src={emp.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                      ) : (
+                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-655 border border-slate-200">
+                          {emp.firstNameKana?.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">
+                          {emp.lastName} {emp.firstName}
+                          <span className="text-xs text-slate-450 font-semibold ml-2">({emp.contractType.name})</span>
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {emp.department?.name || '-'} | {t('form.contractPeriod')}: {formatDate(emp.contractStartDate)} ～ {formatDate(emp.contractEndDate)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <span className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border ${status.colorClasses}`}>
+                        {getExpiryLabel(status)}
+                      </span>
+                      <button onClick={() => openEdit(emp)} className="px-2.5 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer">{t('client.updateBtn')}</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="relative flex-1">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder={searchField === 'all' ? t('contracts.searchPrompt') : t('client.searchFieldPromptSelected')}
-                value={search}
-                onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-9 pr-4 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs shadow-xs bg-white outline-none"
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2.5 items-center">
-            <select value={columnFilters.department?.[0] || ''} onChange={e => handleColumnFilter('department', e.target.value ? [e.target.value] : [])}
-              className="px-3 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs outline-none">
-              <option value="">{t('client.allDepts')}</option>
-              {departments.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-            </select>
-            <select value={columnFilters.status?.[0] || ''} onChange={e => handleColumnFilter('status', e.target.value ? [e.target.value] : [])}
-              className="px-3 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs outline-none">
-              <option value="">{t('client.allStatuses')}</option>
-              {statusOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-            <select value={columnFilters.contractType?.[0] || ''} onChange={e => handleColumnFilter('contractType', e.target.value ? [e.target.value] : [])}
-              className="px-3 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs outline-none">
-              <option value="">{t('contracts.allContractTypes')}</option>
-              {contractTypes.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            <ExportButtons
-              data={filtered.map(e => {
-                const activeContract = getActiveEmployeeContract(e);
-                return {
-                  contractId: activeContract?.id || '',
-                  employeeId: e.id,
-                  employeeName: `${e.lastName} ${e.firstName}`,
-                  employeeKana: `${e.lastNameKana} ${e.firstNameKana}`,
-                  departmentId: e.departmentId || '',
-                  department: e.department?.name || '',
-                  positionId: e.positionId || '',
-                  position: e.position?.name || '',
-                  status: e.status === 'ACTIVE' ? t('client.statusActive') : e.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive'),
-                  contractTypeId: e.contractTypeId || '',
-                  contractType: e.contractType?.name || '',
-                  contractStart: e.contractStartDate ? formatDate(e.contractStartDate) : '-',
-                  contractEnd: e.contractEndDate ? formatDate(e.contractEndDate) : t('contracts.indefiniteLabel'),
-                  salary: formatCurrency(e.salary),
-                };
-              })}
-              columns={[
-                { header: 'Contract ID', key: 'contractId' },
-                { header: 'Employee ID', key: 'employeeId' },
-                { header: t('client.colName'), key: 'employeeName' },
-                { header: t('form.lastNameKana'), key: 'employeeKana' },
-                { header: 'Department ID', key: 'departmentId' },
-                { header: t('client.colDept'), key: 'department' },
-                { header: 'Position ID', key: 'positionId' },
-                { header: t('client.colPos'), key: 'position' },
-                { header: t('common.status'), key: 'status' },
-                { header: 'Contract Type ID', key: 'contractTypeId' },
-                { header: t('form.contractType'), key: 'contractType' },
-                { header: t('form.contractStart'), key: 'contractStart' },
-                { header: t('form.contractPeriod'), key: 'contractEnd' },
-                { header: t('form.salaryTitle'), key: 'salary' },
-              ]}
-              fileName={t('contracts.cardTitle')}
-            />
-            {activeFilterCount > 0 && (
-              <button onClick={() => { setColumnFilters({}); setSearch(''); setCurrentPage(1); }} className="px-3.5 py-2 text-xs text-red-650 hover:bg-red-50 rounded-xl border border-red-200 font-bold transition-all cursor-pointer h-9">
-                {t('common.clear')} ({activeFilterCount})
-              </button>
-            )}
-          </div>
-        </div>
+          )}
 
-        <div className="overflow-x-auto rounded-xl border border-slate-200/60">
-          <table className="w-full table-fixed text-sm border-collapse" style={{ minWidth: '1070px' }}>
-            <colgroup>
-              <col style={{ width: '45px' }} />
-              <col style={{ width: '140px' }} />
-              <col style={{ width: '110px' }} />
-              <col style={{ width: '105px' }} />
-              <col style={{ width: '85px' }} />
-              <col style={{ width: '95px' }} />
-              <col style={{ width: '130px' }} />
-              <col style={{ width: '155px' }} />
-              <col style={{ width: '90px' }} />
-              <col style={{ width: '115px' }} />
-            </colgroup>
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-left text-xs text-slate-500 font-extrabold uppercase tracking-wider">
-                <th className="px-4 py-3.5 select-none w-[50px] min-w-[50px] text-center cursor-pointer hover:text-slate-800" onClick={() => handleSort('createdAt')}>
-                  <div className="flex items-center justify-center gap-1">
-                    <span>No.</span>
-                    {sortField === 'createdAt' ? (
-                      sortDir === 'asc' ? (
-                        <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
-                      ) : (
-                        <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                      )
-                    ) : (
-                      <svg className="w-3 h-3 text-slate-350 opacity-60 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-                    )}
+          {/* Stats - Redesigned to look premium */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: t('contracts.totalStats'), value: stats.total, color: 'text-slate-800', bg: 'bg-white border-slate-200/60 shadow-sm' },
+              { label: t('contracts.expiredStats'), value: stats.expired, color: 'text-red-650 font-black', bg: 'bg-red-50/40 border-red-100 shadow-[0_4px_20px_-4px_rgba(239,68,68,0.06)]' },
+              { label: t('contracts.expiringStats'), value: stats.expiring, color: 'text-orange-600 font-black', bg: 'bg-orange-50/40 border-orange-100 shadow-[0_4px_20px_-4px_rgba(245,158,11,0.06)]' },
+              { label: t('contracts.indefiniteStats'), value: stats.indefinite, color: 'text-green-600 font-black', bg: 'bg-green-50/40 border-green-100 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.06)]' },
+            ].map((s, idx) => (
+              <div key={idx} className={`${s.bg} border rounded-2xl p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.06)] flex justify-between items-start relative overflow-hidden group`}>
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-transparent to-transparent group-hover:from-blue-500 group-hover:to-indigo-600 transition-all duration-300" />
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{s.label}</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={`text-3xl font-extrabold ${s.color} tracking-tight`}>{s.value}</span>
+                    <span className="text-xs text-slate-400 font-bold">{t('common.personUnit')}</span>
                   </div>
-                </th>
-                <th className="px-5 py-3.5 select-none text-left w-[180px] min-w-[180px]">
-                  <div className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer" onClick={() => handleSort('name')}>
-                    <span>{t('contracts.nameAndKana')}</span>
-                    {sortField === 'name' ? (
-                      sortDir === 'asc' ? (
-                        <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
-                      ) : (
-                        <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                      )
-                    ) : (
-                      <svg className="w-3 h-3 text-slate-350 opacity-60 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-                    )}
-                  </div>
-                </th>
-                <FilterableTh label={t('client.colDept')} filterKey="department" activeFilter={activeFilter} filterOptions={departments} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[130px] min-w-[130px]" />
-                <th className="px-5 py-3.5 select-none text-left w-[110px] min-w-[110px]">
-                  <div className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer" onClick={() => handleSort('position')}>
-                    <span>{t('client.colPos')}</span>
-                    {sortField === 'position' ? (
-                      sortDir === 'asc' ? (
-                        <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
-                      ) : (
-                        <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                      )
-                    ) : (
-                      <svg className="w-3 h-3 text-slate-350 opacity-60 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-                    )}
-                  </div>
-                </th>
-                <FilterableTh label={t('common.status')} filterKey="status" activeFilter={activeFilter} filterOptions={statusOptions} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[90px] min-w-[90px]" />
-                <FilterableTh label={t('form.contractType')} filterKey="contractType" activeFilter={activeFilter} filterOptions={contractTypes} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[115px] min-w-[115px]" />
-                <th className="px-5 py-3.5 w-[220px] min-w-[220px]">{t('contracts.colCheckTime')}</th>
-                <th className="px-5 py-3.5 select-none text-left w-[190px] min-w-[190px]">
-                  <div className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer" onClick={() => handleSort('contractEndDate')}>
-                    <span>{t('form.contractPeriod')}</span>
-                    {sortField === 'contractEndDate' ? (
-                      sortDir === 'asc' ? (
-                        <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
-                      ) : (
-                        <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                      )
-                    ) : (
-                      <svg className="w-3 h-3 text-slate-350 opacity-60 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-                    )}
-                  </div>
-                </th>
-                <th className="px-5 py-3.5 w-[100px] min-w-[100px]">{t('contracts.colExpiryState')}</th>
-                <th className="px-5 py-3.5 text-right w-[140px] min-w-[140px]">{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paginated.length === 0 ? (
-                <tr><td colSpan={10} className="px-6 py-16 text-center text-slate-400 bg-slate-50/20">{t('client.noEmployeesFound')}</td></tr>
-              ) : paginated.map((emp, idx) => {
-                const expiry = emp.contractEndDate ? getContractExpiryStatus(emp.contractEndDate) : null;
-                const schedule = getActiveEmployeeContract(emp);
-                return (
-                  <tr key={emp.id} className={`hover:bg-slate-50/40 transition-colors ${emp.status === 'INACTIVE' ? 'opacity-50 bg-slate-50/10' : ''}`}>
-                    <td className="px-4 py-3.5 text-xs text-slate-450 font-bold font-mono text-center w-[50px] min-w-[50px]">
-                      {(currentPage - 1) * PAGE_SIZE + idx + 1}
-                    </td>
-                    <td className="px-5 py-4 w-[180px] min-w-[180px]">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {emp.avatar ? (
-                          <img src={emp.avatar} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm" />
-                        ) : (
-                          <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-sm font-bold text-slate-655 border border-slate-200">
-                            {emp.firstNameKana?.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <span className="font-bold text-slate-800 block truncate">{emp.lastName} {emp.firstName}</span>
-                          <span className="text-[10px] text-slate-400 font-semibold block mt-0.5 truncate">{emp.lastNameKana} {emp.firstNameKana}</span>
-                          <span className="text-[9px] font-mono text-indigo-650 bg-indigo-50/50 px-1 py-0.5 rounded border border-indigo-100/30 w-fit select-all flex items-center gap-1 mt-1 font-semibold">
-                            Emp ID: {emp.id}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigator.clipboard.writeText(emp.id);
-                                alert('Employee ID copied!');
-                              }}
-                              className="hover:text-blue-600 transition-colors font-bold ml-1 cursor-pointer"
-                              title="Copy Employee ID"
-                            >
-                              📋
-                            </button>
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 w-[130px] min-w-[130px] truncate">
-                      <span className="px-2.5 py-0.5 bg-slate-50 border border-slate-200/80 text-slate-700 text-xs rounded-lg font-bold block truncate max-w-full text-center">{emp.department?.name || '-'}</span>
-                      {emp.department?.id && (
-                        <span className="text-[8px] font-mono text-slate-400 block text-center mt-1 select-all" title={`Dept ID: ${emp.department.id}`}>
-                          ID: {emp.department.id.substring(0, 8)}...
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4 text-slate-650 font-semibold text-xs w-[110px] min-w-[110px] truncate">{emp.position.name}</td>
-                    <td className="px-5 py-4 w-[90px] min-w-[90px]">
-                      <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-lg border ${statusColor(emp.status)} block text-center`}>
-                        {emp.status === 'ACTIVE' ? t('client.statusActive') : emp.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive')}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-slate-805 text-xs font-extrabold w-[115px] min-w-[115px] truncate flex flex-col justify-center gap-1">
-                      <span>{emp.contractType?.name || '-'}</span>
-                      {emp.contractType?.id && (
-                        <span className="text-[9px] font-mono text-indigo-650 bg-indigo-50/50 px-1 py-0.5 rounded border border-indigo-100/30 w-fit select-all flex items-center gap-1 mt-1 font-normal">
-                          CT ID: {emp.contractType.id}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigator.clipboard.writeText(emp.contractType.id);
-                              alert('Contract Type ID copied!');
-                            }}
-                            className="hover:text-blue-600 transition-colors font-bold ml-1 cursor-pointer"
-                            title="Copy Contract Type ID"
-                          >
-                            📋
-                          </button>
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4 text-xs w-[220px] min-w-[220px]">
-                      <div className="flex flex-col gap-1.5 min-w-[150px]">
-                        <span className="font-black text-slate-750 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 w-fit">
-                          {formatWorkDaysLocal(schedule?.workDays)} / {schedule?.standardHoursPerDay || 8}h
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-mono font-bold">
-                          {schedule?.defaultCheckIn || '08:00'}〜{schedule?.defaultCheckOut || '17:00'} / {t('contracts.breakLabel')} {schedule?.defaultBreakStart || '12:00'}〜{schedule?.defaultBreakEnd || '13:00'}
-                        </span>
-                        <span className={`text-[9px] font-black w-fit px-2 py-0.5 rounded-lg border ${schedule?.holidayWorkCountsAsOvertime ?? true ? 'bg-rose-50 text-rose-650 border-rose-150' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                          {t('contracts.holidayWorkLabel')}: {(schedule?.holidayWorkCountsAsOvertime ?? true) ? t('contracts.holidayOt') : t('contracts.holidayNormal')}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 text-slate-600 text-xs font-semibold w-[190px] min-w-[190px] truncate">
-                      {emp.contractStartDate ? (
-                        <div className="flex items-center gap-1">
-                          <span>{formatDate(emp.contractStartDate)}</span>
-                          <span className="text-slate-350">～</span>
-                          <span>{emp.contractEndDate ? formatDate(emp.contractEndDate) : t('contracts.indefiniteLabel')}</span>
-                        </div>
-                      ) : '-'}
-                    </td>
-                    <td className="px-5 py-4 w-[100px] min-w-[100px]">
-                      {expiry ? (
-                        <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-lg border ${expiry.colorClasses} block text-center`}>
-                          {getExpiryLabel(expiry)}
-                        </span>
-                      ) : <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-lg border bg-green-50 text-green-700 text-center border-green-200 block">{t('contracts.indefiniteLabel')}</span>}
-                    </td>
-                    <td className="px-5 py-4 text-right w-[140px] min-w-[140px]">
-                      {emp.status !== 'INACTIVE' ? (
-                        <div className="flex justify-end gap-1.5">
-                          <button onClick={() => openEdit(emp)} className="p-2 text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-150 rounded-xl transition-all cursor-pointer" title={t('common.edit')}>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                          </button>
-                          <button onClick={() => openContractScheduleEdit(emp)} className="p-2 text-violet-600 hover:bg-violet-50 border border-transparent hover:border-violet-150 rounded-xl transition-all cursor-pointer" title={t('contracts.editContractTitle')}>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                          </button>
-                          <button onClick={() => handleGenerateContract(emp)} className="p-2 text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-150 rounded-xl transition-all cursor-pointer" title={t('nav.documents')}>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                          </button>
-                          <button onClick={() => { setResignTarget(emp); setResignReason(''); }} className="p-2 text-red-650 hover:bg-red-50 border border-transparent hover:border-red-150 rounded-xl transition-all cursor-pointer" title={t('contracts.resignTitle')}>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                          </button>
-                        </div>
-                      ) : <span className="text-xs text-slate-400 font-bold bg-slate-50 border px-2 py-0.5 rounded-lg">{t('form.statusInactive')}</span>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-200/80">
-          <p className="text-xs text-slate-550 font-bold">{getPaginationText((currentPage - 1) * PAGE_SIZE + 1, Math.min(currentPage * PAGE_SIZE, filtered.length), filtered.length)}</p>
-          <div className="flex gap-1.5">
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3.5 py-2 text-xs font-bold border border-slate-250 bg-white hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">{t('client.prev')}</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button key={page} onClick={() => setCurrentPage(page)} className={`px-3 py-2 text-xs font-black rounded-xl cursor-pointer transition-all ${page === currentPage ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-250 bg-white hover:bg-slate-50 text-slate-650'}`}>{page}</button>
+                </div>
+              </div>
             ))}
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3.5 py-2 text-xs font-bold border border-slate-250 bg-white hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">{t('client.next')}</button>
           </div>
+
+          <Card 
+            title={t('contracts.cardTitle')}
+            action={
+              <button 
+                onClick={() => setImportModalOpen(true)} 
+                className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                JSONインポート (Import JSON)
+              </button>
+            }
+          >
+            {/* Search & Export */}
+            <div className="flex flex-col xl:flex-row gap-3 mb-6 bg-slate-50/50 p-4 border border-slate-200/60 rounded-2xl">
+              <div className="flex flex-col sm:flex-row gap-2.5 flex-1">
+                <div className="relative">
+                  <select
+                    value={searchField}
+                    onChange={e => { setSearchField(e.target.value); setCurrentPage(1); }}
+                    className="pl-3 pr-8 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer select-none appearance-none shadow-xs w-full sm:w-[140px]"
+                  >
+                    <option value="all">{t('client.searchAll')}</option>
+                    <option value="name">{t('client.colName')}</option>
+                    <option value="email">{t('form.email')}</option>
+                    <option value="department">{t('client.colDept')}</option>
+                    <option value="position">{t('client.colPos')}</option>
+                    <option value="contractType">{t('form.contractType')}</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                  </div>
+                </div>
+                <div className="relative flex-1">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder={searchField === 'all' ? t('contracts.searchPrompt') : t('client.searchFieldPromptSelected')}
+                    value={search}
+                    onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+                    className="w-full pl-9 pr-4 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs shadow-xs bg-white outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2.5 items-center">
+                <select value={columnFilters.department?.[0] || ''} onChange={e => handleColumnFilter('department', e.target.value ? [e.target.value] : [])}
+                  className="px-3 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs outline-none">
+                  <option value="">{t('client.allDepts')}</option>
+                  {departments.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                </select>
+                <select value={columnFilters.status?.[0] || ''} onChange={e => handleColumnFilter('status', e.target.value ? [e.target.value] : [])}
+                  className="px-3 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs outline-none">
+                  <option value="">{t('client.allStatuses')}</option>
+                  {statusOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+                <select value={columnFilters.contractType?.[0] || ''} onChange={e => handleColumnFilter('contractType', e.target.value ? [e.target.value] : [])}
+                  className="px-3 py-2.5 border border-slate-250 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl text-xs font-bold bg-white cursor-pointer shadow-xs outline-none">
+                  <option value="">{t('contracts.allContractTypes')}</option>
+                  {contractTypes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+                <ExportButtons
+                  data={filtered.map(e => {
+                    const activeContract = getActiveEmployeeContract(e);
+                    return {
+                      contractId: activeContract?.id || '',
+                      employeeId: e.id,
+                      employeeName: `${e.lastName} ${e.firstName}`,
+                      employeeKana: `${e.lastNameKana} ${e.firstNameKana}`,
+                      departmentId: e.departmentId || '',
+                      department: e.department?.name || '',
+                      positionId: e.positionId || '',
+                      position: e.position?.name || '',
+                      status: e.status === 'ACTIVE' ? t('client.statusActive') : e.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive'),
+                      contractTypeId: e.contractTypeId || '',
+                      contractType: e.contractType?.name || '',
+                      contractStart: e.contractStartDate ? formatDate(e.contractStartDate) : '-',
+                      contractEnd: e.contractEndDate ? formatDate(e.contractEndDate) : t('contracts.indefiniteLabel'),
+                      salary: formatCurrency(e.salary),
+                    };
+                  })}
+                  columns={[
+                    { header: 'Contract ID', key: 'contractId' },
+                    { header: 'Employee ID', key: 'employeeId' },
+                    { header: t('client.colName'), key: 'employeeName' },
+                    { header: t('form.lastNameKana'), key: 'employeeKana' },
+                    { header: 'Department ID', key: 'departmentId' },
+                    { header: t('client.colDept'), key: 'department' },
+                    { header: 'Position ID', key: 'positionId' },
+                    { header: t('client.colPos'), key: 'position' },
+                    { header: t('common.status'), key: 'status' },
+                    { header: 'Contract Type ID', key: 'contractTypeId' },
+                    { header: t('form.contractType'), key: 'contractType' },
+                    { header: t('form.contractStart'), key: 'contractStart' },
+                    { header: t('form.contractPeriod'), key: 'contractEnd' },
+                    { header: t('form.salaryTitle'), key: 'salary' },
+                  ]}
+                  fileName={t('contracts.cardTitle')}
+                />
+                {activeFilterCount > 0 && (
+                  <button onClick={() => { setColumnFilters({}); setSearch(''); setCurrentPage(1); }} className="px-3.5 py-2 text-xs text-red-650 hover:bg-red-50 rounded-xl border border-red-200 font-bold transition-all cursor-pointer h-9">
+                    {t('common.clear')} ({activeFilterCount})
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200/60">
+              <table className="w-full table-fixed text-sm border-collapse" style={{ minWidth: '1070px' }}>
+                <colgroup>
+                  <col style={{ width: '45px' }} />
+                  <col style={{ width: '140px' }} />
+                  <col style={{ width: '110px' }} />
+                  <col style={{ width: '105px' }} />
+                  <col style={{ width: '85px' }} />
+                  <col style={{ width: '95px' }} />
+                  <col style={{ width: '130px' }} />
+                  <col style={{ width: '155px' }} />
+                  <col style={{ width: '90px' }} />
+                  <col style={{ width: '115px' }} />
+                </colgroup>
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-left text-xs text-slate-500 font-extrabold uppercase tracking-wider">
+                    <th className="px-4 py-3.5 select-none w-[50px] min-w-[50px] text-center cursor-pointer hover:text-slate-800" onClick={() => handleSort('createdAt')}>
+                      <div className="flex items-center justify-center gap-1">
+                        <span>No.</span>
+                        {sortField === 'createdAt' ? (
+                          sortDir === 'asc' ? (
+                            <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                          )
+                        ) : (
+                          <svg className="w-3 h-3 text-slate-355 opacity-60 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-5 py-3.5 select-none text-left w-[180px] min-w-[180px]">
+                      <div className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer" onClick={() => handleSort('name')}>
+                        <span>{t('contracts.nameAndKana')}</span>
+                        {sortField === 'name' ? (
+                          sortDir === 'asc' ? (
+                            <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                          )
+                        ) : (
+                          <svg className="w-3 h-3 text-slate-355 opacity-60 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                        )}
+                      </div>
+                    </th>
+                    <FilterableTh label={t('client.colDept')} filterKey="department" activeFilter={activeFilter} filterOptions={departments} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[130px] min-w-[130px]" />
+                    <th className="px-5 py-3.5 select-none text-left w-[110px] min-w-[110px]">
+                      <div className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer" onClick={() => handleSort('position')}>
+                        <span>{t('client.colPos')}</span>
+                        {sortField === 'position' ? (
+                          sortDir === 'asc' ? (
+                            <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                          )
+                        ) : (
+                          <svg className="w-3 h-3 text-slate-355 opacity-60 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                        )}
+                      </div>
+                    </th>
+                    <FilterableTh label={t('common.status')} filterKey="status" activeFilter={activeFilter} filterOptions={statusOptions} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[90px] min-w-[90px]" />
+                    <FilterableTh label={t('form.contractType')} filterKey="contractType" activeFilter={activeFilter} filterOptions={contractTypes.map(c => ({ value: c.name, label: c.name }))} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} sortField={sortField} sortDir={sortDir} onSort={handleSort} widthClass="w-[115px] min-w-[115px]" />
+                    <th className="px-5 py-3.5 w-[220px] min-w-[220px]">{t('contracts.colCheckTime')}</th>
+                    <th className="px-5 py-3.5 select-none text-left w-[190px] min-w-[190px]">
+                      <div className="flex items-center gap-1.5 hover:text-slate-800 transition-colors cursor-pointer" onClick={() => handleSort('contractEndDate')}>
+                        <span>{t('form.contractPeriod')}</span>
+                        {sortField === 'contractEndDate' ? (
+                          sortDir === 'asc' ? (
+                            <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                          )
+                        ) : (
+                          <svg className="w-3 h-3 text-slate-355 opacity-60 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-5 py-3.5 w-[100px] min-w-[100px]">{t('contracts.colExpiryState')}</th>
+                    <th className="px-5 py-3.5 text-right w-[140px] min-w-[140px]">{t('common.actions')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginated.length === 0 ? (
+                    <tr><td colSpan={10} className="px-6 py-16 text-center text-slate-400 bg-slate-50/20">{t('client.noEmployeesFound')}</td></tr>
+                  ) : paginated.map((emp, idx) => {
+                    const expiry = emp.contractEndDate ? getContractExpiryStatus(emp.contractEndDate) : null;
+                    const schedule = getActiveEmployeeContract(emp);
+                    return (
+                      <tr key={emp.id} className={`hover:bg-slate-50/40 transition-colors ${emp.status === 'INACTIVE' ? 'opacity-50 bg-slate-50/10' : ''}`}>
+                        <td className="px-4 py-3.5 text-xs text-slate-450 font-bold font-mono text-center w-[50px] min-w-[50px]">
+                          {(currentPage - 1) * PAGE_SIZE + idx + 1}
+                        </td>
+                        <td className="px-5 py-4 w-[180px] min-w-[180px]">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {emp.avatar ? (
+                              <img src={emp.avatar} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm" />
+                            ) : (
+                              <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-sm font-bold text-slate-655 border border-slate-200">
+                                {emp.firstNameKana?.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <span className="font-bold text-slate-800 block truncate">{emp.lastName} {emp.firstName}</span>
+                              <span className="text-[10px] text-slate-400 font-semibold block mt-0.5 truncate">{emp.lastNameKana} {emp.firstNameKana}</span>
+                              <span className="text-[9px] font-mono text-indigo-650 bg-indigo-50/50 px-1 py-0.5 rounded border border-indigo-100/30 w-fit select-all flex items-center gap-1 mt-1 font-semibold">
+                                Emp ID: {emp.id}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(emp.id);
+                                    alert('Employee ID copied!');
+                                  }}
+                                  className="hover:text-blue-600 transition-colors font-bold ml-1 cursor-pointer"
+                                  title="Copy Employee ID"
+                                >
+                                  📋
+                                </button>
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 w-[130px] min-w-[130px] truncate">
+                          <span className="px-2.5 py-0.5 bg-slate-50 border border-slate-200/80 text-slate-700 text-xs rounded-lg font-bold block truncate max-w-full text-center">{emp.department?.name || '-'}</span>
+                          {emp.department?.id && (
+                            <span className="text-[8px] font-mono text-slate-400 block text-center mt-1 select-all" title={`Dept ID: ${emp.department.id}`}>
+                              ID: {emp.department.id.substring(0, 8)}...
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 text-slate-650 font-semibold text-xs w-[110px] min-w-[110px] truncate">{emp.position?.name}</td>
+                        <td className="px-5 py-4 w-[90px] min-w-[90px]">
+                          <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-lg border ${statusColor(emp.status)} block text-center`}>
+                            {emp.status === 'ACTIVE' ? t('client.statusActive') : emp.status === 'ON_LEAVE' ? t('client.statusLeave') : t('client.statusInactive')}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-slate-805 text-xs font-extrabold w-[115px] min-w-[115px] truncate flex flex-col justify-center gap-1">
+                          <span>{emp.contractType?.name || '-'}</span>
+                          {emp.contractType?.id && (
+                            <span className="text-[9px] font-mono text-indigo-650 bg-indigo-50/50 px-1 py-0.5 rounded border border-indigo-100/30 w-fit select-all flex items-center gap-1 mt-1 font-normal">
+                              CT ID: {emp.contractType.id}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(emp.contractType.id);
+                                  alert('Contract Type ID copied!');
+                                }}
+                                className="hover:text-blue-600 transition-colors font-bold ml-1 cursor-pointer"
+                                title="Copy Contract Type ID"
+                              >
+                                📋
+                              </button>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 text-xs w-[220px] min-w-[220px]">
+                          <div className="flex flex-col gap-1.5 min-w-[150px]">
+                            <span className="font-black text-slate-755 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 w-fit">
+                              {formatWorkDaysLocal(schedule?.workDays)} / {schedule?.standardHoursPerDay || 8}h
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono font-bold">
+                              {schedule?.defaultCheckIn || '08:00'}〜{schedule?.defaultCheckOut || '17:00'} / {t('contracts.breakLabel')} {schedule?.defaultBreakStart || '12:00'}〜{schedule?.defaultBreakEnd || '13:00'}
+                            </span>
+                            <span className={`text-[9px] font-black w-fit px-2 py-0.5 rounded-lg border ${schedule?.holidayWorkCountsAsOvertime ?? true ? 'bg-rose-50 text-rose-650 border-rose-150' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                              {t('contracts.holidayWorkLabel')}: {(schedule?.holidayWorkCountsAsOvertime ?? true) ? t('contracts.holidayOt') : t('contracts.holidayNormal')}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-slate-600 text-xs font-semibold w-[190px] min-w-[190px] truncate">
+                          {emp.contractStartDate ? (
+                            <div className="flex items-center gap-1">
+                              <span>{formatDate(emp.contractStartDate)}</span>
+                              <span className="text-slate-350">～</span>
+                              <span>{emp.contractEndDate ? formatDate(emp.contractEndDate) : t('contracts.indefiniteLabel')}</span>
+                            </div>
+                          ) : '-'}
+                        </td>
+                        <td className="px-5 py-4 w-[100px] min-w-[100px]">
+                          {expiry ? (
+                            <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-lg border ${expiry.colorClasses} block text-center`}>
+                              {getExpiryLabel(expiry)}
+                            </span>
+                          ) : <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-lg border bg-green-50 text-green-700 text-center border-green-200 block">{t('contracts.indefiniteLabel')}</span>}
+                        </td>
+                        <td className="px-5 py-4 text-right w-[140px] min-w-[140px]">
+                          {emp.status !== 'INACTIVE' ? (
+                            <div className="flex justify-end gap-1.5">
+                              <button onClick={() => openEdit(emp)} className="p-2 text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-150 rounded-xl transition-all cursor-pointer" title={t('common.edit')}>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                              </button>
+                              <button onClick={() => openContractScheduleEdit(emp)} className="p-2 text-violet-600 hover:bg-violet-50 border border-transparent hover:border-violet-150 rounded-xl transition-all cursor-pointer" title={t('contracts.editContractTitle')}>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2-2v12a2 2 0 002 2z" /></svg>
+                              </button>
+                              <button onClick={() => handleGenerateContract(emp)} className="p-2 text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-150 rounded-xl transition-all cursor-pointer" title={t('nav.documents')}>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                              </button>
+                              <button onClick={() => { setResignTarget(emp); setResignReason(''); }} className="p-2 text-red-655 hover:bg-red-50 border border-transparent hover:border-red-150 rounded-xl transition-all cursor-pointer" title={t('contracts.resignTitle')}>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                              </button>
+                            </div>
+                          ) : <span className="text-xs text-slate-400 font-bold bg-slate-50 border px-2 py-0.5 rounded-lg">{t('form.statusInactive')}</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-200/80">
+              <p className="text-xs text-slate-550 font-bold">{getPaginationText((currentPage - 1) * PAGE_SIZE + 1, Math.min(currentPage * PAGE_SIZE, filtered.length), filtered.length)}</p>
+              <div className="flex gap-1.5">
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3.5 py-2 text-xs font-bold border border-slate-250 bg-white hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">{t('client.prev')}</button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button key={page} onClick={() => setCurrentPage(page)} className={`px-3 py-2 text-xs font-black rounded-xl cursor-pointer transition-all ${page === currentPage ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-250 bg-white hover:bg-slate-50 text-slate-655'}`}>{page}</button>
+                ))}
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3.5 py-2 text-xs font-bold border border-slate-250 bg-white hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">{t('client.next')}</button>
+              </div>
+            </div>
+          </Card>
+        </>
+      ) : (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Header Card */}
+          <Card 
+            title="雇用形態設定 (Contract Type Settings)" 
+            action={
+              <button 
+                onClick={openNewCt} 
+                className="px-4 py-2 bg-blue-650 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow-md cursor-pointer flex items-center gap-1.5"
+              >
+                <span>➕</span> 雇用形態の追加 (Add Contract Type)
+              </button>
+            }
+          >
+            <p className="text-xs text-slate-400 -mt-2 mb-4">雇用形態の登録および標準勤務条件の管理を行います。</p>
+            
+            <div className="overflow-x-auto rounded-xl border border-slate-200/60">
+              <table className="w-full table-fixed text-sm border-collapse text-left" style={{ minWidth: '1000px' }}>
+                <colgroup>
+                  <col style={{ width: '150px' }} />
+                  <col style={{ width: '130px' }} />
+                  <col style={{ width: '100px' }} />
+                  <col style={{ width: '180px' }} />
+                  <col style={{ width: '80px' }} />
+                  <col style={{ width: '220px' }} />
+                  <col style={{ width: '80px' }} />
+                  <col style={{ width: '100px' }} />
+                </colgroup>
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-505 font-extrabold uppercase tracking-wider">
+                    <th className="px-5 py-3.5">雇用形態名</th>
+                    <th className="px-5 py-3.5">カタカナ名</th>
+                    <th className="px-5 py-3.5">給与区分</th>
+                    <th className="px-5 py-3.5">標準勤務曜日</th>
+                    <th className="px-5 py-3.5">標準時間</th>
+                    <th className="px-5 py-3.5">勤務・休憩時間</th>
+                    <th className="px-5 py-3.5">ステータス</th>
+                    <th className="px-5 py-3.5 text-right">アクション</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {contractTypes.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-12 text-center text-slate-400 bg-slate-50/20">
+                        雇用形態が登録されていません。
+                      </td>
+                    </tr>
+                  ) : (
+                    contractTypes.map((ct) => {
+                      let wdays: number[] = [];
+                      if (typeof ct.defaultWorkDays === 'string') {
+                        try {
+                          wdays = JSON.parse(ct.defaultWorkDays);
+                        } catch (e) {}
+                      } else if (Array.isArray(ct.defaultWorkDays)) {
+                        wdays = ct.defaultWorkDays;
+                      }
+                      
+                      return (
+                        <tr key={ct.id} className="hover:bg-slate-50/40 transition-colors">
+                          <td className="px-5 py-4 font-bold text-slate-800">
+                            {ct.name}
+                          </td>
+                          <td className="px-5 py-4 text-xs font-semibold text-slate-500">
+                            {ct.nameKana}
+                          </td>
+                          <td className="px-5 py-4 text-xs">
+                            <span className="px-2 py-0.5 bg-slate-100 border rounded-lg font-bold text-slate-700">
+                              {ct.defaultSalaryType}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-xs font-semibold text-slate-600">
+                            {formatWorkDaysLocal(wdays)}
+                          </td>
+                          <td className="px-5 py-4 text-xs font-mono font-bold text-slate-850">
+                            {ct.defaultStandardHoursPerDay}h
+                          </td>
+                          <td className="px-5 py-4 text-xs font-mono text-slate-500">
+                            <div className="flex flex-col gap-0.5">
+                              <div>{ct.defaultCheckIn} 〜 {ct.defaultCheckOut}</div>
+                              <div className="text-[10px] text-slate-400">休憩: {ct.defaultBreakStart} 〜 {ct.defaultBreakEnd}</div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 text-xs">
+                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border ${
+                              ct.isActive 
+                                ? 'bg-green-50 text-green-700 border-green-200' 
+                                : 'bg-slate-50 text-slate-400 border-slate-200'
+                            }`}>
+                              {ct.isActive ? '有効' : '無効'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              <button 
+                                onClick={() => openEditCt(ct)} 
+                                className="p-2 text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-150 rounded-xl transition-all cursor-pointer" 
+                                title="編集"
+                              >
+                                ✏️
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteCt(ct.id, ct.name)} 
+                                className="p-2 text-rose-650 hover:bg-rose-50 border border-transparent hover:border-rose-150 rounded-xl transition-all cursor-pointer" 
+                                title="削除"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </div>
-      </Card>
+      )}
 
       {/* Edit Modal */}
       <EmployeeFormModal isOpen={modalOpen} onClose={() => { setModalOpen(false); setEditingEmployee(null); }} onSave={handleSave as any} employee={editingEmployee as any} />
@@ -1001,6 +1288,202 @@ export default function ContractsClient({ initialEmployees }: { initialEmployees
           }
         ], null, 2)}
       />
+
+      {/* Contract Type Add/Edit Form Modal */}
+      {ctModalOpen && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn" onClick={() => setCtModalOpen(false)} />
+            <div className="relative bg-white rounded-3xl border border-slate-100 shadow-2xl w-full max-w-2xl mx-auto p-6.5 animate-fadeIn">
+              <div className="mb-5 pb-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-black text-slate-850">
+                    {editingCt ? '雇用形態の編集' : '雇用形態の追加'}
+                  </h2>
+                  <p className="text-xs text-slate-500 font-bold mt-1 font-semibold">
+                    雇用形態の名称と標準勤務ルールを設定します。
+                  </p>
+                </div>
+                <button onClick={() => setCtModalOpen(false)} className="text-slate-400 hover:text-slate-655 font-bold text-xl cursor-pointer border border-transparent rounded-lg hover:bg-slate-50 p-1 transition-all">&times;</button>
+              </div>
+
+              <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">雇用形態名 (必須)</label>
+                    <input 
+                      type="text" 
+                      value={ctForm.name} 
+                      onChange={e => setCtForm(prev => ({ ...prev, name: e.target.value }))} 
+                      className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20" 
+                      placeholder="例: 正社員"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">カタカナ名 (必須)</label>
+                    <input 
+                      type="text" 
+                      value={ctForm.nameKana} 
+                      onChange={e => setCtForm(prev => ({ ...prev, nameKana: e.target.value }))} 
+                      className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20" 
+                      placeholder="例: セイシャイン"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">説明</label>
+                  <input 
+                    type="text" 
+                    value={ctForm.description} 
+                    onChange={e => setCtForm(prev => ({ ...prev, description: e.target.value }))} 
+                    className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20" 
+                    placeholder="雇用形態の説明"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">期間区分</label>
+                    <select 
+                      value={ctForm.defaultEndDateType} 
+                      onChange={e => setCtForm(prev => ({ ...prev, defaultEndDateType: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20 bg-white cursor-pointer select-none"
+                    >
+                      <option value="none">無期限 (Indefinite)</option>
+                      <option value="fixed">有期限 (Fixed-term)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">給与区分</label>
+                    <select 
+                      value={ctForm.defaultSalaryType} 
+                      onChange={e => setCtForm(prev => ({ ...prev, defaultSalaryType: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20 bg-white cursor-pointer select-none"
+                    >
+                      <option value="月給">月給 (Monthly)</option>
+                      <option value="日給">日給 (Daily)</option>
+                      <option value="時給">時給 (Hourly)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-500 mb-2 uppercase">標準勤務曜日</label>
+                  <div className="flex flex-wrap gap-2">
+                    {weekdayOptions.map(day => {
+                      const checked = ctForm.defaultWorkDays.includes(day.value);
+                      return (
+                        <button
+                          key={day.value}
+                          type="button"
+                          onClick={() => setCtForm(prev => ({
+                            ...prev,
+                            defaultWorkDays: checked 
+                              ? prev.defaultWorkDays.filter(d => d !== day.value) 
+                              : [...prev.defaultWorkDays, day.value].sort(),
+                          }))}
+                          className={`px-3.5 py-1.5 rounded-xl border text-xs font-black transition-all cursor-pointer ${
+                            checked 
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                              : 'bg-white text-slate-650 border-slate-250 hover:bg-slate-50'
+                          }`}
+                        >
+                          {day.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">所定時間 (時)</label>
+                    <input 
+                      type="number" 
+                      min="0" max="24" step="0.5" 
+                      value={ctForm.defaultStandardHoursPerDay} 
+                      onChange={e => setCtForm(prev => ({ ...prev, defaultStandardHoursPerDay: Number(e.target.value) }))} 
+                      className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">出勤時間</label>
+                    <input 
+                      type="time" 
+                      value={ctForm.defaultCheckIn} 
+                      onChange={e => setCtForm(prev => ({ ...prev, defaultCheckIn: e.target.value }))} 
+                      className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">退勤時間</label>
+                    <input 
+                      type="time" 
+                      value={ctForm.defaultCheckOut} 
+                      onChange={e => setCtForm(prev => ({ ...prev, defaultCheckOut: e.target.value }))} 
+                      className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">休憩開始</label>
+                    <input 
+                      type="time" 
+                      value={ctForm.defaultBreakStart} 
+                      onChange={e => setCtForm(prev => ({ ...prev, defaultBreakStart: e.target.value }))} 
+                      className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">休憩終了</label>
+                    <input 
+                      type="time" 
+                      value={ctForm.defaultBreakEnd} 
+                      onChange={e => setCtForm(prev => ({ ...prev, defaultBreakEnd: e.target.value }))} 
+                      className="w-full px-3 py-2 border border-slate-250 rounded-xl text-sm font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="flex items-center justify-between gap-4 p-3.5 rounded-2xl border border-rose-150 bg-rose-50/50 cursor-pointer">
+                    <div>
+                      <p className="text-xs font-black text-rose-800">休日出勤の残業化</p>
+                      <p className="text-[10px] text-rose-600 font-semibold mt-0.5 font-semibold">休日勤務を残業時間として集計します</p>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={ctForm.defaultHolidayWorkCountsAsOvertime} 
+                      onChange={e => setCtForm(prev => ({ ...prev, defaultHolidayWorkCountsAsOvertime: e.target.checked }))} 
+                      className="w-5 h-5 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer" 
+                    />
+                  </label>
+                  
+                  <label className="flex items-center justify-between gap-4 p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 cursor-pointer">
+                    <div>
+                      <p className="text-xs font-black text-slate-800">ステータス (有効 / 無効)</p>
+                      <p className="text-[10px] text-slate-500 font-semibold mt-0.5 font-semibold">有効にすると従業員の契約選択に表示されます</p>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={ctForm.isActive} 
+                      onChange={e => setCtForm(prev => ({ ...prev, isActive: e.target.checked }))} 
+                      className="w-5 h-5 rounded border-slate-350 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2.5 mt-6 pt-4 border-t border-slate-100">
+                <button onClick={() => setCtModalOpen(false)} className="px-4 py-2.5 border border-slate-250 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer">キャンセル</button>
+                <button onClick={handleSaveCt} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-xs font-black shadow-sm cursor-pointer">
+                  保存する
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
     </div>
   );
 }

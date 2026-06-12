@@ -85,8 +85,8 @@ export const dashboardService = {
       employeeId: a.employeeId,
       date: toJSTDateString(a.date),
       // Extract HH:mm from checkIn/checkOut datetimes
-      checkIn: a.checkIn ? a.checkIn.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
-      checkOut: a.checkOut ? a.checkOut.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+      checkIn: a.checkIn ? a.checkIn.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }) : '',
+      checkOut: a.checkOut ? a.checkOut.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }) : '',
       overtimeHours: a.overtimeHours,
       status: a.status,
       note: a.notes || '',
