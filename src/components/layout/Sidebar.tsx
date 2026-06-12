@@ -31,7 +31,6 @@ const menuSections: MenuSection[] = [
     items: [
       { href: '/dashboard', label: 'nav.dashboard', icon: '📊' },
       { href: '/notifications', label: 'nav.notifications', icon: '🔔' },
-      { href: '/profile', label: 'nav.myAccount', icon: '👤' },
     ],
   },
   {
@@ -68,17 +67,11 @@ const menuSections: MenuSection[] = [
     ],
   },
   {
-    label: 'nav.trainingDocs',
-    icon: '📚',
-    items: [
-      { href: '/training', label: 'nav.training', icon: '🎓' },
-      { href: '/documents', label: 'nav.documents', icon: '📄' },
-    ],
-  },
-  {
     label: 'nav.reportsSettings',
     icon: '⚙️',
     items: [
+      { href: '/training', label: 'nav.training', icon: '🎓' },
+      { href: '/documents', label: 'nav.documents', icon: '📄' },
       { href: '/reports', label: 'nav.reports', icon: '📈' },
       { href: '/roles', label: 'nav.roles', icon: '🔑' },
       { href: '/company', label: 'nav.company', icon: '🏢' },
@@ -220,7 +213,7 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
 
   const toggleSection = (label: string) => {
     setOpenSections(prev =>
-      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+      prev.includes(label) ? [] : [label]
     );
   };
 
