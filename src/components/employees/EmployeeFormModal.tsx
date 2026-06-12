@@ -650,74 +650,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                 </div>
               </div>
 
-              {/* 勤務日・所定時間の設定 */}
-              <div className="mt-4 border-t border-slate-100 pt-4 space-y-4">
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  {t('contracts.editContractTitle') || '勤務契約・休日ルール設定'}
-                </h4>
-                
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-2">
-                    {t('contracts.workdayLabel') || '契約勤務曜日'}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { value: 1, label: locale === 'ja' ? '月' : locale === 'vi' ? 'T2' : 'Mon' },
-                      { value: 2, label: locale === 'ja' ? '火' : locale === 'vi' ? 'T3' : 'Tue' },
-                      { value: 3, label: locale === 'ja' ? '水' : locale === 'vi' ? 'T4' : 'Wed' },
-                      { value: 4, label: locale === 'ja' ? '木' : locale === 'vi' ? 'T5' : 'Thu' },
-                      { value: 5, label: locale === 'ja' ? '金' : locale === 'vi' ? 'T6' : 'Fri' },
-                      { value: 6, label: locale === 'ja' ? '土' : locale === 'vi' ? 'T7' : 'Sat' },
-                      { value: 0, label: locale === 'ja' ? '日' : locale === 'vi' ? 'CN' : 'Sun' }
-                    ].map(day => {
-                      const checked = formData.workDays.includes(day.value);
-                      return (
-                        <button
-                          key={day.value}
-                          type="button"
-                          onClick={() => setFormData(prev => ({
-                            ...prev,
-                            workDays: checked ? prev.workDays.filter(d => d !== day.value) : [...prev.workDays, day.value].sort(),
-                          }))}
-                          className={`px-3 py-1.5 rounded-lg border text-xs font-black transition-all cursor-pointer ${checked ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-650 border-slate-250 hover:bg-slate-50'}`}
-                        >
-                          {day.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">{t('contracts.hoursPerDayLabel') || '所定時間/日'}</label>
-                    <input type="number" min="0" max="24" step="0.5" name="standardHoursPerDay" value={formData.standardHoursPerDay} onChange={handleChange} className="w-full px-3 py-2 border border-slate-350 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">{t('contracts.checkinLabel') || '出勤'}</label>
-                    <input type="time" name="defaultCheckIn" value={formData.defaultCheckIn} onChange={handleChange} className="w-full px-3 py-2 border border-slate-350 rounded-lg text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">{t('contracts.checkoutLabel') || '退勤'}</label>
-                    <input type="time" name="defaultCheckOut" value={formData.defaultCheckOut} onChange={handleChange} className="w-full px-3 py-2 border border-slate-350 rounded-lg text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">{t('contracts.breakstartLabel') || '休憩開始'}</label>
-                    <input type="time" name="defaultBreakStart" value={formData.defaultBreakStart} onChange={handleChange} className="w-full px-3 py-2 border border-slate-350 rounded-lg text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">{t('contracts.breakendLabel') || '休憩終了'}</label>
-                    <input type="time" name="defaultBreakEnd" value={formData.defaultBreakEnd} onChange={handleChange} className="w-full px-3 py-2 border border-slate-350 rounded-lg text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500/20" />
-                  </div>
-                </div>
-
-                <label className="flex items-center justify-between gap-4 p-3 rounded-xl border border-rose-150 bg-rose-50/20 cursor-pointer">
-                  <div>
-                    <p className="text-xs font-black text-rose-800">{t('contracts.holidayOtSwitch') || '赤日・祝日に働いた時間を残業扱いにする'}</p>
-                  </div>
-                  <input type="checkbox" checked={formData.holidayWorkCountsAsOvertime} onChange={e => setFormData(prev => ({ ...prev, holidayWorkCountsAsOvertime: e.target.checked }))} className="w-4 h-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer" />
-                </label>
-              </div>
             </section>
 
             {/* 給与形態・諸手当 */}
