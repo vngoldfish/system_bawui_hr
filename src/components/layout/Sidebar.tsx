@@ -39,6 +39,7 @@ const menuSections: MenuSection[] = [
     items: [
       { href: '/employees', label: 'nav.employees', icon: '👤' },
       { href: '/departments', label: 'nav.departments', icon: '🏬' },
+      { href: '/positions', label: 'nav.positions', icon: '👔' },
       { href: '/shitens', label: 'nav.shitens', icon: '🏪' },
       { href: '/contracts', label: 'nav.contracts', icon: '📋' },
       { href: '/residence-cards', label: 'nav.foreigners', icon: '🛂' },
@@ -83,6 +84,7 @@ const menuSections: MenuSection[] = [
 const permissionMap: Record<string, string> = {
   '/employees': 'employees:view',
   '/departments': 'employees:view',
+  '/positions': 'employees:view',
   '/shitens': 'employees:view',
   '/contracts': 'employees:view',
   '/residence-cards': 'residence_card:view',
