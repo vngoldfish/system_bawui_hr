@@ -28,6 +28,7 @@ model Position {
   name        String
   nameKana    String
   description String?
+  allowance   Float    @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

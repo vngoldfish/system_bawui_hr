@@ -158,6 +158,11 @@ export async function POST(request: NextRequest) {
             birthDate: true,
             dependents: true,
             insuranceSalary: true,
+            position: {
+              select: {
+                allowance: true,
+              }
+            }
           },
         });
         if (employee) {
@@ -181,6 +186,7 @@ export async function POST(request: NextRequest) {
                 ? parseFloat(data.bonus)
                 : undefined,
             customBonus: (data.bonus !== undefined && data.bonus !== null && data.bonus !== '') ? parseFloat(data.bonus) : undefined,
+            positionAllowance: employee.position?.allowance || 0,
           });
 
           // Map all 11 detailed fields
@@ -429,6 +435,11 @@ export async function PUT(request: NextRequest) {
         birthDate: true,
         dependents: true,
         insuranceSalary: true,
+        position: {
+          select: {
+            allowance: true,
+          }
+        }
       },
     });
 
@@ -464,6 +475,7 @@ export async function PUT(request: NextRequest) {
         companyRate,
         customAllowances: allowances,
         customBonus: undefined,
+        positionAllowance: employee.position?.allowance || 0,
       });
 
       healthInsuranceCompany = body.healthInsuranceCompany !== undefined ? parseFloat(body.healthInsuranceCompany) : details.healthInsuranceCompany;

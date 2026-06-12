@@ -12,7 +12,7 @@ import { calculatePayrollDetails } from '@/lib/payroll-calculator';
 
 interface Employee {
   id: string; employeeCode: string; firstName: string; lastName: string; firstNameKana: string; lastNameKana: string;
-  department: string; position: string; salary: number; salaryType: string; hourlyRate: number; dailyRate: number;
+  department: string; position: string; positionAllowance?: number; salary: number; salaryType: string; hourlyRate: number; dailyRate: number;
   contractType: string; benefits: {
     healthInsurance: boolean; pension: boolean; employmentInsurance: boolean; workersComp: boolean;
     transportation: number; housing: number; meal: number;
@@ -257,6 +257,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
       customAllowances: editFields.transportation + editFields.housing + editFields.meal + editFields.allowances,
       customBonus: editFields.bonus,
       companyRate: companyInfo?.healthInsuranceRate,
+      positionAllowance: employee.positionAllowance || 0,
     });
 
     setEditFields(prev => ({
@@ -1382,6 +1383,7 @@ export default function PayrollClient({
             month: endMonth,
             dependents: emp.dependents,
             companyRate: companyInfo?.healthInsuranceRate,
+            positionAllowance: emp.positionAllowance || 0,
           });
 
           return {

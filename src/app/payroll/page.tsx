@@ -147,6 +147,7 @@ export default async function PayrollPage() {
           })) : [],
           companyRate: company?.healthInsuranceRate,
           customAllowances: allowances,
+          positionAllowance: dbUser.position?.allowance || 0,
         });
 
         healthInsuranceCompany = details.healthInsuranceCompany;
@@ -211,6 +212,7 @@ export default async function PayrollPage() {
       lastNameKana: dbUser.lastNameKana || '',
       department: dbUser.department?.name || '未所属',
       position: dbUser.position?.name || '一般社員',
+      positionAllowance: dbUser.position?.allowance || 0,
       salary: dbUser.salary || 0,
       salaryType: dbUser.salaryType || '月給',
       hourlyRate: dbUser.hourlyRate || 0,
@@ -268,6 +270,7 @@ export default async function PayrollPage() {
       lastNameKana: emp.lastNameKana || '',
       department: emp.department?.name || '未所属',
       position: emp.position?.name || '役職なし',
+      positionAllowance: emp.position?.allowance || 0,
       salary: emp.salary || 0,
       salaryType: emp.salaryType || '月給',
       hourlyRate: emp.hourlyRate || 0,
@@ -350,6 +353,7 @@ export default async function PayrollPage() {
           })) : [],
           companyRate: company?.healthInsuranceRate,
           customAllowances: allowances,
+          positionAllowance: emp.position?.allowance || 0,
         });
 
         healthInsuranceCompany = details.healthInsuranceCompany;

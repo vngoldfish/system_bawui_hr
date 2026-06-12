@@ -43,7 +43,9 @@ export async function POST(request: NextRequest) {
       }
 
       const name = pos.name?.trim();
+      const nameKana = pos.nameKana?.trim() || name;
       const description = pos.description?.trim() || null;
+      const allowance = parseFloat(pos.allowance) || 0;
 
       const rowDetails: string[] = [];
 
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
       if (rowDetails.length > 0) {
         errors.push(`Row ${rowNum}: ${rowDetails.join(', ')}`);
       } else {
-        validatedPos.push({ name, description });
+        validatedPos.push({ name, nameKana, description, allowance });
       }
     }
 

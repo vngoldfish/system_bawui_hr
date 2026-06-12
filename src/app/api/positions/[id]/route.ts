@@ -7,6 +7,7 @@ const updatePositionSchema = z.object({
   name: z.string().min(1, '役職名は必須です').optional(),
   nameKana: z.string().min(1, '役職名（カナ）は必須です').optional(),
   description: z.string().optional().nullable(),
+  allowance: z.number().nonnegative('手当は0以上にする必要があります').optional(),
 });
 
 // PUT update position

@@ -877,16 +877,21 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
         onClose={() => { setManagePosOpen(false); fetchPositions(); }}
         title={t('form.pos')}
         apiPath="/api/positions"
+        showAllowance={true}
         enableImport={true}
         importPayloadKey="positions"
         importTemplateJson={JSON.stringify([
           {
             "name": "マネージャー",
-            "description": "部門統括者"
+            "nameKana": "マネージャー",
+            "description": "部門統括者",
+            "allowance": 30000
           },
           {
             "name": "一般社員",
-            "description": "担当業務の遂行"
+            "nameKana": "イッパンシャイン",
+            "description": "担当業務の遂行",
+            "allowance": 0
           }
         ], null, 2)}
       />

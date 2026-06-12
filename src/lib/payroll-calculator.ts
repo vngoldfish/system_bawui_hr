@@ -178,6 +178,7 @@
   employeeId,
   insuranceSalary,
   companyRate,
+  positionAllowance,
 }: {
   baseSalary: number;
   salaryType: string;
@@ -196,6 +197,7 @@
   employeeId?: string;
   insuranceSalary?: number | null;
   companyRate?: number | null;
+  positionAllowance?: number;
 }) {
 	  // Override salary from SalaryAdjustment if prisma + employeeId provided
 	  if (prisma && employeeId) {
@@ -246,7 +248,7 @@
 	  const hourlyEquiv = salaryType === '時給' ? hourlyRate : (workHours > 0 ? calculatedBase / workHours : 0);
 	  const overtimePay = Math.round(hourlyEquiv * 1.25 * overtimeHours);
 
-	  const baseAllowances = b.transportation + b.housing + b.meal;
+	  const baseAllowances = b.transportation + b.housing + b.meal + (positionAllowance || 0);
 	  const allowances = customAllowances !== undefined && customAllowances !== null ? customAllowances : baseAllowances;
 	  const bonus = customBonus !== undefined && customBonus !== null ? customBonus : 0;
 	  const totalGross = calculatedBase + overtimePay + allowances + bonus;

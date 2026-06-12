@@ -11,6 +11,7 @@ interface ManageableItem {
   name: string;
   nameKana: string;
   description?: string | null;
+  allowance?: number;
   _count?: { employees: number };
 }
 
@@ -22,6 +23,7 @@ interface ManagementModalProps {
   enableImport?: boolean;
   importPayloadKey?: string;
   importTemplateJson?: string;
+  showAllowance?: boolean;
 }
 
 export default function ManagementModal({
@@ -31,14 +33,15 @@ export default function ManagementModal({
   apiPath,
   enableImport = false,
   importPayloadKey = 'data',
-  importTemplateJson = '[]'
+  importTemplateJson = '[]',
+  showAllowance = false
 }: ManagementModalProps) {
   const { t } = useI18n();
   const [items, setItems] = useState<ManageableItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', nameKana: '', description: '' });
+  const [form, setForm] = useState({ name: '', nameKana: '', description: '', allowance: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -55,7 +58,7 @@ export default function ManagementModal({
   }, [isOpen]);
 
   const resetForm = () => {
-    setForm({ name: '', nameKana: '', description: '' });
+    setForm({ name: '', nameKana: '', description: '', allowance: 0 });
     setEditingId(null);
     setShowAdd(false);
     setError('');
@@ -108,7 +111,12 @@ export default function ManagementModal({
 
   const startEdit = (item: ManageableItem) => {
     setEditingId(item.id);
-    setForm({ name: item.name, nameKana: item.nameKana, description: item.description || '' });
+    setForm({ 
+      name: item.name, 
+      nameKana: item.nameKana, 
+      description: item.description || '', 
+      allowance: item.allowance || 0 
+    });
     setShowAdd(true);
     setError('');
   };
@@ -132,7 +140,7 @@ export default function ManagementModal({
           {!showAdd && (
             <div className="flex gap-2">
               <button
-                onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', nameKana: '', description: '' }); }}
+                onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', nameKana: '', description: '', allowance: 0 }); }}
                 className="flex-1 px-4 py-3 border-2 border-dashed border-slate-200/80 rounded-xl text-xs font-bold text-slate-500 hover:border-blue-500 hover:text-blue-600 transition-all hover:bg-slate-50/50 cursor-pointer"
               >
                 {t('common.addNew')}
@@ -168,6 +176,21 @@ export default function ManagementModal({
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('common.colDescription')}</label>
                 <input type="text" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={t('common.placeholderDesc')} className={inputCls} />
               </div>
+              {showAllowance && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('common.colAllowance') || '役職手当 (Allowance)'}</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 text-sm text-slate-400 font-bold">¥</span>
+                    <input 
+                      type="number" 
+                      value={form.allowance || ''} 
+                      onChange={e => setForm(f => ({ ...f, allowance: parseFloat(e.target.value) || 0 }))} 
+                      placeholder="例: 10000" 
+                      className={inputCls + " pl-8 font-mono font-bold"} 
+                    />
+                  </div>
+                </div>
+              )}
               {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
               <div className="flex gap-2 justify-end pt-1">
                 <button onClick={resetForm} className="px-4 py-2 text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-650 transition-colors cursor-pointer">{t('common.cancel')}</button>
@@ -201,7 +224,15 @@ export default function ManagementModal({
                       </button>
                     </span>
                   </div>
-                  <p className="text-xs text-slate-450 mt-1 font-semibold">{item.nameKana}{item.description ? ` — ${item.description}` : ''}</p>
+                  <p className="text-xs text-slate-450 mt-1 font-semibold">
+                    {item.nameKana}
+                    {item.description ? ` — ${item.description}` : ''}
+                    {showAllowance && item.allowance !== undefined && item.allowance > 0 && (
+                      <span className="ml-2 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 font-bold border border-blue-100 text-[10px]">
+                        手当: ¥{(item.allowance).toLocaleString()}
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {item._count && (
