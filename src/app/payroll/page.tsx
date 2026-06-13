@@ -4,8 +4,7 @@ import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import PayrollClient from '@/components/payroll/PayrollClient';
 import { calculatePayrollDetails } from '@/lib/payroll-calculator';
-
-export const dynamic = 'force-dynamic';
+import { Suspense } from 'react';
 
 const mergeBenefits = (benefits: any) => {
   const defaults = {
@@ -33,7 +32,7 @@ const mergeBenefits = (benefits: any) => {
   };
 };
 
-export default async function PayrollPage() {
+async function PayrollLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -231,20 +230,16 @@ export default async function PayrollPage() {
     }];
 
     return (
-      <DashboardLayout title="給与明細" subtitle={`${dbUser.lastName} ${dbUser.firstName} さんの給与明細書一覧`}>
-        <div className="space-y-6">
-          <PayrollClient 
-            employees={singleEmployeeList} 
-            initialRecords={records} 
-            payrollSettings={{ 
-              cutoffDay: company?.salaryCutoffDay || '末日', 
-              payday: company?.payday || '25' 
-            }} 
-            isEmployeeMode={true}
-            companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
-          />
-        </div>
-      </DashboardLayout>
+      <PayrollClient 
+        employees={singleEmployeeList} 
+        initialRecords={records} 
+        payrollSettings={{ 
+          cutoffDay: company?.salaryCutoffDay || '末日', 
+          payday: company?.payday || '25' 
+        }} 
+        isEmployeeMode={true}
+        companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
+      />
     );
   } else {
     // 2. Admin/Manager Mode: Fetch all DB employees
@@ -408,20 +403,28 @@ export default async function PayrollPage() {
     }));
 
     return (
-      <DashboardLayout title="給与計算" subtitle="給与の自動計算 và 明細管理">
-        <div className="space-y-6">
-          <PayrollClient 
-            employees={employees} 
-            initialRecords={records} 
-            payrollSettings={{ 
-              cutoffDay: company?.salaryCutoffDay || '末日', 
-              payday: company?.payday || '25' 
-            }} 
-            isEmployeeMode={false}
-            companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
-          />
-        </div>
-      </DashboardLayout>
+      <PayrollClient 
+        employees={employees} 
+        initialRecords={records} 
+        payrollSettings={{ 
+          cutoffDay: company?.salaryCutoffDay || '末日', 
+          payday: company?.payday || '25' 
+        }} 
+        isEmployeeMode={false}
+        companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
+      />
     );
   }
+}
+
+export default function PayrollPage() {
+  return (
+    <DashboardLayout title="給与計算" subtitle="給与の自動計算 và 明細管理">
+      <div className="space-y-6">
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <PayrollLoader />
+        </Suspense>
+      </div>
+    </DashboardLayout>
+  );
 }

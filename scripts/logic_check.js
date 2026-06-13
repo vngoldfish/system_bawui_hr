@@ -1,6 +1,7 @@
 import { hashPassword } from '../src/lib/crypto';
+import { prisma } from '../src/lib/prisma';
 // Using built‑in fetch (Node 22+)
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const ADMIN_EMAIL = 'admin@bawui.com';
 const ADMIN_PASSWORD = '1234@abcd';
 
@@ -30,8 +31,10 @@ async function login() {
   });
   if (!res.ok) throw new Error('Login failed: ' + res.status);
   const data = await res.json();
-  const setCookie = res.headers.get('set-cookie');
-  const cookie = setCookie?.split(';')[0] ?? '';
+  const setCookies = typeof res.headers.getSetCookie === 'function'
+    ? res.headers.getSetCookie()
+    : (res.headers.get('set-cookie')?.split(',') ?? []);
+  const cookie = setCookies.map(c => c.split(';')[0].trim()).join('; ');
   return cookie;
 }
 
@@ -39,7 +42,11 @@ async function createEmployee(cookie) {
   const body = {
     firstName: 'Nguyen',
     lastName: 'Van A',
+    firstNameKana: 'グエン',
+    lastNameKana: 'ヴァンエー',
     email: 'nguyenvana@example.com',
+    phone: '090-1234-5678',
+    salary: 300000,
     departmentId: '', // will fill later
     positionId: '',
     contractTypeId: '',
@@ -49,22 +56,27 @@ async function createEmployee(cookie) {
   // fetch required IDs
   const depRes = await fetch(`${BASE_URL}/api/departments?skip=0&take=1`, { headers: { Cookie: cookie } });
   const depData = await depRes.json();
-  body.departmentId = depData.data[0]?.id ?? '';
+  body.departmentId = (Array.isArray(depData) ? depData[0]?.id : depData.data?.[0]?.id) ?? '';
+
   const posRes = await fetch(`${BASE_URL}/api/positions?skip=0&take=1`, { headers: { Cookie: cookie } });
   const posData = await posRes.json();
-  body.positionId = posData.data[0]?.id ?? '';
+  body.positionId = (Array.isArray(posData) ? posData[0]?.id : posData.data?.[0]?.id) ?? '';
+
   const ctRes = await fetch(`${BASE_URL}/api/contract-types?skip=0&take=1`, { headers: { Cookie: cookie } });
   const ctData = await ctRes.json();
-  body.contractTypeId = ctData.data[0]?.id ?? '';
+  body.contractTypeId = (Array.isArray(ctData) ? ctData[0]?.id : ctData.data?.[0]?.id) ?? '';
 
   const res = await fetch(`${BASE_URL}/api/employees`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error('Create employee failed: ' + res.status);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Create employee failed: ${res.status} - ${errText}`);
+  }
   const emp = await res.json();
-  return emp.data.id;
+  return emp.id || emp.data?.id;
 }
 
 async function checkSync(cookie, empId) {
@@ -77,9 +89,14 @@ async function checkSync(cookie, empId) {
   const payroll = await payrollRes.json();
   const attendance = await attendanceRes.json();
   const audit = await auditRes.json();
-  console.log('Payroll data length:', payroll.data?.length ?? 0);
-  console.log('Attendance data length:', attendance.data?.length ?? 0);
-  console.log('Audit entries:', audit.data?.length ?? 0);
+
+  const payrollLen = Array.isArray(payroll) ? payroll.length : (payroll.data?.length ?? 0);
+  const attendanceLen = Array.isArray(attendance) ? attendance.length : (attendance.data?.length ?? 0);
+  const auditLen = audit.logs?.length ?? (audit.data?.length ?? 0);
+
+  console.log('Payroll data length:', payrollLen);
+  console.log('Attendance data length:', attendanceLen);
+  console.log('Audit entries:', auditLen);
 }
 
 async function deleteEmployee(cookie, empId) {

@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { successResponse, errorResponse, handleApiError } from '@/lib/api-utils';
 import { z } from 'zod';
+import { getSessionUser } from '@/lib/session';
+import { logDatabaseChange } from '@/lib/audit-logger';
 
 const updateContractTypeSchema = z.object({
   name: z.string().min(1).optional(),
@@ -22,6 +24,14 @@ const updateContractTypeSchema = z.object({
 // PUT update contract type
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = getSessionUser(request);
+    if (!user) {
+      return errorResponse('Unauthorized', 401);
+    }
+    if (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER') {
+      return errorResponse('Forbidden', 403);
+    }
+
     const { id } = await params;
     const body = await request.json();
     const data = updateContractTypeSchema.parse(body);
@@ -34,6 +44,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data,
     });
 
+    logDatabaseChange({
+      request,
+      action: 'UPDATE',
+      model: 'ContractType',
+      recordId: contractType.id,
+      details: { name: contractType.name, nameKana: contractType.nameKana },
+    });
+
     return successResponse(contractType);
   } catch (error) {
     return handleApiError(error);
@@ -43,6 +61,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // DELETE contract type
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = getSessionUser(_request);
+    if (!user) {
+      return errorResponse('Unauthorized', 401);
+    }
+    if (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER') {
+      return errorResponse('Forbidden', 403);
+    }
+
     const { id } = await params;
 
     const existing = await prisma.contractType.findUnique({
@@ -56,6 +82,15 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     }
 
     await prisma.contractType.delete({ where: { id } });
+
+    logDatabaseChange({
+      request: _request,
+      action: 'DELETE',
+      model: 'ContractType',
+      recordId: id,
+      details: { name: existing.name, nameKana: existing.nameKana },
+    });
+
     return successResponse({ message: '雇用形態を削除しました' });
   } catch (error) {
     return handleApiError(error);

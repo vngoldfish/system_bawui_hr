@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     const importedCodes = new Set<string>();
 
     // Determine the starting auto-increment value for employeeCode
-    let lastEmployee = await prisma.employee.findFirst({
+    const lastEmployee = await prisma.employee.findFirst({
       where: { employeeCode: { startsWith: 'NV' } },
       orderBy: { employeeCode: 'desc' },
       select: { employeeCode: true },

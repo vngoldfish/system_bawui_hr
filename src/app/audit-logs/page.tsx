@@ -4,10 +4,9 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import AuditLogsClient from '@/components/audit-logs/AuditLogsClient';
 import { prisma } from '@/lib/prisma';
 import { getAuditLogs } from '@/services/auditService';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function AuditLogsPage() {
+async function AuditLogsLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -44,12 +43,20 @@ export default async function AuditLogsPage() {
   const result = getAuditLogs({ page: 1, limit: 20 });
 
   return (
+    <AuditLogsClient
+      initialLogs={result.logs}
+      initialPagination={result.pagination}
+      currentUser={user}
+    />
+  );
+}
+
+export default function AuditLogsPage() {
+  return (
     <DashboardLayout title="操作ログ" subtitle="システム変更記録および管理者アクションを監視します。">
-      <AuditLogsClient
-        initialLogs={result.logs}
-        initialPagination={result.pagination}
-        currentUser={user}
-      />
+      <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+        <AuditLogsLoader />
+      </Suspense>
     </DashboardLayout>
   );
 }

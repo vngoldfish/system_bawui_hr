@@ -13,7 +13,16 @@ import ExportButtons from '@/components/common/ExportButtons';
 
 type ExpiryLevel = 'expired' | 'expiring' | 'valid';
 
-function getExpiryStatus(expiryDate: string, t: any): { level: ExpiryLevel; daysLeft: number; label: string; colorClasses: string; pct: number } {
+function getExpiryStatus(expiryDate: string | null | undefined, t: any): { level: ExpiryLevel; daysLeft: number; label: string; colorClasses: string; pct: number } {
+  if (!expiryDate) {
+    return {
+      level: 'expired',
+      daysLeft: -9999,
+      label: t('residenceCards.statusMissing') || '未登録 (Not Registered)',
+      colorClasses: 'bg-red-50 text-red-700 border-red-200 shadow-sm',
+      pct: 0
+    };
+  }
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const expiry = new Date(expiryDate);
@@ -128,7 +137,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
 
   // Filter foreign employees only
   const foreignEmployees = useMemo(() => {
-    return employees.filter(emp => emp.status !== 'INACTIVE' && emp.nationality && emp.nationality !== '日本' && emp.residenceExpiry);
+    return employees.filter(emp => emp.status !== 'INACTIVE' && emp.nationality && emp.nationality !== '日本');
   }, [employees]);
 
   // Apply filters and sort
@@ -148,7 +157,6 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
     // Status filter
     if (statusFilter !== 'ALL') {
       result = result.filter(emp => {
-        if (!emp.residenceExpiry) return false;
         const status = getExpiryStatus(emp.residenceExpiry, t);
         return status.level === statusFilter;
       });
@@ -177,9 +185,9 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
 
   // Calculate stats
   const stats = useMemo(() => {
-    const expired = foreignEmployees.filter(e => e.residenceExpiry && getExpiryStatus(e.residenceExpiry, t).level === 'expired').length;
-    const expiring = foreignEmployees.filter(e => e.residenceExpiry && getExpiryStatus(e.residenceExpiry, t).level === 'expiring').length;
-    const valid = foreignEmployees.filter(e => e.residenceExpiry && getExpiryStatus(e.residenceExpiry, t).level === 'valid').length;
+    const expired = foreignEmployees.filter(e => getExpiryStatus(e.residenceExpiry, t).level === 'expired').length;
+    const expiring = foreignEmployees.filter(e => getExpiryStatus(e.residenceExpiry, t).level === 'expiring').length;
+    const valid = foreignEmployees.filter(e => getExpiryStatus(e.residenceExpiry, t).level === 'valid').length;
     return { total: foreignEmployees.length, expired, expiring, valid };
   }, [foreignEmployees, t]);
 
@@ -191,7 +199,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
 
   const exportData = useMemo(() => {
     return filteredEmployees.map(emp => {
-      const expiryStatus = emp.residenceExpiry ? getExpiryStatus(emp.residenceExpiry, t) : null;
+      const expiryStatus = getExpiryStatus(emp.residenceExpiry, t);
       return {
         code: emp.employeeCode,
         name: `${emp.lastName} ${emp.firstName}`,
@@ -340,7 +348,7 @@ export default function ResidenceCardsClient({ initialEmployees }: { initialEmpl
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredEmployees.map(emp => {
-                  const expiryStatus = emp.residenceExpiry ? getExpiryStatus(emp.residenceExpiry, t) : null;
+                  const expiryStatus = getExpiryStatus(emp.residenceExpiry, t);
                   return (
                     <tr key={emp.id} className="hover:bg-slate-50/40 transition-colors">
                       <td className="px-5 py-4 font-mono text-xs text-blue-600 font-bold w-[100px] min-w-[100px] truncate">{emp.employeeCode}</td>

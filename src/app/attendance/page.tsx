@@ -7,9 +7,19 @@ import { employeeService } from '@/services/employeeService';
 import { attendanceService } from '@/services/attendanceService';
 import { prisma } from '@/lib/prisma';
 
-export const dynamic = 'force-dynamic';
+export const unstable_instant = {
+  prefetch: 'static',
+  samples: [
+    {
+      cookies: [
+        { name: 'session_user', value: null },
+        { name: 'view_mode', value: null }
+      ]
+    }
+  ]
+};
 
-export default async function AttendancePage() {
+async function AttendanceLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -63,14 +73,20 @@ export default async function AttendancePage() {
 
   return (
     <DashboardLayout title="勤怠管理" subtitle={isEmployee ? `${user.lastName} ${user.firstName} さんの出退勤管理` : "従業員の出退勤・残業管理"}>
-      <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]">Loading...</div>}>
-        <AttendanceClient 
-          initialRecords={records} 
-          employees={employees} 
-          holidays={holidays} 
-          isEmployeeMode={isEmployee} 
-        />
-      </Suspense>
+      <AttendanceClient 
+        initialRecords={records} 
+        employees={employees} 
+        holidays={holidays} 
+        isEmployeeMode={isEmployee} 
+      />
     </DashboardLayout>
+  );
+}
+
+export default function AttendancePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+      <AttendanceLoader />
+    </Suspense>
   );
 }

@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import TrainingClient from '@/components/training/TrainingClient';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function TrainingPage() {
+async function TrainingLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -46,10 +45,16 @@ export default async function TrainingPage() {
     position: emp.position?.name || '一般社員',
   }));
 
+  return <TrainingClient employees={employees} />;
+}
+
+export default function TrainingPage() {
   return (
     <DashboardLayout title="研修管理" subtitle="研修プログラム・受講管理・修了証">
       <div className="space-y-6">
-        <TrainingClient employees={employees} />
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <TrainingLoader />
+        </Suspense>
       </div>
     </DashboardLayout>
   );

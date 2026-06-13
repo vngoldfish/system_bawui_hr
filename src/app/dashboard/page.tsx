@@ -4,10 +4,9 @@ import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import DashboardClient from '@/components/dashboard/DashboardClient';
 import { dashboardService } from '@/services/dashboardService';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function DashboardPage() {
+async function DashboardLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -110,31 +109,37 @@ export default async function DashboardPage() {
     }));
 
     return (
-      <DashboardLayout title="ダッシュボード" subtitle="人事管理システムの概要">
-        <DashboardClient 
-          employees={formattedEmployee as any} 
-          attendance={formattedAttendance} 
-          leaves={formattedLeaves} 
-          shitens={[]}
-          isEmployeeMode={true}
-          currentUser={user}
-        />
-      </DashboardLayout>
+      <DashboardClient 
+        employees={formattedEmployee as any} 
+        attendance={formattedAttendance} 
+        leaves={formattedLeaves} 
+        shitens={[]}
+        isEmployeeMode={true}
+        currentUser={user}
+      />
     );
   }
 
   const { employees, attendance, leaves, shitens } = await dashboardService.getDashboardData();
 
   return (
+    <DashboardClient 
+      employees={employees as any} 
+      attendance={attendance} 
+      leaves={leaves} 
+      shitens={shitens}
+      isEmployeeMode={false}
+      currentUser={user}
+    />
+  );
+}
+
+export default function DashboardPage() {
+  return (
     <DashboardLayout title="ダッシュボード" subtitle="人事管理システムの概要">
-      <DashboardClient 
-        employees={employees as any} 
-        attendance={attendance} 
-        leaves={leaves} 
-        shitens={shitens}
-        isEmployeeMode={false}
-        currentUser={user}
-      />
+      <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+        <DashboardLoader />
+      </Suspense>
     </DashboardLayout>
   );
 }

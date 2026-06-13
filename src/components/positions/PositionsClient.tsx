@@ -7,6 +7,9 @@ import { formatCurrency } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import ExportButtons from '@/components/common/ExportButtons';
 import GenericImportModal from '@/components/common/GenericImportModal';
+import Portal from '@/components/common/Portal';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import NotificationModal from '@/components/common/NotificationModal';
 
 interface Position {
   id: string;
@@ -112,12 +115,47 @@ export default function PositionsClient({
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [posStats, setPosStats] = useState<PositionStats | null>(null);
-  const [manageOpen, setManageOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [loadingEmps, setLoadingEmps] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'name' | 'salary' | 'department'>('name');
+
+  // Direct Form States
+  const [formOpen, setFormOpen] = useState(false);
+  const [formEditingId, setFormEditingId] = useState<string | null>(null);
+  const [formVal, setFormVal] = useState({ name: '', nameKana: '', description: '', allowance: 0 });
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Custom Confirmation Modal States
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmData({ title, message, onConfirm });
+    setConfirmOpen(true);
+  };
+
+  // Custom Notification Modal States
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationData, setNotificationData] = useState<{
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
+
+  const showNotification = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setNotificationData({ title, message, type });
+    setNotificationOpen(true);
+    setTimeout(() => {
+      setNotificationOpen(false);
+    }, 3000);
+  };
 
   const exportData = useMemo(() => {
     return positions.map(p => ({
@@ -138,6 +176,122 @@ export default function PositionsClient({
     } catch (err) {
       console.error('Failed to fetch positions:', err);
     }
+  };
+
+  const handleAddClick = () => {
+    setFormVal({ name: '', nameKana: '', description: '', allowance: 0 });
+    setFormEditingId(null);
+    setFormError('');
+    setFormOpen(true);
+  };
+
+  const handleEditClick = (pos: Position) => {
+    setFormVal({
+      name: pos.name,
+      nameKana: pos.nameKana,
+      description: pos.description || '',
+      allowance: pos.allowance || 0,
+    });
+    setFormEditingId(pos.id);
+    setFormError('');
+    setFormOpen(true);
+  };
+
+  const handleSavePos = async () => {
+    if (!formVal.name.trim() || !formVal.nameKana.trim()) {
+      setFormError(t('common.errorNameKanaRequired') || 'Name and Kana are required');
+      return;
+    }
+
+    showConfirm(
+      locale === 'vi' ? 'Xác nhận thao tác' : locale === 'ja' ? '操作の確認' : 'Confirm Action',
+      locale === 'vi' ? 'Bạn có chắc chắn muốn thực hiện thao tác này không?' : locale === 'ja' ? 'この操作を実行してもよろしいですか？' : 'Are you sure you want to perform this action?',
+      async () => {
+        setSaving(true);
+        setFormError('');
+        try {
+          const url = formEditingId ? `/api/positions/${formEditingId}` : '/api/positions';
+          const method = formEditingId ? 'PUT' : 'POST';
+          const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formVal),
+          });
+
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || t('common.saveError') || 'Failed to save');
+          }
+
+          const updatedRes = await fetch('/api/positions');
+          const updatedData = await updatedRes.json();
+          const newPosList: Position[] = Array.isArray(updatedData) ? updatedData : updatedData.data || [];
+          setPositions(newPosList);
+
+          // If editing, update details view
+          if (formEditingId) {
+            const updatedPos = newPosList.find(p => p.id === formEditingId);
+            if (updatedPos) {
+              setSelectedPos(updatedPos);
+            }
+            showNotification(
+              locale === 'vi' ? 'Thành công' : locale === 'ja' ? '成功' : 'Success',
+              locale === 'vi' ? 'Cập nhật chức vụ thành công.' : locale === 'ja' ? '役職を更新しました。' : 'Position updated successfully.'
+            );
+          } else {
+            showNotification(
+              locale === 'vi' ? 'Thành công' : locale === 'ja' ? '成功' : 'Success',
+              locale === 'vi' ? 'Thêm mới chức vụ thành công.' : locale === 'ja' ? '役職を追加しました。' : 'Position added successfully.'
+            );
+          }
+
+          setFormOpen(false);
+        } catch (e: any) {
+          setFormError(e.message);
+        } finally {
+          setSaving(false);
+        }
+      }
+    );
+  };
+
+  const handleDeletePos = async (id: string) => {
+    showConfirm(
+      locale === 'vi' ? 'Xác nhận xoá' : locale === 'ja' ? '削除の確認' : 'Confirm Delete',
+      locale === 'vi' ? 'Bạn có chắc chắn muốn thực hiện thao tác này không?' : locale === 'ja' ? 'この操作を実行してもよろしいですか？' : 'Are you sure you want to perform this action?',
+      async () => {
+        try {
+          const res = await fetch(`/api/positions/${id}`, { method: 'DELETE' });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || t('common.deleteError') || 'Failed to delete');
+          }
+
+          const updatedRes = await fetch('/api/positions');
+          const updatedData = await updatedRes.json();
+          const newPosList: Position[] = Array.isArray(updatedData) ? updatedData : updatedData.data || [];
+          setPositions(newPosList);
+
+          // Clear details if selected position is deleted
+          if (selectedPos?.id === id) {
+            setSelectedPos(null);
+            setEmployees([]);
+            setFilteredEmployees([]);
+            setPosStats(null);
+          }
+          showNotification(
+            locale === 'vi' ? 'Thành công' : locale === 'ja' ? '成功' : 'Success',
+            locale === 'vi' ? 'Xoá chức vụ thành công.' : locale === 'ja' ? '役職を削除しました。' : 'Position deleted successfully.'
+          );
+        } catch (e: any) {
+          showNotification(
+            locale === 'vi' ? 'Thất bại' : locale === 'ja' ? 'エラー' : 'Failed',
+            e.message || 'Operation failed',
+            'error'
+          );
+        }
+      }
+    );
   };
 
   const fetchEmployeesByPos = async (posId: string) => {
@@ -273,10 +427,10 @@ export default function PositionsClient({
             📥 {t('common.import') || 'Import'}
           </button>
           <button
-            onClick={() => setManageOpen(true)}
-            className="px-4.5 py-2.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-xs cursor-pointer hover:shadow-md active:scale-95"
+            onClick={handleAddClick}
+            className="px-4.5 py-2.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-xs cursor-pointer hover:shadow-md active:scale-95 flex items-center gap-1"
           >
-            {locale === 'ja' ? '役職を追加・編集' : locale === 'vi' ? 'Quản lý chức vụ' : 'Manage Positions'}
+            ➕ {locale === 'ja' ? '新規追加' : locale === 'vi' ? 'Thêm mới' : 'Add New'}
           </button>
         </div>
       </div>
@@ -332,18 +486,40 @@ export default function PositionsClient({
                 </p>
               )}
               <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-                <span className="font-mono truncate select-all">ID: {pos.id}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(pos.id);
-                    alert('Position ID copied!');
-                  }}
-                  className="hover:text-indigo-600 transition-colors cursor-pointer bg-slate-100 hover:bg-indigo-50 w-6 h-6 rounded-lg flex items-center justify-center border border-slate-200/50"
-                  title="Copy Position ID"
-                >
-                  📋
-                </button>
+                <span className="font-mono truncate select-all mr-2">ID: {pos.id}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(pos.id);
+                      alert('Position ID copied!');
+                    }}
+                    className="hover:text-indigo-600 transition-colors cursor-pointer bg-slate-100 hover:bg-indigo-50 w-6 h-6 rounded-lg flex items-center justify-center border border-slate-200/50"
+                    title="Copy Position ID"
+                  >
+                    📋
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditClick(pos);
+                    }}
+                    className="hover:text-blue-600 transition-colors cursor-pointer bg-slate-100 hover:bg-blue-50 w-6 h-6 rounded-lg flex items-center justify-center border border-slate-200/50"
+                    title={t('common.edit') || 'Edit'}
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeletePos(pos.id);
+                    }}
+                    className="hover:text-rose-600 transition-colors cursor-pointer bg-slate-100 hover:bg-rose-50 w-6 h-6 rounded-lg flex items-center justify-center border border-slate-200/50"
+                    title={t('common.delete') || 'Delete'}
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -358,19 +534,33 @@ export default function PositionsClient({
               <span className="w-8 h-8 rounded-xl bg-slate-150 flex items-center justify-center text-base border border-slate-200/60 shadow-2xs">👔</span>
               <span>{selectedPos.name} {locale === 'ja' ? ' の詳細ダッシュボード' : locale === 'vi' ? ' - Chi tiết chức vụ' : ' Detail Dashboard'}</span>
             </h2>
-            <button
-              onClick={() => {
-                setSelectedPos(null);
-                setEmployees([]);
-                setFilteredEmployees([]);
-                setPosStats(null);
-                setSearchTerm('');
-                setStatusFilter('ALL');
-              }}
-              className="text-xs text-slate-400 hover:text-slate-700 font-bold border border-slate-200 rounded-xl px-3 py-1.5 bg-white hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
-            >
-              {t('departments.closeBtn') || '閉じる'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleEditClick(selectedPos)}
+                className="text-xs text-blue-600 hover:text-blue-700 font-bold border border-blue-200 rounded-xl px-3 py-1.5 bg-blue-50/50 hover:bg-blue-50 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+              >
+                ✏️ {t('common.edit') || 'Edit'}
+              </button>
+              <button
+                onClick={() => handleDeletePos(selectedPos.id)}
+                className="text-xs text-rose-600 hover:text-rose-700 font-bold border border-rose-200 rounded-xl px-3 py-1.5 bg-rose-50/50 hover:bg-rose-50 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+              >
+                🗑️ {t('common.delete') || 'Delete'}
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedPos(null);
+                  setEmployees([]);
+                  setFilteredEmployees([]);
+                  setPosStats(null);
+                  setSearchTerm('');
+                  setStatusFilter('ALL');
+                }}
+                className="text-xs text-slate-400 hover:text-slate-700 font-bold border border-slate-200 rounded-xl px-3 py-1.5 bg-white hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
+              >
+                {t('departments.closeBtn') || '閉じる'}
+              </button>
+            </div>
           </div>
 
           {/* KPI Row */}
@@ -545,14 +735,93 @@ export default function PositionsClient({
         </div>
       )}
 
-      {/* Management Modal */}
-      <ManagementModal
-        isOpen={manageOpen}
-        onClose={() => { setManageOpen(false); fetchPositions(); }}
-        title={t('form.pos')}
-        apiPath="/api/positions"
-        showAllowance={true}
-      />
+      {/* Position Overlay Form Modal */}
+      {formOpen && (
+        <Portal>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setFormOpen(false)} />
+            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col border border-slate-100 animate-fadeIn">
+              <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-white/95 backdrop-blur-md">
+                <h2 className="text-base font-extrabold text-slate-800 tracking-wide">
+                  {formEditingId ? (locale === 'ja' ? '役職を編集' : locale === 'vi' ? 'Sửa chức vụ' : 'Edit Position') : (locale === 'ja' ? '役職を追加' : locale === 'vi' ? 'Thêm chức vụ' : 'Add Position')}
+                </h2>
+                <button
+                  onClick={() => setFormOpen(false)}
+                  className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-400 hover:text-slate-600 flex items-center justify-center text-lg leading-none hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('common.colName') || 'Tên'}</label>
+                    <input
+                      type="text"
+                      value={formVal.name}
+                      onChange={e => setFormVal(f => ({ ...f, name: e.target.value }))}
+                      placeholder={t('common.placeholderName') || 'Name'}
+                      className="premium-input w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('common.colKana') || 'Tên Kana'}</label>
+                    <input
+                      type="text"
+                      value={formVal.nameKana}
+                      onChange={e => setFormVal(f => ({ ...f, nameKana: e.target.value }))}
+                      placeholder={t('common.placeholderKana') || 'Kana'}
+                      className="premium-input w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('common.colDescription') || 'Mô tả'}</label>
+                  <input
+                    type="text"
+                    value={formVal.description}
+                    onChange={e => setFormVal(f => ({ ...f, description: e.target.value }))}
+                    placeholder={t('common.placeholderDesc') || 'Description'}
+                    className="premium-input w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('common.colAllowance') || '役職手当 (Phụ cấp chức vụ)'}</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-2.5 text-sm text-slate-400 font-bold">¥</span>
+                    <input
+                      type="number"
+                      value={formVal.allowance || ''}
+                      onChange={e => setFormVal(f => ({ ...f, allowance: parseFloat(e.target.value) || 0 }))}
+                      placeholder="例: 10000"
+                      className="premium-input w-full px-3.5 py-2.5 pl-8 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                {formError && <p className="text-xs font-bold text-rose-600">{formError}</p>}
+
+                <div className="flex gap-2 justify-end pt-3 border-t border-slate-100">
+                  <button
+                    onClick={() => setFormOpen(false)}
+                    className="px-4 py-2 text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-650 transition-colors cursor-pointer"
+                  >
+                    {t('common.cancel') || 'Cancel'}
+                  </button>
+                  <button
+                    onClick={handleSavePos}
+                    disabled={saving}
+                    className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-all cursor-pointer hover:scale-[1.02] active:scale-95 shadow-sm hover:shadow-md"
+                  >
+                    {formEditingId ? (t('common.save') || 'Save') : (t('common.add') || 'Add')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
 
       <GenericImportModal
         isOpen={importModalOpen}
@@ -576,6 +845,27 @@ export default function PositionsClient({
         ], null, 2)}
         title={locale === 'ja' ? '役職インポート' : locale === 'vi' ? 'Nhập dữ liệu chức vụ' : 'Import Positions'}
         description={locale === 'ja' ? '役職の一覧を含むJSONファイルをアップロードして、一括インポートします。' : locale === 'vi' ? 'Tải lên tệp JSON chứa danh sách các chức vụ để nhập hàng loạt.' : 'Upload a JSON file containing positions list.'}
+      />
+
+      {/* Custom Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title={confirmData?.title || ''}
+        message={confirmData?.message || ''}
+        onConfirm={confirmData?.onConfirm || (() => {})}
+        cancelText={t('common.cancel') || 'Cancel'}
+        confirmText={t('common.confirm') || (locale === 'vi' ? 'Xác nhận' : 'Confirm')}
+      />
+
+      {/* Success/Error Notification Modal */}
+      <NotificationModal
+        isOpen={notificationOpen}
+        onClose={() => setNotificationOpen(false)}
+        title={notificationData?.title || ''}
+        message={notificationData?.message || ''}
+        type={notificationData?.type || 'success'}
+        closeText={t('common.closeBtn') || (locale === 'vi' ? 'Đóng' : 'Close')}
       />
     </div>
   );

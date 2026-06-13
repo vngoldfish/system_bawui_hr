@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import NotificationsClient from '@/components/notifications/NotificationsClient';
 import { prisma } from '@/lib/prisma';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function NotificationsPage() {
+async function NotificationsLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -309,10 +308,16 @@ export default async function NotificationsPage() {
     return a.title.localeCompare(b.title, 'ja');
   });
 
+  return <NotificationsClient initialNotifications={generatedNotifications} />;
+}
+
+export default function NotificationsPage() {
   return (
     <DashboardLayout title="通知・リマインダー" subtitle="システム通知・リマインダー管理">
       <div className="space-y-6">
-        <NotificationsClient initialNotifications={generatedNotifications} />
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <NotificationsLoader />
+        </Suspense>
       </div>
     </DashboardLayout>
   );

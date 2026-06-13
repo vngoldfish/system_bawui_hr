@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateEmployeeSchema } from '@/lib/validations/employee';
+import { syncEmployeeSalaries } from '@/lib/payroll-calculator';
 import { successResponse, errorResponse, handleApiError } from '@/lib/api-utils';
 import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
@@ -30,6 +31,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await syncEmployeeSalaries(prisma);
     const user = getSessionUser(request);
     if (!user) {
       return errorResponse('Unauthorized', 401);
@@ -140,6 +142,28 @@ export async function PUT(
       updateData.password = hashPassword(employeeData.password);
     }
 
+    const salaryChanged = (employeeData.salary !== undefined && employeeData.salary !== existing.salary) ||
+                          (employeeData.hourlyRate !== undefined && employeeData.hourlyRate !== existing.hourlyRate) ||
+                          (employeeData.dailyRate !== undefined && employeeData.dailyRate !== existing.dailyRate);
+
+    if (salaryChanged) {
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      await prisma.salaryAdjustment.create({
+        data: {
+          employeeId: id,
+          effectiveFrom: currentMonth,
+          oldBaseSalary: existing.salary,
+          newBaseSalary: employeeData.salary !== undefined ? employeeData.salary : existing.salary,
+          oldHourlyRate: existing.hourlyRate,
+          newHourlyRate: employeeData.hourlyRate !== undefined ? employeeData.hourlyRate : existing.hourlyRate,
+          oldDailyRate: existing.dailyRate,
+          newDailyRate: employeeData.dailyRate !== undefined ? employeeData.dailyRate : existing.dailyRate,
+          reason: "従業員情報更新による変更 (Changed via employee profile update)",
+          adjustedBy: user.id,
+        }
+      });
+    }
+
     // Track residence card history if residence fields changed
     const residenceFields = ['residenceStatus', 'residenceCardNumber', 'residenceCardIssueDate', 'residenceExpiry', 'workRestriction'] as const;
     const residenceChanged = residenceFields.some(f => {
@@ -148,9 +172,12 @@ export async function PUT(
       return newVal !== undefined && (newVal || '') !== (oldVal || '');
     });
 
+    const isNewImageUploaded = employeeData.residenceCardImage !== undefined && employeeData.residenceCardImage !== existing.residenceCardImage;
+    const isExpiryChanged = employeeData.residenceExpiry !== undefined && employeeData.residenceExpiry !== null && existing.residenceExpiry !== null && new Date(employeeData.residenceExpiry).getTime() > new Date(existing.residenceExpiry).getTime();
+
     let historicalImage = existing.residenceCardImage;
 
-    if (residenceChanged && (existing.residenceStatus || existing.residenceCardNumber)) {
+    if (residenceChanged && (isNewImageUploaded || isExpiryChanged) && (existing.residenceStatus || existing.residenceCardNumber)) {
       // If there is an existing card image, rename it from valid to expired
       if (existing.residenceCardImage) {
         try {
@@ -200,6 +227,10 @@ export async function PUT(
         } catch (renameErr) {
           console.error('[RENAME ERROR] Failed to rename old card image:', renameErr);
         }
+      }
+
+      if (!isNewImageUploaded) {
+        updateData.residenceCardImage = null;
       }
 
       await prisma.residenceCardHistory.create({

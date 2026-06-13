@@ -3,15 +3,14 @@ import { redirect } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import RolesClient from '@/components/roles/RolesClient';
 import { prisma } from '@/lib/prisma';
-
-export const dynamic = 'force-dynamic';
+import { Suspense } from 'react';
 
 function toJSTDateString(date: Date | null | undefined): string {
   if (!date) return '';
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(date);
 }
 
-export default async function RolesPage() {
+async function RolesLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -83,12 +82,20 @@ export default async function RolesPage() {
   }));
 
   return (
+    <RolesClient
+      employees={employees}
+      initialRolePermissions={initialRolePermissions}
+      initialPermissions={initialPermissions}
+    />
+  );
+}
+
+export default function RolesPage() {
+  return (
     <DashboardLayout title="権限・アカウント管理" subtitle="従業員のログイン情報とシステム権限の設定">
-      <RolesClient
-        employees={employees}
-        initialRolePermissions={initialRolePermissions}
-        initialPermissions={initialPermissions}
-      />
+      <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+        <RolesLoader />
+      </Suspense>
     </DashboardLayout>
   );
 }

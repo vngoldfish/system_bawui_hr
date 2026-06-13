@@ -3,7 +3,6 @@ import { getSessionUser } from '@/lib/session';
 import { successResponse, errorResponse, handleApiError } from '@/lib/api-utils';
 import { getAuditLogs } from '@/services/auditService';
 
-export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {

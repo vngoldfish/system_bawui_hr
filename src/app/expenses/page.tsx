@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ExpensesClient from '@/components/expenses/ExpensesClient';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function ExpensesPage() {
+async function ExpensesLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -46,10 +45,16 @@ export default async function ExpensesPage() {
     position: emp.position?.name || '一般社員',
   }));
 
+  return <ExpensesClient employees={employees} />;
+}
+
+export default function ExpensesPage() {
   return (
     <DashboardLayout title="経費管理" subtitle="経費申請・承認・集計">
       <div className="space-y-6">
-        <ExpensesClient employees={employees} />
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <ExpensesLoader />
+        </Suspense>
       </div>
     </DashboardLayout>
   );

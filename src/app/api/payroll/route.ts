@@ -4,11 +4,12 @@ import { createdResponse, errorResponse, handleApiError, successResponse } from 
 import { hasPermission } from '@/lib/auth-mock';
 import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
-import { getEffectiveSalary, calculatePayrollDetails } from '@/lib/payroll-calculator';
+import { getEffectiveSalary, calculatePayrollDetails, syncEmployeeSalaries } from '@/lib/payroll-calculator';
 
 // GET payroll records
 export async function GET(request: NextRequest) {
   try {
+    await syncEmployeeSalaries(prisma);
     const user = getSessionUser(request);
     if (!user) {
       return errorResponse('Unauthorized', 401);
@@ -328,6 +329,7 @@ export async function POST(request: NextRequest) {
 // PUT update payroll record(s) - Approve, Pay, Edit details
 export async function PUT(request: NextRequest) {
   try {
+    await syncEmployeeSalaries(prisma);
     const user = getSessionUser(request);
     if (!user) {
       return errorResponse('Unauthorized', 401);
@@ -459,12 +461,13 @@ export async function PUT(request: NextRequest) {
     const companyRate = company?.healthInsuranceRate;
 
     if (employee) {
+      const effective = await getEffectiveSalary(existing.employeeId, existing.month, prisma);
       const details = calculatePayrollDetails({
-        baseSalary,
+        baseSalary: body.baseSalary !== undefined ? parseFloat(body.baseSalary) : (effective?.baseSalary ?? employee.salary ?? 0),
         salaryType: employee.salaryType || '月給',
         workDays: workDays !== null ? workDays : 20,
-        hourlyRate: employee.hourlyRate || 0,
-        dailyRate: employee.dailyRate || 0,
+        hourlyRate: effective?.hourlyRate ?? employee.hourlyRate ?? 0,
+        dailyRate: effective?.dailyRate ?? employee.dailyRate ?? 0,
         overtimeHours: overtimeHours !== null ? overtimeHours : 0,
         benefits: employee.benefits,
         birthDate: employee.birthDate ? employee.birthDate.toISOString() : null,

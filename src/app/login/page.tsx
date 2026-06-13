@@ -1,9 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import LoginForm from '@/components/auth/LoginForm';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function LoginPage() {
+async function LoginLoader() {
   let companyName = '株式会社ロング';
   try {
     const company = await prisma.company.findFirst();
@@ -15,4 +14,12 @@ export default async function LoginPage() {
   }
 
   return <LoginForm companyName={companyName} />;
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div></div>}>
+      <LoginLoader />
+    </Suspense>
+  );
 }

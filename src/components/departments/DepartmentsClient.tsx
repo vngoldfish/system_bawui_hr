@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Card from '@/components/common/Card';
-import ManagementModal from '@/components/common/ManagementModal';
 import { formatCurrency } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import ExportButtons from '@/components/common/ExportButtons';
 import GenericImportModal from '@/components/common/GenericImportModal';
+import Portal from '@/components/common/Portal';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import NotificationModal from '@/components/common/NotificationModal';
 
 
 interface Department {
@@ -132,12 +134,47 @@ export default function DepartmentsClient({
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
   const [deptStats, setDeptStats] = useState<DeptStats | null>(null);
-  const [manageOpen, setManageOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [loadingEmps, setLoadingEmps] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'name' | 'salary' | 'position'>('name');
+
+  // Direct Form States
+  const [formOpen, setFormOpen] = useState(false);
+  const [formEditingId, setFormEditingId] = useState<string | null>(null);
+  const [formVal, setFormVal] = useState({ name: '', nameKana: '', description: '' });
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Custom Confirmation Modal States
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmData({ title, message, onConfirm });
+    setConfirmOpen(true);
+  };
+
+  // Custom Notification Modal States
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationData, setNotificationData] = useState<{
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
+
+  const showNotification = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setNotificationData({ title, message, type });
+    setNotificationOpen(true);
+    setTimeout(() => {
+      setNotificationOpen(false);
+    }, 3000);
+  };
 
   const exportData = useMemo(() => {
     return departments.map(d => ({
@@ -149,7 +186,6 @@ export default function DepartmentsClient({
     }));
   }, [departments]);
 
-
   const fetchDepartments = async () => {
     try {
       const res = await fetch('/api/departments');
@@ -158,6 +194,122 @@ export default function DepartmentsClient({
     } catch (err) {
       console.error('Failed to fetch departments:', err);
     }
+  };
+
+  const handleAddClick = () => {
+    setFormVal({ name: '', nameKana: '', description: '' });
+    setFormEditingId(null);
+    setFormError('');
+    setFormOpen(true);
+  };
+
+  const handleEditClick = (dept: Department) => {
+    setFormVal({
+      name: dept.name,
+      nameKana: dept.nameKana,
+      description: dept.description || '',
+    });
+    setFormEditingId(dept.id);
+    setFormError('');
+    setFormOpen(true);
+  };
+
+  const handleSaveDept = async () => {
+    if (!formVal.name.trim() || !formVal.nameKana.trim()) {
+      setFormError(t('common.errorNameKanaRequired') || 'Name and Kana are required');
+      return;
+    }
+
+    showConfirm(
+      locale === 'vi' ? 'Xác nhận thao tác' : locale === 'ja' ? '操作の確認' : 'Confirm Action',
+      locale === 'vi' ? 'Bạn có chắc chắn muốn thực hiện thao tác này không?' : locale === 'ja' ? 'この操作を実行してもよろしいですか？' : 'Are you sure you want to perform this action?',
+      async () => {
+        setSaving(true);
+        setFormError('');
+        try {
+          const url = formEditingId ? `/api/departments/${formEditingId}` : '/api/departments';
+          const method = formEditingId ? 'PUT' : 'POST';
+          const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formVal),
+          });
+
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || t('common.saveError') || 'Failed to save');
+          }
+
+          const updatedRes = await fetch('/api/departments');
+          const updatedData = await updatedRes.json();
+          const newDeptList: Department[] = Array.isArray(updatedData) ? updatedData : updatedData.data || [];
+          setDepartments(newDeptList);
+
+          // If editing, update details view
+          if (formEditingId) {
+            const updatedDept = newDeptList.find(d => d.id === formEditingId);
+            if (updatedDept) {
+              setSelectedDept(updatedDept);
+            }
+            showNotification(
+              locale === 'vi' ? 'Thành công' : locale === 'ja' ? '成功' : 'Success',
+              locale === 'vi' ? 'Cập nhật bộ phận thành công.' : locale === 'ja' ? '部署を更新しました。' : 'Department updated successfully.'
+            );
+          } else {
+            showNotification(
+              locale === 'vi' ? 'Thành công' : locale === 'ja' ? '成功' : 'Success',
+              locale === 'vi' ? 'Thêm mới bộ phận thành công.' : locale === 'ja' ? '部署を追加しました。' : 'Department added successfully.'
+            );
+          }
+
+          setFormOpen(false);
+        } catch (e: any) {
+          setFormError(e.message);
+        } finally {
+          setSaving(false);
+        }
+      }
+    );
+  };
+
+  const handleDeleteDept = async (id: string) => {
+    showConfirm(
+      locale === 'vi' ? 'Xác nhận xoá' : locale === 'ja' ? '削除の確認' : 'Confirm Delete',
+      locale === 'vi' ? 'Bạn có chắc chắn muốn thực hiện thao tác này không?' : locale === 'ja' ? 'この操作を実行してもよろしいですか？' : 'Are you sure you want to perform this action?',
+      async () => {
+        try {
+          const res = await fetch(`/api/departments/${id}`, { method: 'DELETE' });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || t('common.deleteError') || 'Failed to delete');
+          }
+
+          const updatedRes = await fetch('/api/departments');
+          const updatedData = await updatedRes.json();
+          const newDeptList: Department[] = Array.isArray(updatedData) ? updatedData : updatedData.data || [];
+          setDepartments(newDeptList);
+
+          // Clear details if selected department is deleted
+          if (selectedDept?.id === id) {
+            setSelectedDept(null);
+            setEmployees([]);
+            setFilteredEmployees([]);
+            setMonthlyStats([]);
+            setDeptStats(null);
+          }
+          showNotification(
+            locale === 'vi' ? 'Thành công' : locale === 'ja' ? '成功' : 'Success',
+            locale === 'vi' ? 'Xoá bộ phận thành công.' : locale === 'ja' ? '部署を削除しました。' : 'Department deleted successfully.'
+          );
+        } catch (e: any) {
+          showNotification(
+            locale === 'vi' ? 'Thất bại' : locale === 'ja' ? 'エラー' : 'Failed',
+            e.message || 'Operation failed',
+            'error'
+          );
+        }
+      }
+    );
   };
 
   const fetchEmployeesByDept = async (deptId: string) => {
@@ -381,10 +533,10 @@ export default function DepartmentsClient({
             📥 {t('common.import') || 'Import'}
           </button>
           <button
-            onClick={() => setManageOpen(true)}
-            className="px-4.5 py-2.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-xs cursor-pointer hover:shadow-md active:scale-95"
+            onClick={handleAddClick}
+            className="px-4.5 py-2.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-xs cursor-pointer hover:shadow-md active:scale-95 flex items-center gap-1"
           >
-            {t('departments.manageBtn')}
+            ➕ {locale === 'ja' ? '新規追加' : locale === 'vi' ? 'Thêm mới' : 'Add New'}
           </button>
         </div>
       </div>
@@ -435,18 +587,40 @@ export default function DepartmentsClient({
                 </p>
               )}
               <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-                <span className="font-mono truncate select-all">ID: {dept.id}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(dept.id);
-                    alert('Department ID copied!');
-                  }}
-                  className="hover:text-indigo-600 transition-colors cursor-pointer bg-slate-100 hover:bg-indigo-50 w-6 h-6 rounded-lg flex items-center justify-center border border-slate-200/50"
-                  title="Copy Department ID"
-                >
-                  📋
-                </button>
+                <span className="font-mono truncate select-all mr-2">ID: {dept.id}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(dept.id);
+                      alert('Department ID copied!');
+                    }}
+                    className="hover:text-indigo-600 transition-colors cursor-pointer bg-slate-100 hover:bg-indigo-50 w-6 h-6 rounded-lg flex items-center justify-center border border-slate-200/50"
+                    title="Copy Department ID"
+                  >
+                    📋
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditClick(dept);
+                    }}
+                    className="hover:text-blue-600 transition-colors cursor-pointer bg-slate-100 hover:bg-blue-50 w-6 h-6 rounded-lg flex items-center justify-center border border-slate-200/50"
+                    title={t('common.edit') || 'Edit'}
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteDept(dept.id);
+                    }}
+                    className="hover:text-rose-600 transition-colors cursor-pointer bg-slate-100 hover:bg-rose-50 w-6 h-6 rounded-lg flex items-center justify-center border border-slate-200/50"
+                    title={t('common.delete') || 'Delete'}
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -463,20 +637,34 @@ export default function DepartmentsClient({
               </span>
               <span>{selectedDept.name} {t('departments.detailDashboard')}</span>
             </h2>
-            <button
-              onClick={() => {
-                setSelectedDept(null);
-                setEmployees([]);
-                setFilteredEmployees([]);
-                setMonthlyStats([]);
-                setDeptStats(null);
-                setSearchTerm('');
-                setStatusFilter('ALL');
-              }}
-              className="text-xs text-slate-400 hover:text-slate-700 font-bold border border-slate-200 rounded-xl px-3 py-1.5 bg-white hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
-            >
-              {t('departments.closeBtn')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleEditClick(selectedDept)}
+                className="text-xs text-blue-600 hover:text-blue-700 font-bold border border-blue-200 rounded-xl px-3 py-1.5 bg-blue-50/50 hover:bg-blue-50 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+              >
+                ✏️ {t('common.edit') || 'Edit'}
+              </button>
+              <button
+                onClick={() => handleDeleteDept(selectedDept.id)}
+                className="text-xs text-rose-600 hover:text-rose-700 font-bold border border-rose-200 rounded-xl px-3 py-1.5 bg-rose-50/50 hover:bg-rose-50 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+              >
+                🗑️ {t('common.delete') || 'Delete'}
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedDept(null);
+                  setEmployees([]);
+                  setFilteredEmployees([]);
+                  setMonthlyStats([]);
+                  setDeptStats(null);
+                  setSearchTerm('');
+                  setStatusFilter('ALL');
+                }}
+                className="text-xs text-slate-400 hover:text-slate-700 font-bold border border-slate-200 rounded-xl px-3 py-1.5 bg-white hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
+              >
+                {t('departments.closeBtn')}
+              </button>
+            </div>
           </div>
 
           {/* Department KPI Stats Row */}
@@ -827,13 +1015,80 @@ export default function DepartmentsClient({
         </div>
       )}
 
-      {/* Management Modal */}
-      <ManagementModal
-        isOpen={manageOpen}
-        onClose={() => { setManageOpen(false); fetchDepartments(); }}
-        title={t('form.dept')}
-        apiPath="/api/departments"
-      />
+      {/* Department Overlay Form Modal */}
+      {formOpen && (
+        <Portal>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setFormOpen(false)} />
+            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col border border-slate-100 animate-fadeIn">
+              <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-white/95 backdrop-blur-md">
+                <h2 className="text-base font-extrabold text-slate-800 tracking-wide">
+                  {formEditingId ? (locale === 'ja' ? '部署を編集' : locale === 'vi' ? 'Sửa bộ phận' : 'Edit Department') : (locale === 'ja' ? '部署を追加' : locale === 'vi' ? 'Thêm bộ phận' : 'Add Department')}
+                </h2>
+                <button
+                  onClick={() => setFormOpen(false)}
+                  className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-400 hover:text-slate-600 flex items-center justify-center text-lg leading-none hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('common.colName') || 'Tên'}</label>
+                    <input
+                      type="text"
+                      value={formVal.name}
+                      onChange={e => setFormVal(f => ({ ...f, name: e.target.value }))}
+                      placeholder={t('common.placeholderName') || 'Name'}
+                      className="premium-input w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('common.colKana') || 'Tên Kana'}</label>
+                    <input
+                      type="text"
+                      value={formVal.nameKana}
+                      onChange={e => setFormVal(f => ({ ...f, nameKana: e.target.value }))}
+                      placeholder={t('common.placeholderKana') || 'Kana'}
+                      className="premium-input w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('common.colDescription') || 'Mô tả'}</label>
+                  <input
+                    type="text"
+                    value={formVal.description}
+                    onChange={e => setFormVal(f => ({ ...f, description: e.target.value }))}
+                    placeholder={t('common.placeholderDesc') || 'Description'}
+                    className="premium-input w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+
+                {formError && <p className="text-xs font-bold text-rose-600">{formError}</p>}
+
+                <div className="flex gap-2 justify-end pt-3 border-t border-slate-100">
+                  <button
+                    onClick={() => setFormOpen(false)}
+                    className="px-4 py-2 text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-650 transition-colors cursor-pointer"
+                  >
+                    {t('common.cancel') || 'Cancel'}
+                  </button>
+                  <button
+                    onClick={handleSaveDept}
+                    disabled={saving}
+                    className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-all cursor-pointer hover:scale-[1.02] active:scale-95 shadow-sm hover:shadow-md"
+                  >
+                    {formEditingId ? (t('common.save') || 'Save') : (t('common.add') || 'Add')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
 
       <GenericImportModal
         isOpen={importModalOpen}
@@ -855,6 +1110,27 @@ export default function DepartmentsClient({
         ], null, 2)}
         title={t('common.importDepartments') || 'Import Departments'}
         description={t('common.importDepartmentsDesc') || 'Upload a JSON file containing a list of departments to import them all at once.'}
+      />
+
+      {/* Custom Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title={confirmData?.title || ''}
+        message={confirmData?.message || ''}
+        onConfirm={confirmData?.onConfirm || (() => {})}
+        cancelText={t('common.cancel') || 'Cancel'}
+        confirmText={t('common.confirm') || (locale === 'vi' ? 'Xác nhận' : 'Confirm')}
+      />
+
+      {/* Success/Error Notification Modal */}
+      <NotificationModal
+        isOpen={notificationOpen}
+        onClose={() => setNotificationOpen(false)}
+        title={notificationData?.title || ''}
+        message={notificationData?.message || ''}
+        type={notificationData?.type || 'success'}
+        closeText={t('common.closeBtn') || (locale === 'vi' ? 'Đóng' : 'Close')}
       />
     </div>
   );

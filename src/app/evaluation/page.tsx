@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import EvaluationClient from '@/components/evaluation/EvaluationClient';
-
-export const dynamic = 'force-dynamic';
+import { Suspense } from 'react';
 
 const employees = [
   { id: '1', firstName: '太郎', lastName: '山田', firstNameKana: 'タロウ', department: '営業部', position: '部長' },
@@ -23,7 +22,7 @@ const employees = [
   { id: '14', firstName: '恵子', lastName: '加藤', firstNameKana: 'ケイコ', department: '経理部', position: '課長' },
 ];
 
-export default async function EvaluationPage() {
+async function EvaluationLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -59,10 +58,16 @@ export default async function EvaluationPage() {
     redirect('/dashboard?error=forbidden');
   }
 
+  return <EvaluationClient employees={employees} />;
+}
+
+export default function EvaluationPage() {
   return (
     <DashboardLayout title="評価管理" subtitle="従業員の人事評価・目標管理">
       <div className="space-y-6">
-        <EvaluationClient employees={employees} />
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <EvaluationLoader />
+        </Suspense>
       </div>
     </DashboardLayout>
   );

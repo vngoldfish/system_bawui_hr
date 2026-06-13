@@ -3,10 +3,9 @@ import ShitensClient from '@/components/shitens/ShitensClient';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function ShitensPage() {
+async function ShitensLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   if (!sessionUserCookie) {
@@ -33,10 +32,16 @@ export default async function ShitensPage() {
     _count: s._count,
   }));
 
+  return <ShitensClient initialShitens={serialized} />;
+}
+
+export default function ShitensPage() {
   return (
     <DashboardLayout title="支店管理" subtitle="支店情報の管理と従業員配属">
       <div className="space-y-6">
-        <ShitensClient initialShitens={serialized} />
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <ShitensLoader />
+        </Suspense>
       </div>
     </DashboardLayout>
   );

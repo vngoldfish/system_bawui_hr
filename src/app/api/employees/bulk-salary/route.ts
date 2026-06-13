@@ -33,9 +33,42 @@ export async function PUT(request: NextRequest) {
       return successResponse({ count: 0, message: 'No updates provided' });
     }
 
+    const employeeIds = updates.map(u => u.id);
+    const existingEmployees = await prisma.employee.findMany({
+      where: { id: { in: employeeIds } },
+      select: { id: true, salary: true, hourlyRate: true, dailyRate: true }
+    });
+
+    const existingMap = new Map(existingEmployees.map(e => [e.id, e]));
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
     // Run updates in a database transaction for data safety
-    const updatedEmployees = await prisma.$transaction(
-      updates.map(u => {
+    await prisma.$transaction(async (tx) => {
+      for (const u of updates) {
+        const existing = existingMap.get(u.id);
+        if (!existing) continue;
+
+        const salaryChanged = (u.salary !== existing.salary) ||
+                              (u.hourlyRate !== undefined && u.hourlyRate !== existing.hourlyRate) ||
+                              (u.dailyRate !== undefined && u.dailyRate !== existing.dailyRate);
+
+        if (salaryChanged) {
+          await tx.salaryAdjustment.create({
+            data: {
+              employeeId: u.id,
+              effectiveFrom: currentMonth,
+              oldBaseSalary: existing.salary,
+              newBaseSalary: u.salary,
+              oldHourlyRate: existing.hourlyRate,
+              newHourlyRate: u.hourlyRate !== undefined ? u.hourlyRate : existing.hourlyRate,
+              oldDailyRate: existing.dailyRate,
+              newDailyRate: u.dailyRate !== undefined ? u.dailyRate : existing.dailyRate,
+              reason: "一括給与改定による変更 (Changed via bulk salary update)",
+              adjustedBy: user.id,
+            }
+          });
+        }
+
         const updateData: any = {
           salary: u.salary,
         };
@@ -43,12 +76,12 @@ export async function PUT(request: NextRequest) {
         if (u.dailyRate !== undefined) updateData.dailyRate = u.dailyRate;
         if (u.salaryType !== undefined) updateData.salaryType = u.salaryType;
 
-        return prisma.employee.update({
+        await tx.employee.update({
           where: { id: u.id },
           data: updateData,
         });
-      })
-    );
+      }
+    });
 
     // Log the bulk change in audit logs
     logDatabaseChange({
@@ -57,14 +90,14 @@ export async function PUT(request: NextRequest) {
       model: 'Employee',
       recordId: 'BULK_SALARY_UPDATE',
       details: {
-        updatedCount: updatedEmployees.length,
-        employeeIds: updates.map(u => u.id),
+        updatedCount: updates.length,
+        employeeIds,
       },
     });
 
     return successResponse({
-      count: updatedEmployees.length,
-      message: `${updatedEmployees.length}名の給与を一括改定しました。`,
+      count: updates.length,
+      message: `${updates.length}名の給与を一括改定しました。`,
     });
   } catch (error) {
     return handleApiError(error);

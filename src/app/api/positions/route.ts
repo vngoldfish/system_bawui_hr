@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { successResponse, createdResponse, handleApiError } from '@/lib/api-utils';
+import { successResponse, createdResponse, errorResponse, handleApiError } from '@/lib/api-utils';
 import { z } from 'zod';
+import { getSessionUser } from '@/lib/session';
+import { logDatabaseChange } from '@/lib/audit-logger';
 
 const createPositionSchema = z.object({
   name: z.string().min(1, '役職名は必須です'),
@@ -11,8 +13,13 @@ const createPositionSchema = z.object({
 });
 
 // GET all positions
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const user = getSessionUser(request);
+    if (!user) {
+      return errorResponse('Unauthorized', 401);
+    }
+
     const positions = await prisma.position.findMany({
       include: { _count: { select: { employees: true } } },
       orderBy: { name: 'asc' },
@@ -26,10 +33,27 @@ export async function GET() {
 // POST new position
 export async function POST(request: NextRequest) {
   try {
+    const user = getSessionUser(request);
+    if (!user) {
+      return errorResponse('Unauthorized', 401);
+    }
+    if (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER') {
+      return errorResponse('Forbidden', 403);
+    }
+
     const body = await request.json();
     const data = createPositionSchema.parse(body);
 
     const position = await prisma.position.create({ data });
+
+    logDatabaseChange({
+      request,
+      action: 'CREATE',
+      model: 'Position',
+      recordId: position.id,
+      details: { name: position.name, nameKana: position.nameKana },
+    });
+
     return createdResponse(position);
   } catch (error) {
     return handleApiError(error);

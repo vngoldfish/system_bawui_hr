@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createEmployeeSchema, employeeQuerySchema } from '@/lib/validations/employee';
 import { successResponse, createdResponse, errorResponse, handleApiError, parsePagination, buildMeta } from '@/lib/api-utils';
+import { syncEmployeeSalaries } from '@/lib/payroll-calculator';
 import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
 import { Prisma } from '@prisma/client';
@@ -24,6 +25,7 @@ const employeeInclude = {
 // GET all employees with pagination, search, filter
 export async function GET(request: NextRequest) {
   try {
+    await syncEmployeeSalaries(prisma);
     const user = getSessionUser(request);
     if (!user) {
       return errorResponse('Unauthorized', 401);

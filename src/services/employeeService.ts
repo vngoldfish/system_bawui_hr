@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import type { Employee } from '@/types';
+import { syncEmployeeSalaries } from '@/lib/payroll-calculator';
 
 // Complete relations for detail sheets and employee forms
 const employeeIncludeFull = {
@@ -112,6 +113,7 @@ export function serializeEmployee(emp: any): Employee {
 
 export const employeeService = {
   async getAll(): Promise<Employee[]> {
+    await syncEmployeeSalaries(prisma);
     const employees = await prisma.employee.findMany({
       include: employeeIncludeFull,
       orderBy: { createdAt: 'desc' },
@@ -120,6 +122,7 @@ export const employeeService = {
   },
 
   async getAllSortedByContractExpiry(): Promise<Employee[]> {
+    await syncEmployeeSalaries(prisma);
     const employees = await prisma.employee.findMany({
       include: contractEmployeeInclude,
       orderBy: { contractEndDate: 'asc' },
@@ -128,6 +131,7 @@ export const employeeService = {
   },
 
   async getForeignEmployees(): Promise<Employee[]> {
+    await syncEmployeeSalaries(prisma);
     const employees = await prisma.employee.findMany({
       where: {
         nationality: { not: '日本' },
@@ -139,6 +143,7 @@ export const employeeService = {
   },
 
   async getById(id: string): Promise<Employee | null> {
+    await syncEmployeeSalaries(prisma);
     const emp = await prisma.employee.findUnique({
       where: { id },
       include: employeeIncludeFull,

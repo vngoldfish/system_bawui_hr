@@ -3,14 +3,9 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProfileClient from '@/components/profile/ProfileClient';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function ProfilePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tab?: string }>;
-}) {
+async function ProfileLoader({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const resolvedSearchParams = await searchParams;
   const initialTab = resolvedSearchParams.tab || 'basic';
   const cookieStore = await cookies();
@@ -62,9 +57,19 @@ export default async function ProfilePage({
     hireDate: dbUser.hireDate.toISOString().split('T')[0],
   };
 
+  return <ProfileClient user={mappedUser} initialTab={initialTab as any} />;
+}
+
+export default function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   return (
     <DashboardLayout title="マイアカウント" subtitle="プロファイル管理・言語設定">
-      <ProfileClient user={mappedUser} initialTab={initialTab as any} />
+      <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+        <ProfileLoader searchParams={searchParams} />
+      </Suspense>
     </DashboardLayout>
   );
 }

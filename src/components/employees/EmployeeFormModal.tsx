@@ -740,14 +740,14 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                 {isForeign && (
                   <>
                     <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.visaType')}</label>
-                      <select name="residenceStatus" value={formData.residenceStatus} onChange={handleChange} className={inputCls} required={isForeign}>
+                      <select name="residenceStatus" value={formData.residenceStatus} onChange={handleChange} className={inputCls}>
                         <option value="">{t('common.select')}</option>
                         {visaOptions.map(s => <option key={s} value={s}>{getVisaStatusLabel(s, locale)}</option>)}
                       </select>
                     </div>
-                    <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.visaNo')}</label><input type="text" name="residenceCardNumber" value={formData.residenceCardNumber} onChange={handleChange} placeholder="AB12345678" className={inputCls} required={isForeign} /></div>
-                    <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.issueDate')}</label><input type="date" name="residenceCardIssueDate" value={formData.residenceCardIssueDate} onChange={handleChange} className={inputCls} required={isForeign} /></div>
-                    <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.expiryDate')}</label><input type="date" name="residenceExpiry" value={formData.residenceExpiry} onChange={handleChange} className={inputCls} required={isForeign} /></div>
+                    <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.visaNo')}</label><input type="text" name="residenceCardNumber" value={formData.residenceCardNumber} onChange={handleChange} placeholder="AB12345678" className={inputCls} /></div>
+                    <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.issueDate')}</label><input type="date" name="residenceCardIssueDate" value={formData.residenceCardIssueDate} onChange={handleChange} className={inputCls} /></div>
+                    <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.expiryDate')}</label><input type="date" name="residenceExpiry" value={formData.residenceExpiry} onChange={handleChange} className={inputCls} /></div>
                     <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.restriction')}</label><input type="text" name="workRestriction" value={formData.workRestriction} onChange={handleChange} placeholder={t('form.restrictionNone')} className={inputCls} /></div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-slate-700 mb-1">{t('residenceCards.colCardImage')}</label>

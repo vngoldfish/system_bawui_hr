@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ReportsClient from '@/components/reports/ReportsClient';
-
-export const dynamic = 'force-dynamic';
+import { Suspense } from 'react';
 
 function calculateAge(birthDate: Date | null) {
   if (!birthDate) return 30; // Default fallback age
@@ -17,7 +16,7 @@ function calculateAge(birthDate: Date | null) {
   return age;
 }
 
-export default async function ReportsPage() {
+async function ReportsLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -61,10 +60,16 @@ export default async function ReportsPage() {
     age: calculateAge(emp.birthDate),
   }));
 
+  return <ReportsClient employees={employees} />;
+}
+
+export default function ReportsPage() {
   return (
     <DashboardLayout title="レポート・分析" subtitle="人事データの分析・レポート出力">
       <div className="space-y-6">
-        <ReportsClient employees={employees} />
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <ReportsLoader />
+        </Suspense>
       </div>
     </DashboardLayout>
   );

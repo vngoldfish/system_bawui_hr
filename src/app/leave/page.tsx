@@ -3,10 +3,21 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import LeaveClient from '@/components/leave/LeaveClient';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
+export const unstable_instant = {
+  prefetch: 'static',
+  samples: [
+    {
+      cookies: [
+        { name: 'session_user', value: null },
+        { name: 'view_mode', value: null }
+      ]
+    }
+  ]
+};
 
-export default async function LeavePage() {
+async function LeaveLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -110,12 +121,20 @@ export default async function LeavePage() {
     reason: l.reason,
     status: l.status,
   }));
-  
+
   return (
     <DashboardLayout title="休暇管理" subtitle={isEmployee ? `${dbUser.lastName} ${dbUser.firstName} さんの休暇申請` : "休暇申請の管理と承認"}>
       <div className="space-y-6">
         <LeaveClient employees={employees} initialLeaves={leaves} isEmployeeMode={isEmployee} currentUserId={dbUser.id} />
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function LeavePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+      <LeaveLoader />
+    </Suspense>
   );
 }

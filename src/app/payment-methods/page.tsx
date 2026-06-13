@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import PaymentMethodsClient from '@/components/payment-methods/PaymentMethodsClient';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function PaymentMethodsPage() {
+async function PaymentMethodsLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -49,10 +48,16 @@ export default async function PaymentMethodsPage() {
     salaryType: emp.salaryType || '月給',
   }));
 
+  return <PaymentMethodsClient employees={employees} />;
+}
+
+export default function PaymentMethodsPage() {
   return (
     <DashboardLayout title="支給方法管理" subtitle="給与の支給方法・銀行振込・現金支給の管理">
       <div className="space-y-6">
-        <PaymentMethodsClient employees={employees} />
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <PaymentMethodsLoader />
+        </Suspense>
       </div>
     </DashboardLayout>
   );

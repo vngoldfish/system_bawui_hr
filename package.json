@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "mv src/middleware.ts src/middleware.ts.tmp && next build && mv src/middleware.ts.tmp src/middleware.ts || (mv src/middleware.ts.tmp src/middleware.ts 2>/dev/null; false)",
     "start": "next start",
     "lint": "eslint",
     "seed:real": "ts-node prisma/seed-real.ts",

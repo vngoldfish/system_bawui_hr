@@ -47,9 +47,9 @@ export default function NewSalaryAdjustmentModal({
         body: JSON.stringify({
           employeeId: employee.id,
           effectiveFrom,
-          newBaseSalary: parseFloat(newBaseSalary) || 0,
-          newHourlyRate: parseFloat(newHourlyRate) || 0,
-          newDailyRate: parseFloat(newDailyRate) || 0,
+          newBaseSalary: employee.salaryType === '月給' ? (parseFloat(newBaseSalary) || 0) : (employee.salary || 0),
+          newHourlyRate: employee.salaryType === '時給' ? (parseFloat(newHourlyRate) || 0) : (employee.hourlyRate || 0),
+          newDailyRate: employee.salaryType === '日給' ? (parseFloat(newDailyRate) || 0) : (employee.dailyRate || 0),
           reason,
         }),
       });
@@ -131,79 +131,79 @@ export default function NewSalaryAdjustmentModal({
             </div>
 
             {/* Monthly Base Salary */}
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex justify-between">
-                <span>{t('client.newSalary') || 'New Base Salary (Monthly)'}</span>
-                {employee.salaryType === '月給' && (
+            {employee.salaryType === '月給' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex justify-between">
+                  <span>{t('client.newSalary') || 'New Base Salary (Monthly)'}</span>
                   <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
                     Active
                   </span>
-                )}
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={newBaseSalary}
-                  onChange={(e) => setNewBaseSalary(e.target.value)}
-                  className={`${inputCls} ${employee.salaryType === '月給' ? 'ring-2 ring-indigo-500/20' : ''}`}
-                />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                  {t('common.yen') || '¥'}
-                </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={newBaseSalary}
+                    onChange={(e) => setNewBaseSalary(e.target.value)}
+                    className={`${inputCls} ring-2 ring-indigo-500/20`}
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    {t('common.yen') || '¥'}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Hourly Rate */}
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex justify-between">
-                <span>{t('client.newHourlyRate') || 'New Hourly Rate'}</span>
-                {employee.salaryType === '時給' && (
+            {employee.salaryType === '時給' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex justify-between">
+                  <span>{t('client.newHourlyRate') || 'New Hourly Rate'}</span>
                   <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
                     Active
                   </span>
-                )}
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={newHourlyRate}
-                  onChange={(e) => setNewHourlyRate(e.target.value)}
-                  className={`${inputCls} ${employee.salaryType === '時給' ? 'ring-2 ring-indigo-500/20' : ''}`}
-                />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                  {t('client.hourlyRateUnit') || '¥ / Hour'}
-                </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={newHourlyRate}
+                    onChange={(e) => setNewHourlyRate(e.target.value)}
+                    className={`${inputCls} ring-2 ring-indigo-500/20`}
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    {t('client.hourlyRateUnit') || '¥ / Hour'}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Daily Rate */}
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex justify-between">
-                <span>{t('client.newDailyRate') || 'New Daily Rate'}</span>
-                {employee.salaryType === '日給' && (
+            {employee.salaryType === '日給' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex justify-between">
+                  <span>{t('client.newDailyRate') || 'New Daily Rate'}</span>
                   <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
                     Active
                   </span>
-                )}
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={newDailyRate}
-                  onChange={(e) => setNewDailyRate(e.target.value)}
-                  className={`${inputCls} ${employee.salaryType === '日給' ? 'ring-2 ring-indigo-500/20' : ''}`}
-                />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                  {t('client.dailyRateUnit') || '¥ / Day'}
-                </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={newDailyRate}
+                    onChange={(e) => setNewDailyRate(e.target.value)}
+                    className={`${inputCls} ring-2 ring-indigo-500/20`}
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    {t('client.dailyRateUnit') || '¥ / Day'}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Reason */}
             <div>

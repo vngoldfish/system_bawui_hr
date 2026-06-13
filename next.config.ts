@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  cacheComponents: true,
   output: 'standalone', // BẮT BUỘC THÊM DÒNG NÀ
   images: {
     unoptimized: true,

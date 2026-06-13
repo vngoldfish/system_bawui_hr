@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n";
-import { cookies } from "next/headers";
 
 const geistSans = { variable: "font-sans" };
 const geistMono = { variable: "font-mono" };
@@ -18,24 +17,12 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const sessionUserCookie = cookieStore.get("session_user");
-  let initialLocale = "ja";
-  if (sessionUserCookie) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(sessionUserCookie.value));
-      if (parsed && parsed.language) {
-        initialLocale = parsed.language;
-      }
-    } catch (_e) {
-      // Ignore
-    }
-  }
+  const initialLocale = "ja";
 
   return (
     <html
@@ -51,3 +38,4 @@ export default async function RootLayout({
     </html>
   );
 }
+

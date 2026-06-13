@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { successResponse, errorResponse, handleApiError } from '@/lib/api-utils';
 import { z } from 'zod';
+import { getSessionUser } from '@/lib/session';
+import { logDatabaseChange } from '@/lib/audit-logger';
 
 const updatePositionSchema = z.object({
   name: z.string().min(1, '役職名は必須です').optional(),
@@ -13,6 +15,14 @@ const updatePositionSchema = z.object({
 // PUT update position
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = getSessionUser(request);
+    if (!user) {
+      return errorResponse('Unauthorized', 401);
+    }
+    if (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER') {
+      return errorResponse('Forbidden', 403);
+    }
+
     const { id } = await params;
     const body = await request.json();
     const data = updatePositionSchema.parse(body);
@@ -25,6 +35,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data,
     });
 
+    logDatabaseChange({
+      request,
+      action: 'UPDATE',
+      model: 'Position',
+      recordId: position.id,
+      details: { name: position.name, nameKana: position.nameKana },
+    });
+
     return successResponse(position);
   } catch (error) {
     return handleApiError(error);
@@ -34,6 +52,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // DELETE position
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = getSessionUser(_request);
+    if (!user) {
+      return errorResponse('Unauthorized', 401);
+    }
+    if (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER') {
+      return errorResponse('Forbidden', 403);
+    }
+
     const { id } = await params;
 
     const existing = await prisma.position.findUnique({
@@ -47,6 +73,15 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     }
 
     await prisma.position.delete({ where: { id } });
+
+    logDatabaseChange({
+      request: _request,
+      action: 'DELETE',
+      model: 'Position',
+      recordId: id,
+      details: { name: existing.name, nameKana: existing.nameKana },
+    });
+
     return successResponse({ message: '役職を削除しました' });
   } catch (error) {
     return handleApiError(error);

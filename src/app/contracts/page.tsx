@@ -2,10 +2,9 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import ContractsClient from '@/components/contracts/ContractsClient';
 import { employeeService } from '@/services/employeeService';
 import { prisma } from '@/lib/prisma';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function ContractsPage() {
+async function ContractsLoader() {
   const serialized = await employeeService.getAllSortedByContractExpiry();
   
   const contractTypes = await prisma.contractType.findMany({
@@ -19,11 +18,19 @@ export default async function ContractsPage() {
   }));
 
   return (
+    <ContractsClient 
+      initialEmployees={serialized} 
+      initialContractTypes={serializedContractTypes as any} 
+    />
+  );
+}
+
+export default function ContractsPage() {
+  return (
     <DashboardLayout title="契約管理" subtitle="雇用契約の管理">
-      <ContractsClient 
-        initialEmployees={serialized} 
-        initialContractTypes={serializedContractTypes as any} 
-      />
+      <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+        <ContractsLoader />
+      </Suspense>
     </DashboardLayout>
   );
 }

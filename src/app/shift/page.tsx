@@ -3,12 +3,9 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ShiftClient from '@/components/shift/ShiftClient';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-
-
-export default async function ShiftPage() {
+async function ShiftLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -80,10 +77,16 @@ export default async function ShiftPage() {
     mappedEmployees = mappedEmployees.filter(emp => emp.department === userDeptName);
   }
 
+  return <ShiftClient employees={mappedEmployees} isReadOnly={isReadOnly} />;
+}
+
+export default function ShiftPage() {
   return (
     <DashboardLayout title="シフト管理" subtitle="シフト作成・管理・集計">
       <div className="space-y-6">
-        <ShiftClient employees={mappedEmployees} isReadOnly={isReadOnly} />
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <ShiftLoader />
+        </Suspense>
       </div>
     </DashboardLayout>
   );

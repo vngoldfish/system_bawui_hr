@@ -443,3 +443,57 @@ export function calculateNursingCarePremium(
   const totalPremium = smr * rate;
   return apply50SenRounding(totalPremium);
 }
+
+export async function syncEmployeeSalaries(prisma: any) {
+  try {
+    const { cookies } = await import('next/headers');
+    await cookies();
+  } catch (e) {
+    // Ignore if outside Next.js request context
+  }
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const employees = await prisma.employee.findMany({
+    where: {
+      status: {
+        in: ['ACTIVE', 'ON_LEAVE']
+      }
+    },
+    select: {
+      id: true,
+      salary: true,
+      hourlyRate: true,
+      dailyRate: true
+    }
+  });
+
+  for (const emp of employees) {
+    const latestAdjustment = await prisma.salaryAdjustment.findFirst({
+      where: {
+        employeeId: emp.id,
+        effectiveFrom: {
+          lte: currentMonth
+        }
+      },
+      orderBy: {
+        effectiveFrom: 'desc'
+      }
+    });
+
+    if (latestAdjustment) {
+      const diffBase = latestAdjustment.newBaseSalary !== emp.salary;
+      const diffHourly = latestAdjustment.newHourlyRate !== emp.hourlyRate;
+      const diffDaily = latestAdjustment.newDailyRate !== emp.dailyRate;
+
+      if (diffBase || diffHourly || diffDaily) {
+        await prisma.employee.update({
+          where: { id: emp.id },
+          data: {
+            salary: latestAdjustment.newBaseSalary,
+            hourlyRate: latestAdjustment.newHourlyRate,
+            dailyRate: latestAdjustment.newDailyRate
+          }
+        });
+      }
+    }
+  }
+}

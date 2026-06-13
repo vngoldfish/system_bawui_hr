@@ -64,20 +64,37 @@ export async function POST(request: NextRequest) {
       return errorResponse('effectiveFrom cannot be before employee hire date month', 400);
     }
 
-    const adjustment = await prisma.salaryAdjustment.create({
-      data: {
-        employeeId,
-        effectiveFrom,
-        oldBaseSalary: employee.salary,
-        newBaseSalary: newBaseSalary !== undefined ? parseFloat(newBaseSalary) : employee.salary,
-        oldHourlyRate: employee.hourlyRate || 0,
-        newHourlyRate: newHourlyRate !== undefined ? parseFloat(newHourlyRate) : employee.hourlyRate || 0,
-        oldDailyRate: employee.dailyRate || 0,
-        newDailyRate: newDailyRate !== undefined ? parseFloat(newDailyRate) : employee.dailyRate || 0,
-        reason: reason || '',
-        adjustedBy: user.id,
-      }
+    const existingAdjustment = await prisma.salaryAdjustment.findFirst({
+      where: { employeeId, effectiveFrom },
     });
+
+    let adjustment;
+    if (existingAdjustment) {
+      adjustment = await prisma.salaryAdjustment.update({
+        where: { id: existingAdjustment.id },
+        data: {
+          newBaseSalary: newBaseSalary !== undefined ? parseFloat(newBaseSalary) : employee.salary,
+          newHourlyRate: newHourlyRate !== undefined ? parseFloat(newHourlyRate) : employee.hourlyRate || 0,
+          newDailyRate: newDailyRate !== undefined ? parseFloat(newDailyRate) : employee.dailyRate || 0,
+          reason: reason || '',
+          adjustedBy: user.id,
+          adjustedAt: new Date(),
+        },
+      });
+    } else {
+      adjustment = await prisma.salaryAdjustment.create({
+        data: {
+          employeeId,
+          effectiveFrom,
+          oldBaseSalary: employee.salary,
+          newBaseSalary: newBaseSalary !== undefined ? parseFloat(newBaseSalary) : employee.salary,
+          newHourlyRate: newHourlyRate !== undefined ? parseFloat(newHourlyRate) : employee.hourlyRate || 0,
+          newDailyRate: newDailyRate !== undefined ? parseFloat(newDailyRate) : employee.dailyRate || 0,
+          reason: reason || '',
+          adjustedBy: user.id,
+        }
+      });
+    }
 
     const currentMonth = new Date().toISOString().slice(0, 7);
     if (effectiveFrom <= currentMonth) {

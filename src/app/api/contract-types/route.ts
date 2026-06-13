@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { successResponse, createdResponse, handleApiError } from '@/lib/api-utils';
+import { successResponse, createdResponse, errorResponse, handleApiError } from '@/lib/api-utils';
 import { z } from 'zod';
+import { getSessionUser } from '@/lib/session';
+import { logDatabaseChange } from '@/lib/audit-logger';
 
 const createContractTypeSchema = z.object({
   name: z.string().min(1, '雇用形態名は必須です'),
@@ -20,8 +22,13 @@ const createContractTypeSchema = z.object({
 });
 
 // GET all contract types
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const user = getSessionUser(request);
+    if (!user) {
+      return errorResponse('Unauthorized', 401);
+    }
+
     const contractTypes = await prisma.contractType.findMany({
       include: { _count: { select: { employees: true } } },
       orderBy: { name: 'asc' },
@@ -35,10 +42,27 @@ export async function GET() {
 // POST new contract type
 export async function POST(request: NextRequest) {
   try {
+    const user = getSessionUser(request);
+    if (!user) {
+      return errorResponse('Unauthorized', 401);
+    }
+    if (user.role !== 'SUPER_ADMIN' && user.role !== 'HR_MANAGER') {
+      return errorResponse('Forbidden', 403);
+    }
+
     const body = await request.json();
     const data = createContractTypeSchema.parse(body);
 
     const contractType = await prisma.contractType.create({ data });
+
+    logDatabaseChange({
+      request,
+      action: 'CREATE',
+      model: 'ContractType',
+      recordId: contractType.id,
+      details: { name: contractType.name, nameKana: contractType.nameKana },
+    });
+
     return createdResponse(contractType);
   } catch (error) {
     return handleApiError(error);

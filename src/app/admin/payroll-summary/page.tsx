@@ -3,11 +3,12 @@ import { useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils';
 
 export default function PayrollSummaryPage() {
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState('');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchSummary = async (m: string) => {
+    if (!m) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/payroll/company-cost-summary?month=${m}`);
@@ -16,7 +17,16 @@ export default function PayrollSummaryPage() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchSummary(month); }, [month]);
+  useEffect(() => {
+    setMonth(new Date().toISOString().slice(0, 7));
+  }, []);
+
+  useEffect(() => {
+    if (month) {
+      fetchSummary(month);
+    }
+  }, [month]);
+
   if (!data) return <div className="p-8">Loading...</div>;
 
   const totalInsurance =

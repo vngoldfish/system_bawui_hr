@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import DocumentsClient from '@/components/documents/DocumentsClient';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function DocumentsPage() {
+async function DocumentsLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -51,10 +50,16 @@ export default async function DocumentsPage() {
     address: emp.address || '',
   }));
 
+  return <DocumentsClient employees={employees} />;
+}
+
+export default function DocumentsPage() {
   return (
     <DashboardLayout title="書類管理" subtitle="各種証明書・書類の発行管理">
       <div className="space-y-6">
-        <DocumentsClient employees={employees} />
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <DocumentsLoader />
+        </Suspense>
       </div>
     </DashboardLayout>
   );

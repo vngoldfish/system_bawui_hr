@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import BenefitsClient from '@/components/benefits/BenefitsClient';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function BenefitsPage() {
+async function BenefitsLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -50,10 +49,16 @@ export default async function BenefitsPage() {
     benefits: emp.benefits || null,
   }));
 
+  return <BenefitsClient employees={employees} />;
+}
+
+export default function BenefitsPage() {
   return (
     <DashboardLayout title="福利厚生" subtitle="社会保険・手当・福利厚生の管理">
       <div className="space-y-6">
-        <BenefitsClient employees={employees} />
+        <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+          <BenefitsLoader />
+        </Suspense>
       </div>
     </DashboardLayout>
   );

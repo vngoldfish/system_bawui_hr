@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import TemplatesClient from '@/components/notifications/TemplatesClient';
+import { Suspense } from 'react';
 
-export const dynamic = 'force-dynamic';
-
-export default async function TemplatesPage() {
+async function TemplatesLoader() {
   const cookieStore = await cookies();
   const sessionUserCookie = cookieStore.get('session_user');
   
@@ -83,9 +82,15 @@ export default async function TemplatesPage() {
     content: t.content,
   }));
 
+  return <TemplatesClient initialTemplates={templates} />;
+}
+
+export default function TemplatesPage() {
   return (
     <DashboardLayout title="通知テンプレート管理" subtitle="自動通知および自動リマインダーの文章編集">
-      <TemplatesClient initialTemplates={templates} />
+      <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
+        <TemplatesLoader />
+      </Suspense>
     </DashboardLayout>
   );
 }
