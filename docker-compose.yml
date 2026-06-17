@@ -2,9 +2,8 @@ version: '3.8'
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
+    container_name: system_bawui_hr-app
     ports:
       - "3001:3000"
     environment:
@@ -16,10 +15,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    restart: always
+    restart: unless-stopped
+    networks:
+      - bawui-net
 
   db:
     image: postgres:15-alpine
+    container_name: system_bawui_hr-db
     environment:
       - POSTGRES_USER=${DB_USER:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres_password}
@@ -34,7 +36,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: always
+    restart: unless-stopped
+    networks:
+      - bawui-net
 
   backup:
     image: prodrigestivill/postgres-backup-local:15
@@ -44,7 +48,7 @@ services:
       - POSTGRES_USER=${DB_USER:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres_password}
       - SCHEDULE=@daily
-      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-7}
+      - BACKUP_KEEP_DAYS=7
       - BACKUP_ON_START=TRUE
       - TZ=Asia/Tokyo
     volumes:
@@ -52,7 +56,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    restart: always
+    restart: unless-stopped
+    networks:
+      - bawui-net
 
 volumes:
   pgdata:
+
+networks:
+  bawui-net:
+    external: true
