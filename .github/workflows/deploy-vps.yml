@@ -18,7 +18,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             echo "=== Đã kết nối vào VPS ==="
-            cd /opt/apps/bwshr
+            cd /opt/apps/system_bawui_hr
             
             # Ép Git trên VPS kéo code mới nhất bạn vừa push lên GitHub về
             sudo git pull origin main
