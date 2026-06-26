@@ -1,6 +1,12 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useSyncExternalStore, useEffect } from 'react';
+import {
+  type AppLocale,
+  getClientLocaleSnapshot,
+  isAllowedLocale,
+  persistClientLocale,
+} from '@/lib/locale';
 import { staffTranslations } from './translations/staff';
 import { financeTranslations } from './translations/finance';
 import { docsTranslations } from './translations/docs';
@@ -38,6 +44,7 @@ export const translations: Record<string, Record<string, unknown>> = {
       documents: '書類管理',
       reports: 'レポート',
       roles: '権限管理',
+      settings: 'システム設定',
       company: '会社情報',
       auditLogs: '操作ログ',
       myAccount: 'マイアカウント',
@@ -229,6 +236,9 @@ export const translations: Record<string, Record<string, unknown>> = {
       breakStart: '休憩開始',
       breakEnd: '休憩終了',
       punchSuccess: '打刻が完了しました',
+      punchReset: '打刻を取り消す',
+      punchResetConfirm: '今日の打刻を取り消して、未打刻の状態に戻しますか？',
+      punchResetSuccess: '打刻を取り消しました。再度打刻できます。',
       workingHours: '実労働時間',
       overTime: '残業時間',
       overtimeStats: '残業統計',
@@ -446,6 +456,7 @@ export const translations: Record<string, Record<string, unknown>> = {
       documents: 'Documents',
       reports: 'Reports',
       roles: 'Roles & Perms',
+      settings: 'System Settings',
       company: 'Company Info',
       auditLogs: 'Audit Logs',
       myAccount: 'My Account',
@@ -634,6 +645,9 @@ export const translations: Record<string, Record<string, unknown>> = {
       breakStart: 'Break Start',
       breakEnd: 'Break End',
       punchSuccess: 'Clocked successfully',
+      punchReset: 'Clear punch',
+      punchResetConfirm: 'Clear today\'s punches and go back to not punched?',
+      punchResetSuccess: 'Punch cleared. You can punch again.',
       workingHours: 'Working Hours',
       overTime: 'Overtime',
       overtimeStats: 'Overtime Stats',
@@ -848,6 +862,7 @@ export const translations: Record<string, Record<string, unknown>> = {
       documents: 'Quản lý tài liệu',
       reports: 'Báo cáo thống kê',
       roles: 'Phân quyền hệ thống',
+      settings: 'Cài đặt hệ thống',
       company: 'Thông tin công ty',
       auditLogs: 'Lịch sử hoạt động',
       myAccount: 'Tài khoản của tôi',
@@ -1039,6 +1054,9 @@ export const translations: Record<string, Record<string, unknown>> = {
       breakStart: 'Nghỉ giữa ca',
       breakEnd: 'Vào lại ca',
       punchSuccess: 'Ghi nhận thời gian thành công',
+      punchReset: 'Hủy chấm công',
+      punchResetConfirm: 'Hủy chấm công hôm nay và trở về chưa điểm danh?',
+      punchResetSuccess: 'Đã hủy chấm công. Bạn có thể chấm lại.',
       workingHours: 'Số giờ làm việc',
       overTime: 'Số giờ tăng ca',
       overtimeStats: 'Thống kê tăng ca',
@@ -1256,6 +1274,7 @@ export const translations: Record<string, Record<string, unknown>> = {
       documents: '档案管理',
       reports: '统计图表',
       roles: '权限设置',
+      settings: '系统设置',
       company: '企业信息',
       auditLogs: '操作日志',
       myAccount: '我的账号',
@@ -1447,6 +1466,9 @@ export const translations: Record<string, Record<string, unknown>> = {
       breakStart: '开始休息',
       breakEnd: '结束休息',
       punchSuccess: '打卡记录已保存',
+      punchReset: '取消打卡',
+      punchResetConfirm: '取消今日打卡并恢复为未打卡状态？',
+      punchResetSuccess: '已取消打卡，可以重新打卡。',
       workingHours: '实际工时',
       overTime: '加班时长',
       overtimeStats: '加班统计',
@@ -1637,6 +1659,7 @@ export const translations: Record<string, Record<string, unknown>> = {
       documents: 'จัดการเอกสาร',
       reports: 'รายงานข้อมูล',
       roles: 'จัดการสิทธิ์ระบบ',
+      settings: 'ตั้งค่าระบบ',
       company: 'ข้อมูลบริษัท',
       auditLogs: 'ประวัติการใช้งาน',
       myAccount: 'บัญชีของฉัน',
@@ -1807,6 +1830,9 @@ export const translations: Record<string, Record<string, unknown>> = {
       breakStart: 'เริ่มพักเบรก',
       breakEnd: 'กลับจากพักเบรก',
       punchSuccess: 'บันทึกเวลาเสร็จสิ้น',
+      punchReset: 'ยกเลิกการลงเวลา',
+      punchResetConfirm: 'ยกเลิกการลงเวลาวันนี้และกลับเป็นยังไม่ลงเวลา?',
+      punchResetSuccess: 'ยกเลิกการลงเวลาแล้ว สามารถลงเวลาใหม่ได้',
       workingHours: 'ชั่วโมงทำงานจริง',
       overTime: 'ชั่วโมงทำงานล่วงเวลา',
       overtimeStats: 'สถิติล่วงเวลา',
@@ -1974,46 +2000,40 @@ const I18nContext = createContext<I18nContextProps>({
   t: (path) => path,
 });
 
-export function I18nProvider({ children, initialLocale = 'ja' }: { children: React.ReactNode; initialLocale?: string }) {
-  const [locale, setLocaleState] = useState<string>(initialLocale);
+function subscribeToLocale(onStoreChange: () => void) {
+  if (typeof window === 'undefined') return () => {};
+  const handler = () => onStoreChange();
+  window.addEventListener('languageChange', handler);
+  window.addEventListener('storage', handler);
+  return () => {
+    window.removeEventListener('languageChange', handler);
+    window.removeEventListener('storage', handler);
+  };
+}
 
-  useEffect(() => {
-    // Sync with localStorage or cookie on mount (client-side only)
-    const localLang = window.localStorage.getItem('app_lang');
-    if (localLang && ['ja', 'en', 'vi', 'zh', 'th'].includes(localLang)) {
-      if (localLang !== initialLocale) {
-        setLocaleState(localLang);
-      }
-      return;
-    }
-    const cookieValue = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('session_user='))
-      ?.split('=')[1];
-    if (cookieValue) {
-      try {
-        const parsed = JSON.parse(decodeURIComponent(cookieValue));
-        if (parsed?.language && ['ja', 'en', 'vi', 'zh', 'th'].includes(parsed.language)) {
-          window.localStorage.setItem('app_lang', parsed.language);
-          if (parsed.language !== initialLocale) {
-            setLocaleState(parsed.language);
-          }
-        }
-      } catch (_) {
-        // ignore
-      }
-    }
-  }, [initialLocale]);
+export function I18nProvider({
+  children,
+  initialLocale = 'ja',
+}: {
+  children: React.ReactNode;
+  initialLocale?: AppLocale;
+}) {
+  const serverLocale: AppLocale = isAllowedLocale(initialLocale) ? initialLocale : 'ja';
+  const locale = useSyncExternalStore(
+    subscribeToLocale,
+    () => getClientLocaleSnapshot(serverLocale),
+    () => serverLocale
+  );
 
   const setLocale = (newLocale: string) => {
-    if (!['ja', 'en', 'vi', 'zh', 'th'].includes(newLocale)) return;
-    setLocaleState(newLocale);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('app_lang', newLocale);
-      // Dispatch a custom event so other components know language changed
-      window.dispatchEvent(new Event('languageChange'));
-    }
+    if (!isAllowedLocale(newLocale)) return;
+    persistClientLocale(newLocale);
+    window.dispatchEvent(new Event('languageChange'));
   };
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const t = (path: string): string => {
     const keys = path.split('.');

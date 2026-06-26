@@ -54,6 +54,22 @@ export function handleApiError(error: unknown) {
   }
   if (error instanceof Error) {
     console.error('API Error:', error.message);
+    if (error.name === 'PrismaClientValidationError' || error.message.includes('Invalid `prisma')) {
+      const brief = error.message.split('\n').slice(0, 6).join(' ').slice(0, 500);
+      return NextResponse.json(
+        { error: 'データ形式エラー', details: brief || error.message },
+        { status: 400 }
+      );
+    }
+    if (error.message.includes('Unknown argument') || error.message.includes('Unknown field')) {
+      return NextResponse.json(
+        {
+          error: 'サーバーとDBの同期が必要です。`npx prisma generate` と dev サーバー再起動、または Docker 再ビルドを実行してください。',
+          details: error.message.slice(0, 300),
+        },
+        { status: 500 }
+      );
+    }
     if (error.message.includes('Unique constraint')) {
       return errorResponse('このデータは既に存在します', 409);
     }

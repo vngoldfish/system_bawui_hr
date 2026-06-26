@@ -75,6 +75,7 @@ const menuSections: MenuSection[] = [
       { href: '/documents', label: 'nav.documents', icon: '📄' },
       { href: '/reports', label: 'nav.reports', icon: '📈' },
       { href: '/roles', label: 'nav.roles', icon: '🔑' },
+      { href: '/settings', label: 'nav.settings', icon: '⚙️' },
       { href: '/company', label: 'nav.company', icon: '🏢' },
       { href: '/audit-logs', label: 'nav.auditLogs', icon: '📜' },
     ],
@@ -98,6 +99,7 @@ const permissionMap: Record<string, string> = {
   '/benefits': 'payroll:view',
   '/reports': 'reports:view',
   '/roles': 'settings:view',
+  '/settings': 'settings:view',
   '/company': 'settings:view',
   '/audit-logs': 'audit_logs:view',
 };

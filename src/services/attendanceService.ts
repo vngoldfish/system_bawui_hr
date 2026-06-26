@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { serializeEmployee } from './employeeService';
 
-// Optimized minimal include for attendance logs
 const attendanceEmployeeInclude = {
   department: true,
   position: true,
@@ -11,6 +10,37 @@ const attendanceEmployeeInclude = {
     orderBy: { startDate: 'desc' as const },
   },
 };
+
+function buildDateFilter(options?: { month?: string; monthsBack?: number }) {
+  if (options?.month) {
+    const [year, monthNum] = options.month.split('-').map(Number);
+    const startDate = new Date(year, monthNum - 1, 1);
+    const endDate = new Date(year, monthNum, 0, 23, 59, 59, 999);
+    return { gte: startDate, lte: endDate };
+  }
+
+  if (options?.monthsBack) {
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth() - options.monthsBack + 1, 1);
+    return { gte: startDate };
+  }
+
+  return undefined;
+}
+
+function serializeAttendanceRecord(rec: any) {
+  return {
+    ...rec,
+    date: rec.date.toISOString(),
+    checkIn: rec.checkIn?.toISOString() ?? null,
+    checkOut: rec.checkOut?.toISOString() ?? null,
+    breakStart: rec.breakStart?.toISOString() ?? null,
+    breakEnd: rec.breakEnd?.toISOString() ?? null,
+    createdAt: rec.createdAt.toISOString(),
+    updatedAt: rec.updatedAt.toISOString(),
+    employee: serializeEmployee(rec.employee),
+  };
+}
 
 export const attendanceService = {
   async getHolidays() {
@@ -26,8 +56,20 @@ export const attendanceService = {
     }));
   },
 
-  async getAttendanceRecords() {
+  async getAttendanceRecords(options?: { month?: string; monthsBack?: number; employeeId?: string }) {
+    const where: { employeeId?: string; date?: { gte: Date; lte?: Date } } = {};
+
+    if (options?.employeeId) {
+      where.employeeId = options.employeeId;
+    }
+
+    const dateFilter = buildDateFilter(options);
+    if (dateFilter) {
+      where.date = dateFilter;
+    }
+
     const records = await prisma.attendanceRecord.findMany({
+      where,
       include: {
         employee: {
           include: attendanceEmployeeInclude,
@@ -35,22 +77,24 @@ export const attendanceService = {
       },
       orderBy: { date: 'desc' },
     });
-    return records.map(rec => ({
-      ...rec,
-      date: rec.date.toISOString(),
-      checkIn: rec.checkIn?.toISOString() ?? null,
-      checkOut: rec.checkOut?.toISOString() ?? null,
-      breakStart: rec.breakStart?.toISOString() ?? null,
-      breakEnd: rec.breakEnd?.toISOString() ?? null,
-      createdAt: rec.createdAt.toISOString(),
-      updatedAt: rec.updatedAt.toISOString(),
-      employee: serializeEmployee(rec.employee),
-    }));
+
+    return records.map(serializeAttendanceRecord);
   },
 
-  async getAttendanceRecordsByEmployeeId(employeeId: string) {
+  async getAttendanceRecordsByMonth(month: string) {
+    return this.getAttendanceRecords({ month });
+  },
+
+  async getAttendanceRecordsByEmployeeId(employeeId: string, options?: { monthsBack?: number }) {
+    const where: { employeeId: string; date?: { gte: Date } } = { employeeId };
+
+    const dateFilter = buildDateFilter(options);
+    if (dateFilter) {
+      where.date = dateFilter;
+    }
+
     const records = await prisma.attendanceRecord.findMany({
-      where: { employeeId },
+      where,
       include: {
         employee: {
           include: attendanceEmployeeInclude,
@@ -58,16 +102,7 @@ export const attendanceService = {
       },
       orderBy: { date: 'desc' },
     });
-    return records.map(rec => ({
-      ...rec,
-      date: rec.date.toISOString(),
-      checkIn: rec.checkIn?.toISOString() ?? null,
-      checkOut: rec.checkOut?.toISOString() ?? null,
-      breakStart: rec.breakStart?.toISOString() ?? null,
-      breakEnd: rec.breakEnd?.toISOString() ?? null,
-      createdAt: rec.createdAt.toISOString(),
-      updatedAt: rec.updatedAt.toISOString(),
-      employee: serializeEmployee(rec.employee),
-    }));
-  }
+
+    return records.map(serializeAttendanceRecord);
+  },
 };

@@ -25,11 +25,11 @@ export function formatTime(time: string | null): string {
 }
 
 // Format currency to Japanese Yen
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number | null | undefined): string {
   return new Intl.NumberFormat("ja-JP", {
     style: "currency",
     currency: "JPY",
-  }).format(amount);
+  }).format(amount ?? 0);
 }
 
 // Calculate overtime hours

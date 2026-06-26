@@ -194,7 +194,7 @@ export default function ProfileClient({ user, initialTab = 'basic' }: { user: Pr
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl cursor-pointer transition-all whitespace-nowrap ${
+            className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl cursor-pointer transition-all whitespace-nowrap ${
               activeTab === tab.key
                 ? 'bg-white dark:bg-slate-800 shadow text-blue-650 dark:text-blue-400 font-black'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'

@@ -22,16 +22,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const initialLocale = "ja";
-
   return (
     <html
-      lang={initialLocale}
+      lang="ja"
       className={`${geistSans.variable} ${geistMono.variable} h-full overflow-hidden antialiased`}
       suppressHydrationWarning
     >
       <body className="h-full overflow-hidden" suppressHydrationWarning>
-        <I18nProvider initialLocale={initialLocale}>
+        <I18nProvider initialLocale="ja">
           {children}
         </I18nProvider>
       </body>

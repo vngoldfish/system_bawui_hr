@@ -3,34 +3,8 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import PayrollClient from '@/components/payroll/PayrollClient';
-import { calculatePayrollDetails } from '@/lib/payroll-calculator';
+import { loadPayrollRecordsForAdmin, loadPayrollRecordsForEmployee } from '@/services/payrollService';
 import { Suspense } from 'react';
-
-const mergeBenefits = (benefits: any) => {
-  const defaults = {
-    healthInsurance: true,
-    pension: true,
-    employmentInsurance: true,
-    workersComp: true,
-    transportation: 0,
-    housing: 0,
-    meal: 0,
-    residentTax: false,
-    residentTaxAmount: 0
-  };
-  if (!benefits || typeof benefits !== 'object') return defaults;
-  return {
-    healthInsurance: benefits.healthInsurance ?? defaults.healthInsurance,
-    pension: benefits.pension ?? defaults.pension,
-    employmentInsurance: benefits.employmentInsurance ?? defaults.employmentInsurance,
-    workersComp: benefits.workersComp ?? defaults.workersComp,
-    transportation: benefits.transportation ?? defaults.transportation,
-    housing: benefits.housing ?? defaults.housing,
-    meal: benefits.meal ?? defaults.meal,
-    residentTax: benefits.residentTax ?? defaults.residentTax,
-    residentTaxAmount: benefits.residentTaxAmount ?? defaults.residentTaxAmount,
-  };
-};
 
 async function PayrollLoader() {
   const cookieStore = await cookies();
@@ -42,365 +16,31 @@ async function PayrollLoader() {
   
   const user = JSON.parse(decodeURIComponent(sessionUserCookie.value));
   
-  // Fetch logged-in employee details from DB
   const dbUser = await prisma.employee.findUnique({
     where: { id: user.id },
     include: {
       department: true,
       position: true,
       dependents: true,
-    }
+      employeeContracts: {
+        include: {
+          contractType: true,
+        },
+      },
+    },
   });
 
   if (!dbUser) {
     redirect('/login');
   }
 
-  // Fetch company details from database
   const company = await prisma.company.findFirst();
 
   const viewMode = cookieStore.get('view_mode')?.value || 'admin';
   const isEmployee = dbUser.role === 'EMPLOYEE' || viewMode === 'employee';
 
   if (isEmployee) {
-    const hireDate = new Date(dbUser.hireDate);
-    const hireYear = hireDate.getFullYear();
-    const hireMonth = hireDate.getMonth() + 1;
-    const hireMonthStr = `${hireYear}-${String(hireMonth).padStart(2, '0')}`;
-
-    const now = new Date();
-    const nowYear = now.getFullYear();
-    const nowMonth = now.getMonth() + 1;
-    const nowMonthStr = `${nowYear}-${String(nowMonth).padStart(2, '0')}`;
-
-    // 1. Regular Employee Mode: Only fetch real database records that are APPROVED or PAID from hire date to now
-    const dbRecords = await prisma.payrollRecord.findMany({
-      where: {
-        employeeId: dbUser.id,
-        month: {
-          gte: hireMonthStr,
-          lte: nowMonthStr,
-        },
-        status: {
-          in: ['APPROVED', 'PAID']
-        }
-      },
-      orderBy: { month: 'desc' },
-    });
-
-    const records = await Promise.all(dbRecords.map(async (r) => {
-      const allowances = r.bonus;
-      const totalGross = r.baseSalary + r.overtimePay + allowances;
-
-      // Query attendance records for the working month (previous month) to get real days/hours
-      const [year, monthVal] = r.month.split('-').map(Number);
-      const startOfMonth = new Date(year, monthVal - 2, 1);
-      const endOfMonth = new Date(year, monthVal - 1, 0, 23, 59, 59, 999);
-
-      const attendance = await prisma.attendanceRecord.findMany({
-        where: {
-          employeeId: r.employeeId,
-          date: {
-            gte: startOfMonth,
-            lte: endOfMonth,
-          }
-        }
-      });
-
-      const workDays = r.workDays !== null && r.workDays !== undefined ? r.workDays : (attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length || 22);
-      const absentDays = r.absentDays !== null && r.absentDays !== undefined ? r.absentDays : (attendance.filter(a => a.status === 'ABSENT').length || 0);
-      const overtimeHours = r.overtimeHours !== null && r.overtimeHours !== undefined ? r.overtimeHours : (attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0) || 0);
-      const workHours = r.workHours !== null && r.workHours !== undefined ? r.workHours : (workDays * 8);
-
-      let healthInsuranceCompany = r.healthInsuranceCompany;
-      let pensionCompany = r.pensionCompany;
-      let employmentInsuranceCompany = r.employmentInsuranceCompany;
-      let workersCompCompany = r.workersCompCompany;
-      let healthInsuranceEmployee = r.healthInsuranceEmployee;
-      let pensionEmployee = r.pensionEmployee;
-      let employmentInsuranceEmployee = r.employmentInsuranceEmployee;
-      let residentTax = r.residentTax;
-      let incomeTax = r.incomeTax;
-      let nursingCareInsurance = r.nursingCareInsurance;
-      let totalCompanyCost = r.totalCompanyCost;
-
-      if (!totalCompanyCost || totalCompanyCost === 0) {
-        const details = calculatePayrollDetails({
-          baseSalary: r.baseSalary,
-          salaryType: dbUser.salaryType || '月給',
-          workDays,
-          hourlyRate: dbUser.hourlyRate || 0,
-          dailyRate: dbUser.dailyRate || 0,
-          overtimeHours,
-          benefits: mergeBenefits(dbUser.benefits),
-          birthDate: dbUser.birthDate ? dbUser.birthDate.toISOString() : null,
-          month: r.month,
-          dependentsCount: dbUser.dependents ? dbUser.dependents.length : 0,
-          dependents: dbUser.dependents ? dbUser.dependents.map(d => ({
-            id: d.id,
-            name: d.name,
-            relationship: d.relationship,
-            birthDate: d.birthDate ? d.birthDate.toISOString() : null,
-            gender: d.gender,
-            cohabitation: d.cohabitation,
-          })) : [],
-          companyRate: company?.healthInsuranceRate,
-          customAllowances: allowances,
-          positionAllowance: dbUser.position?.allowance || 0,
-        });
-
-        healthInsuranceCompany = details.healthInsuranceCompany;
-        pensionCompany = details.pensionCompany;
-        employmentInsuranceCompany = details.employmentInsuranceCompany;
-        workersCompCompany = details.workersCompCompany;
-        healthInsuranceEmployee = details.healthInsuranceEmployee;
-        pensionEmployee = details.pensionEmployee;
-        employmentInsuranceEmployee = details.employmentInsuranceEmployee;
-        residentTax = details.residentTax;
-        incomeTax = details.incomeTax;
-        nursingCareInsurance = details.nursingCareInsurance;
-        totalCompanyCost = details.totalCompanyCost;
-      }
-
-      const healthInsurance = healthInsuranceEmployee + (nursingCareInsurance || 0);
-      const totalDeductions = r.deductions + healthInsurance + pensionEmployee + employmentInsuranceEmployee + incomeTax + residentTax;
-
-      return {
-        id: r.id,
-        employeeId: r.employeeId,
-        month: r.month,
-        baseSalary: r.baseSalary,
-        overtimePay: r.overtimePay,
-        allowances,
-        healthInsurance,
-        pension: pensionEmployee,
-        employmentInsurance: employmentInsuranceEmployee,
-        workersComp: workersCompCompany,
-        incomeTax,
-        residentTax,
-        totalGross,
-        totalDeductions,
-        netSalary: r.netSalary,
-        salaryType: dbUser.salaryType || '月給',
-        workDays,
-        workHours,
-        overtimeHours: Math.round(overtimeHours * 10) / 10,
-        absentDays,
-        status: r.status,
-        paymentDate: r.paymentDate ? r.paymentDate.toISOString() : undefined,
-        healthInsuranceCompany,
-        pensionCompany,
-        employmentInsuranceCompany,
-        workersCompCompany,
-        healthInsuranceEmployee,
-        pensionEmployee,
-        employmentInsuranceEmployee,
-        nursingCareInsurance,
-        totalCompanyCost,
-      };
-    }));
-
-    // Do not generate mock/hypothetical records when empty, display empty table based on real database records instead
-
-    const singleEmployeeList = [{
-      id: dbUser.id,
-      employeeCode: dbUser.employeeCode,
-      firstName: dbUser.firstName,
-      lastName: dbUser.lastName,
-      firstNameKana: dbUser.firstNameKana || '',
-      lastNameKana: dbUser.lastNameKana || '',
-      department: dbUser.department?.name || '未所属',
-      position: dbUser.position?.name || '一般社員',
-      positionAllowance: dbUser.position?.allowance || 0,
-      salary: dbUser.salary || 0,
-      salaryType: dbUser.salaryType || '月給',
-      hourlyRate: dbUser.hourlyRate || 0,
-      dailyRate: dbUser.dailyRate || 0,
-      contractType: '正社員',
-      benefits: mergeBenefits(dbUser.benefits),
-      birthDate: dbUser.birthDate ? dbUser.birthDate.toISOString() : null,
-      dependents: dbUser.dependents ? dbUser.dependents.map(d => ({
-        id: d.id,
-        name: d.name,
-        relationship: d.relationship,
-        birthDate: d.birthDate ? d.birthDate.toISOString() : null,
-        gender: d.gender,
-        cohabitation: d.cohabitation,
-      })) : [],
-    }];
-
-    return (
-      <PayrollClient 
-        employees={singleEmployeeList} 
-        initialRecords={records} 
-        payrollSettings={{ 
-          cutoffDay: company?.salaryCutoffDay || '末日', 
-          payday: company?.payday || '25' 
-        }} 
-        isEmployeeMode={true}
-        companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
-      />
-    );
-  } else {
-    // 2. Admin/Manager Mode: Fetch all DB employees
-    const dbEmployees = await prisma.employee.findMany({
-      include: {
-        department: true,
-        position: true,
-        dependents: true,
-        employeeContracts: {
-          include: {
-            contractType: true
-          }
-        }
-      }
-    });
-
-    const employees = dbEmployees.map(emp => ({
-      id: emp.id,
-      employeeCode: emp.employeeCode,
-      firstName: emp.firstName,
-      lastName: emp.lastName,
-      firstNameKana: emp.firstNameKana || '',
-      lastNameKana: emp.lastNameKana || '',
-      department: emp.department?.name || '未所属',
-      position: emp.position?.name || '役職なし',
-      positionAllowance: emp.position?.allowance || 0,
-      salary: emp.salary || 0,
-      salaryType: emp.salaryType || '月給',
-      hourlyRate: emp.hourlyRate || 0,
-      dailyRate: emp.dailyRate || 0,
-      contractType: emp.employeeContracts?.[0]?.contractType?.name || '正社員',
-      benefits: mergeBenefits(emp.benefits),
-      birthDate: emp.birthDate ? emp.birthDate.toISOString() : null,
-      dependents: emp.dependents ? emp.dependents.map(d => ({
-        id: d.id,
-        name: d.name,
-        relationship: d.relationship,
-        birthDate: d.birthDate ? d.birthDate.toISOString() : null,
-        gender: d.gender,
-        cohabitation: d.cohabitation,
-      })) : [],
-    }));
-
-    // Fetch existing database records for Admin view
-    const dbRecords = await prisma.payrollRecord.findMany({
-      orderBy: { month: 'desc' },
-    });
-
-    const records = await Promise.all(dbRecords.map(async (r) => {
-      const allowances = r.bonus;
-      const totalGross = r.baseSalary + r.overtimePay + allowances;
-      
-      const emp = dbEmployees.find(e => e.id === r.employeeId);
-
-      // Query attendance records for the working month (previous month) to get real days/hours
-      const [year, monthVal] = r.month.split('-').map(Number);
-      const startOfMonth = new Date(year, monthVal - 2, 1);
-      const endOfMonth = new Date(year, monthVal - 1, 0, 23, 59, 59, 999);
-
-      const attendance = await prisma.attendanceRecord.findMany({
-        where: {
-          employeeId: r.employeeId,
-          date: {
-            gte: startOfMonth,
-            lte: endOfMonth,
-          }
-        }
-      });
-
-      const workDays = r.workDays !== null && r.workDays !== undefined ? r.workDays : (attendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length || 22);
-      const absentDays = r.absentDays !== null && r.absentDays !== undefined ? r.absentDays : (attendance.filter(a => a.status === 'ABSENT').length || 0);
-      const overtimeHours = r.overtimeHours !== null && r.overtimeHours !== undefined ? r.overtimeHours : (attendance.reduce((sum, a) => sum + (a.overtimeHours || 0), 0) || 0);
-      const workHours = r.workHours !== null && r.workHours !== undefined ? r.workHours : (workDays * 8);
-
-      let healthInsuranceCompany = r.healthInsuranceCompany;
-      let pensionCompany = r.pensionCompany;
-      let employmentInsuranceCompany = r.employmentInsuranceCompany;
-      let workersCompCompany = r.workersCompCompany;
-      let healthInsuranceEmployee = r.healthInsuranceEmployee;
-      let pensionEmployee = r.pensionEmployee;
-      let employmentInsuranceEmployee = r.employmentInsuranceEmployee;
-      let residentTax = r.residentTax;
-      let incomeTax = r.incomeTax;
-      let nursingCareInsurance = r.nursingCareInsurance;
-      let totalCompanyCost = r.totalCompanyCost;
-
-      if (emp && (!totalCompanyCost || totalCompanyCost === 0)) {
-        const details = calculatePayrollDetails({
-          baseSalary: r.baseSalary,
-          salaryType: emp.salaryType || '月給',
-          workDays,
-          hourlyRate: emp.hourlyRate || 0,
-          dailyRate: emp.dailyRate || 0,
-          overtimeHours,
-          benefits: mergeBenefits(emp.benefits),
-          birthDate: emp.birthDate ? emp.birthDate.toISOString() : null,
-          month: r.month,
-          dependentsCount: emp.dependents ? emp.dependents.length : 0,
-          dependents: emp.dependents ? emp.dependents.map(d => ({
-            id: d.id,
-            name: d.name,
-            relationship: d.relationship,
-            birthDate: d.birthDate ? d.birthDate.toISOString() : null,
-            gender: d.gender,
-            cohabitation: d.cohabitation,
-          })) : [],
-          companyRate: company?.healthInsuranceRate,
-          customAllowances: allowances,
-          positionAllowance: emp.position?.allowance || 0,
-        });
-
-        healthInsuranceCompany = details.healthInsuranceCompany;
-        pensionCompany = details.pensionCompany;
-        employmentInsuranceCompany = details.employmentInsuranceCompany;
-        workersCompCompany = details.workersCompCompany;
-        healthInsuranceEmployee = details.healthInsuranceEmployee;
-        pensionEmployee = details.pensionEmployee;
-        employmentInsuranceEmployee = details.employmentInsuranceEmployee;
-        residentTax = details.residentTax;
-        incomeTax = details.incomeTax;
-        nursingCareInsurance = details.nursingCareInsurance;
-        totalCompanyCost = details.totalCompanyCost;
-      }
-
-      const healthInsurance = healthInsuranceEmployee + (nursingCareInsurance || 0);
-      const totalDeductions = r.deductions + healthInsurance + pensionEmployee + employmentInsuranceEmployee + incomeTax + residentTax;
-
-      return {
-        id: r.id,
-        employeeId: r.employeeId,
-        month: r.month,
-        baseSalary: r.baseSalary,
-        overtimePay: r.overtimePay,
-        allowances,
-        healthInsurance,
-        pension: pensionEmployee,
-        employmentInsurance: employmentInsuranceEmployee,
-        workersComp: workersCompCompany,
-        incomeTax,
-        residentTax,
-        totalGross,
-        totalDeductions,
-        netSalary: r.netSalary,
-        salaryType: emp?.salaryType || '月給',
-        workDays,
-        workHours,
-        overtimeHours: Math.round(overtimeHours * 10) / 10,
-        absentDays,
-        status: r.status,
-        paymentDate: r.paymentDate ? r.paymentDate.toISOString() : undefined,
-        healthInsuranceCompany,
-        pensionCompany,
-        employmentInsuranceCompany,
-        workersCompCompany,
-        healthInsuranceEmployee,
-        pensionEmployee,
-        employmentInsuranceEmployee,
-        nursingCareInsurance,
-        totalCompanyCost,
-      };
-    }));
+    const { employees, records } = await loadPayrollRecordsForEmployee(dbUser, company);
 
     return (
       <PayrollClient 
@@ -410,11 +50,39 @@ async function PayrollLoader() {
           cutoffDay: company?.salaryCutoffDay || '末日', 
           payday: company?.payday || '25' 
         }} 
-        isEmployeeMode={false}
+        isEmployeeMode={true}
         companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
       />
     );
   }
+
+  const dbEmployees = await prisma.employee.findMany({
+    include: {
+      department: true,
+      position: true,
+      dependents: true,
+      employeeContracts: {
+        include: {
+          contractType: true,
+        },
+      },
+    },
+  });
+
+  const { employees, records } = await loadPayrollRecordsForAdmin(dbEmployees, company);
+
+  return (
+    <PayrollClient 
+      employees={employees} 
+      initialRecords={records} 
+      payrollSettings={{ 
+        cutoffDay: company?.salaryCutoffDay || '末日', 
+        payday: company?.payday || '25' 
+      }} 
+      isEmployeeMode={false}
+      companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
+    />
+  );
 }
 
 export default function PayrollPage() {

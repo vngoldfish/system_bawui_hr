@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { isAllowedLocale, localeCookieValue } from '@/lib/locale';
 
 const SECRET = process.env.SESSION_SECRET || 'company-internal-highly-secure-default-key-9876543210';
 
@@ -64,6 +65,9 @@ export function setSessionCookies(response: NextResponse, user: SessionUser) {
     'Set-Cookie',
     `session_user=${serializedUser}; Path=/; Max-Age=28800; SameSite=Lax`
   );
+
+  const language = user.language && isAllowedLocale(user.language) ? user.language : 'ja';
+  response.headers.append('Set-Cookie', localeCookieValue(language));
 }
 
 export function clearSessionCookies(response: NextResponse) {
@@ -74,5 +78,9 @@ export function clearSessionCookies(response: NextResponse) {
   response.headers.append(
     'Set-Cookie',
     'session_user=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
+  );
+  response.headers.append(
+    'Set-Cookie',
+    'app_lang=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
   );
 }

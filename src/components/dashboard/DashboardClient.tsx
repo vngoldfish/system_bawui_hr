@@ -502,6 +502,29 @@ export default function DashboardClient({
     }
   };
 
+  const hasPunchToday = !!(punchState.checkIn || punchState.breakStart || punchState.breakEnd || punchState.checkOut);
+
+  const handlePunchReset = async () => {
+    if (!window.confirm(t('dashboard.punchResetConfirm'))) return;
+    setPunchLoading(true);
+    setPunchError(null);
+    setPunchSuccess(null);
+
+    try {
+      const res = await fetch('/api/attendance/punch', { method: 'DELETE' });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || t('dashboard.punchError'));
+      }
+      setPunchState({ checkIn: null, breakStart: null, breakEnd: null, checkOut: null });
+      setPunchSuccess(t('dashboard.punchResetSuccess'));
+    } catch (err: any) {
+      setPunchError(err.message || t('dashboard.punchErrorOccurred'));
+    } finally {
+      setPunchLoading(false);
+    }
+  };
+
   const todayStr = useMemo(() => {
     return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date());
   }, []);
@@ -1753,6 +1776,17 @@ export default function DashboardClient({
                     {punchState.breakEnd && <span className="block text-[9px] font-medium opacity-75 mt-0.5 font-mono">{punchState.breakEnd}</span>}
                   </button>
                 </div>
+
+                {hasPunchToday && (
+                  <button
+                    type="button"
+                    disabled={punchLoading}
+                    onClick={handlePunchReset}
+                    className="mt-4 w-full max-w-sm px-4 py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-700 font-bold rounded-2xl text-xxs transition-all cursor-pointer"
+                  >
+                    ↩ {t('dashboard.punchReset')}
+                  </button>
+                )}
               </div>
             </Card>
           </div>

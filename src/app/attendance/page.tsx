@@ -52,7 +52,7 @@ async function AttendanceLoader() {
   if (isEmployee) {
     const [employee, empRecords, allHolidays] = await Promise.all([
       employeeService.getById(user.id),
-      attendanceService.getAttendanceRecordsByEmployeeId(user.id),
+      attendanceService.getAttendanceRecordsByEmployeeId(user.id, { monthsBack: 24 }),
       attendanceService.getHolidays(),
     ]);
     if (employee) {
@@ -63,7 +63,7 @@ async function AttendanceLoader() {
   } else {
     const [allEmployees, allRecords, allHolidays] = await Promise.all([
       employeeService.getAll(),
-      attendanceService.getAttendanceRecords(),
+      attendanceService.getAttendanceRecords({ monthsBack: 12 }),
       attendanceService.getHolidays(),
     ]);
     employees = allEmployees;

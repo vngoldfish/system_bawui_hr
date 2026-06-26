@@ -484,6 +484,25 @@ function EmployeeDetailModal({ employee: initialEmployee, onClose, onEdit, onSav
                       </span>
                     </div>
                   )}
+                  <div className="col-span-full mt-3 pt-3 border-t border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{t('form.workLimitTitle')}</p>
+                    {employee.workLimitVisa28h || employee.workLimitIncomeCap80k ? (
+                      <div className="flex flex-wrap gap-2">
+                        {employee.workLimitVisa28h && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                            {t('client.workLimitVisa28hOn').replace('{hours}', String(employee.workLimitWeeklyHours ?? 28))}
+                          </span>
+                        )}
+                        {employee.workLimitIncomeCap80k && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-violet-50 text-violet-800 border border-violet-200">
+                            {t('client.workLimitIncomeCapOn').replace('{amount}', (employee.workLimitMonthlyIncome ?? 80000).toLocaleString('ja-JP'))}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-slate-500">{t('client.workLimitNone')}</span>
+                    )}
+                  </div>
                 </div>
               </div>
 

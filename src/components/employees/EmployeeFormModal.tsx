@@ -7,6 +7,7 @@ import ContractTypeManagementModal from '@/components/common/ContractTypeManagem
 import Portal from '@/components/common/Portal';
 import { useI18n } from '@/lib/i18n';
 import { countryOptions, visaOptions, getCountryLabel, getVisaStatusLabel } from '@/lib/translations/options';
+import { DEFAULT_INCOME_CAP_MONTHLY, DEFAULT_VISA_WEEKLY_HOURS, suggestVisa28hFromStatus } from '@/lib/work-limit';
 
 interface EmployeeFormData {
   employeeCode: string;
@@ -31,6 +32,10 @@ interface EmployeeFormData {
   residenceExpiry: string;
   workRestriction: string;
   residenceCardImage: string;
+  workLimitVisa28h: boolean;
+  workLimitIncomeCap80k: boolean;
+  workLimitWeeklyHours: string;
+  workLimitMonthlyIncome: string;
   contractTypeId: string;
   contractStartDate: string;
   contractEndDate: string;
@@ -93,6 +98,10 @@ const emptyForm: EmployeeFormData = {
   residenceExpiry: '',
   workRestriction: '',
   residenceCardImage: '',
+  workLimitVisa28h: false,
+  workLimitIncomeCap80k: false,
+  workLimitWeeklyHours: String(DEFAULT_VISA_WEEKLY_HOURS),
+  workLimitMonthlyIncome: String(DEFAULT_INCOME_CAP_MONTHLY),
   contractTypeId: '',
   contractStartDate: new Date().toISOString().split('T')[0],
   contractEndDate: '',
@@ -197,6 +206,10 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
         residenceCardIssueDate: toDateInputValue(employee.residenceCardIssueDate),
         residenceExpiry: toDateInputValue(employee.residenceExpiry),
         workRestriction: toInputValue(employee.workRestriction),
+        workLimitVisa28h: !!employee.workLimitVisa28h,
+        workLimitIncomeCap80k: !!employee.workLimitIncomeCap80k,
+        workLimitWeeklyHours: employee.workLimitWeeklyHours != null ? String(employee.workLimitWeeklyHours) : String(DEFAULT_VISA_WEEKLY_HOURS),
+        workLimitMonthlyIncome: employee.workLimitMonthlyIncome != null ? String(employee.workLimitMonthlyIncome) : String(DEFAULT_INCOME_CAP_MONTHLY),
         contractTypeId: toInputValue(employee.contractTypeId),
         contractStartDate: toDateInputValue(employee.contractStartDate),
         contractEndDate: toDateInputValue(employee.contractEndDate),
@@ -277,6 +290,9 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
       }
       if (name === 'contractEndDateType') {
         if (value === 'none') next.contractEndDate = '';
+      }
+      if (name === 'residenceStatus' && suggestVisa28hFromStatus(value)) {
+        next.workLimitVisa28h = true;
       }
       if (name === 'status') {
         if (value === 'INACTIVE') {
@@ -411,6 +427,10 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
         residenceCardIssueDate: isForeign ? formData.residenceCardIssueDate : null,
         residenceExpiry: isForeign ? formData.residenceExpiry : null,
         workRestriction: isForeign ? formData.workRestriction : null,
+        workLimitVisa28h: formData.workLimitVisa28h,
+        workLimitIncomeCap80k: formData.workLimitIncomeCap80k,
+        workLimitWeeklyHours: formData.workLimitVisa28h ? (parseFloat(formData.workLimitWeeklyHours) || DEFAULT_VISA_WEEKLY_HOURS) : null,
+        workLimitMonthlyIncome: formData.workLimitIncomeCap80k ? (parseFloat(formData.workLimitMonthlyIncome) || DEFAULT_INCOME_CAP_MONTHLY) : null,
         contractTypeId: formData.contractTypeId,
         contractStartDate: formData.contractStartDate || null,
         contractEndDate: formData.contractEndDateType === 'fixed' ? (formData.contractEndDate || null) : null,
@@ -780,6 +800,65 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                     </div>
                   </>
                 )}
+              </div>
+            </section>
+
+            {/* 就労時間・収入上限 */}
+            <section>
+              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">{t('form.workLimitTitle')}</h3>
+              <p className="text-xs text-slate-500 mb-4">留学生・家族滞在の週28時間 / 被扶養者維持の月収上限などを管理します。</p>
+              <div className="space-y-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.workLimitVisa28h}
+                    onChange={e => setFormData(prev => ({ ...prev, workLimitVisa28h: e.target.checked }))}
+                    className="mt-1 rounded border-slate-300 text-blue-600"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-semibold text-slate-800">{t('form.workLimitVisa28h')}</span>
+                    <p className="text-xs text-slate-500 mt-0.5">{t('form.workLimitVisa28hHint')}</p>
+                    {formData.workLimitVisa28h && (
+                      <div className="mt-2 max-w-[200px]">
+                        <label className="block text-xs font-medium text-slate-600 mb-1">{t('form.workLimitWeeklyHours')}</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={168}
+                          step={0.5}
+                          value={formData.workLimitWeeklyHours}
+                          onChange={e => setFormData(prev => ({ ...prev, workLimitWeeklyHours: e.target.value }))}
+                          className={inputCls}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer border-t border-slate-200 pt-4">
+                  <input
+                    type="checkbox"
+                    checked={formData.workLimitIncomeCap80k}
+                    onChange={e => setFormData(prev => ({ ...prev, workLimitIncomeCap80k: e.target.checked }))}
+                    className="mt-1 rounded border-slate-300 text-blue-600"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-semibold text-slate-800">{t('form.workLimitIncomeCap')}</span>
+                    <p className="text-xs text-slate-500 mt-0.5">{t('form.workLimitIncomeCapHint')}</p>
+                    {formData.workLimitIncomeCap80k && (
+                      <div className="mt-2 max-w-[200px]">
+                        <label className="block text-xs font-medium text-slate-600 mb-1">{t('form.workLimitMonthlyIncome')}</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1000}
+                          value={formData.workLimitMonthlyIncome}
+                          onChange={e => setFormData(prev => ({ ...prev, workLimitMonthlyIncome: e.target.value }))}
+                          className={inputCls}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </label>
               </div>
             </section>
 

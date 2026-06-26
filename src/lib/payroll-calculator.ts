@@ -1,3 +1,48 @@
+import {
+  configToRateSettings,
+  getDefaultPayrollRateConfig,
+} from './payroll-rates-defaults';
+import {
+  getR8IncomeTaxTable,
+  lookupMonthlyIncomeTax,
+  type IncomeTaxTableData,
+} from './income-tax-table';
+
+export interface PayrollRateSettings {
+  healthInsuranceRate: number;
+  nursingCareRate: number;
+  pensionRate: number;
+  employmentInsuranceEmployeeRate: number;
+  employmentInsuranceCompanyRate: number;
+  workersCompRate: number;
+  incomeTaxTable?: IncomeTaxTableData | null;
+}
+
+export function getDefaultRateSettings(): PayrollRateSettings {
+  const defaults = getDefaultPayrollRateConfig(new Date().getFullYear());
+  return configToRateSettings(defaults);
+}
+
+/** SMR income: insuranceSalary nếu có, else base + fixed allowances (housing/meal/position) KHÔNG gồm transport/overtime */
+export function getSmrIncome({
+  insuranceSalary,
+  calculatedBase,
+  housing = 0,
+  meal = 0,
+  positionAllowance = 0,
+}: {
+  insuranceSalary?: number | null;
+  calculatedBase: number;
+  housing?: number;
+  meal?: number;
+  positionAllowance?: number;
+}): number {
+  if (insuranceSalary && insuranceSalary > 0) {
+    return insuranceSalary;
+  }
+  return calculatedBase + housing + meal + positionAllowance;
+}
+
 	export function getHealthInsuranceSMR(income: number): number {
 	  const brackets = [
 	    { max: 63000, smr: 58000 },
@@ -179,6 +224,7 @@
   insuranceSalary,
   companyRate,
   positionAllowance,
+  rateSettings,
 }: {
   baseSalary: number;
   salaryType: string;
@@ -198,6 +244,7 @@
   insuranceSalary?: number | null;
   companyRate?: number | null;
   positionAllowance?: number;
+  rateSettings?: PayrollRateSettings;
 }) {
 	  // Override salary from SalaryAdjustment if prisma + employeeId provided
 	  if (prisma && employeeId) {
@@ -253,34 +300,43 @@
 	  const bonus = customBonus !== undefined && customBonus !== null ? customBonus : 0;
 	  const totalGross = calculatedBase + overtimePay + allowances + bonus;
 
+	  const rates: PayrollRateSettings = rateSettings ?? getDefaultRateSettings();
+	  // Legacy fallback: company.healthInsuranceRate từ Company model
+	  if (!rateSettings && companyRate && companyRate > 0) {
+	    rates.healthInsuranceRate = companyRate;
+	  }
+
 	  // --- LUẬT BẢO HIỂM XÃ HỘI VÀ THUẾ CHUẨN NHẬT BẢN ---
 
-	  // 1. Tính toán Standard Monthly Remuneration (SMR)
-	  // Lương tiêu chuẩn dùng để đóng bảo hiểm y tế và hưu trí
-	  const smrIncome = (insuranceSalary && insuranceSalary > 0)
-	    ? insuranceSalary
-	    : (calculatedBase + overtimePay + allowances);
+	  // 1. SMR: không gồm transportation và overtime
+	  const smrIncome = getSmrIncome({
+	    insuranceSalary,
+	    calculatedBase,
+	    housing: b.housing,
+	    meal: b.meal,
+	    positionAllowance: positionAllowance || 0,
+	  });
 	  const healthSMR = getHealthInsuranceSMR(smrIncome);
 	  const pensionSMR = getPensionSMR(smrIncome);
 
-	  // 2. Health Insurance (健康保険): Tỷ lệ bảo hiểm y tế cấu hình từ công ty (mặc định Tokyo là 9.98%)
-	  const healthInsuranceRate = (companyRate && companyRate > 0) ? (companyRate / 100) : 0.0998;
+	  // 2. Health Insurance (健康保険)
+	  const healthInsuranceRate = rates.healthInsuranceRate / 100;
 	  const totalHealthPremium = b.healthInsurance ? (healthSMR * healthInsuranceRate) : 0;
 	  const healthInsurance = apply50SenRounding(totalHealthPremium);
 
-	  // 3. Nursing Care Insurance (介護保険): Chỉ áp dụng từ 40-64 tuổi. Tỷ lệ trung bình khoảng 1.6% (chia đôi -> nhân viên gánh 0.8%)
+	  // 3. Nursing Care Insurance (介護保険): 40-64 tuổi
 	  const hasNursingCare = isNursingCareApplicable(birthDate, month);
-	  const nursingCareRate = 0.016;
+	  const nursingCareRate = rates.nursingCareRate / 100;
 	  const totalNursingPremium = (b.healthInsurance && hasNursingCare) ? (healthSMR * nursingCareRate) : 0;
 	  const nursingCarePremium = apply50SenRounding(totalNursingPremium);
 
-	  // 4. Welfare Pension (厚生年金): Tỷ lệ cố định 18.3% (chia đôi -> nhân viên gánh 9.15%)
-	  const pensionRate = 0.183;
+	  // 4. Welfare Pension (厚生年金)
+	  const pensionRate = rates.pensionRate / 100;
 	  const totalPensionPremium = b.pension ? (pensionSMR * pensionRate) : 0;
 	  const pension = apply50SenRounding(totalPensionPremium);
 
-	  // 5. Employment Insurance (雇用保険): Tính trên tổng thu nhập thực tế phát sinh (Gross). Tỷ lệ đóng cho nhân viên ngành phổ thông là 0.6%
-	  const employmentInsuranceRate = 0.006;
+	  // 5. Employment Insurance (雇用保険): trên totalGross
+	  const employmentInsuranceRate = rates.employmentInsuranceEmployeeRate / 100;
 	  const employmentInsurance = b.employmentInsurance ? Math.round(totalGross * employmentInsuranceRate) : 0;
 
 	  const workersComp = 0; // Công ty đóng 100%, nhân viên đóng 0%
@@ -307,7 +363,8 @@
 	    }
 	  }
 
-	  const incomeTax = estimateIncomeTaxGetsugakuhyo(taxableIncome, finalDependentsCount);
+	  const taxTable = rates.incomeTaxTable ?? getR8IncomeTaxTable();
+	  const incomeTax = lookupMonthlyIncomeTax(taxableIncome, finalDependentsCount, taxTable);
 
 	  // 7. Resident Tax (住民税): Thu hộ (特別徴収) nếu được bật, ngược lại bằng 0
 	  const residentTax = b.residentTax ? b.residentTaxAmount : 0;
@@ -323,6 +380,8 @@
 	    totalGross,
 	    employmentInsuranceEnabled: !!b.employmentInsurance,
 	    workersCompEnabled: !!b.workersComp,
+	    employmentInsuranceCompanyRate: rates.employmentInsuranceCompanyRate,
+	    workersCompRate: rates.workersCompRate,
 	  });
 
 	  const nursingCareInsurance = nursingCarePremium;
@@ -394,6 +453,55 @@
 	  };
 	}
 
+	export async function batchGetEffectiveSalaries(
+	  month: string,
+	  prisma: any,
+	  employeeId?: string
+	): Promise<Record<string, { baseSalary: number; hourlyRate: number; dailyRate: number }>> {
+	  const employees = await prisma.employee.findMany({
+	    where: {
+	      status: { in: ['ACTIVE', 'ON_LEAVE'] },
+	      ...(employeeId ? { id: employeeId } : {}),
+	    },
+	    select: {
+	      id: true,
+	      salary: true,
+	      hourlyRate: true,
+	      dailyRate: true,
+	    },
+	  });
+
+	  const adjustments = await prisma.salaryAdjustment.findMany({
+	    where: { effectiveFrom: { lte: month } },
+	    orderBy: { effectiveFrom: 'desc' },
+	  });
+
+	  const latestAdjustmentByEmployee = new Map<string, (typeof adjustments)[0]>();
+	  for (const adjustment of adjustments) {
+	    if (!latestAdjustmentByEmployee.has(adjustment.employeeId)) {
+	      latestAdjustmentByEmployee.set(adjustment.employeeId, adjustment);
+	    }
+	  }
+
+	  const result: Record<string, { baseSalary: number; hourlyRate: number; dailyRate: number }> = {};
+	  for (const employee of employees) {
+	    const adjustment = latestAdjustmentByEmployee.get(employee.id);
+	    result[employee.id] = adjustment
+	      ? {
+	          baseSalary: adjustment.newBaseSalary,
+	          hourlyRate: adjustment.newHourlyRate,
+	          dailyRate: adjustment.newDailyRate,
+	        }
+	      : {
+	          baseSalary: employee.salary ?? 0,
+	          hourlyRate: employee.hourlyRate ?? 0,
+	          dailyRate: employee.dailyRate ?? 0,
+	        };
+	  }
+
+	  return result;
+	}
+
 	export function calculateCompanyContributions({
   healthInsurance,
   nursingCarePremium,
@@ -401,6 +509,8 @@
   totalGross,
   employmentInsuranceEnabled,
   workersCompEnabled,
+  employmentInsuranceCompanyRate = 0.9,
+  workersCompRate = 0.3,
 }: {
   healthInsurance: number;
   nursingCarePremium: number;
@@ -408,6 +518,8 @@
   totalGross: number;
   employmentInsuranceEnabled: boolean;
   workersCompEnabled: boolean;
+  employmentInsuranceCompanyRate?: number;
+  workersCompRate?: number;
 }): {
   healthInsuranceCompany: number;
   pensionCompany: number;
@@ -417,8 +529,12 @@
 } {
   const healthInsuranceCompany = healthInsurance + nursingCarePremium;
   const pensionCompany = pension;
-  const employmentInsuranceCompany = employmentInsuranceEnabled ? Math.round(totalGross * 0.0095) : 0;
-  const workersCompCompany = workersCompEnabled ? Math.round(totalGross * 0.003) : 0;
+  const employmentInsuranceCompany = employmentInsuranceEnabled
+    ? Math.round(totalGross * (employmentInsuranceCompanyRate / 100))
+    : 0;
+  const workersCompCompany = workersCompEnabled
+    ? Math.round(totalGross * (workersCompRate / 100))
+    : 0;
 
   const totalCompanyCost =
     healthInsuranceCompany + pensionCompany + employmentInsuranceCompany + workersCompCompany;

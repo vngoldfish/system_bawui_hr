@@ -3,10 +3,15 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Card from '@/components/common/Card';
-import { formatDate, cn } from '@/lib/utils';
+import ExportButtons from '@/components/common/ExportButtons';
+import { formatDate, formatCurrency, cn } from '@/lib/utils';
 import Portal from '@/components/common/Portal';
 import { useI18n } from '@/lib/i18n';
 import { getAttendanceText, weekDayLabelsMap, dayNamesMap } from '@/lib/translations/attendance';
+import { getPayrollMonthForAttendanceDate } from '@/lib/payroll-helpers';
+import { resolveEmployeeWorkLimits, sumWeeklyWorkedHours } from '@/lib/work-limit';
+import { estimateGrossFromAttendance } from '@/lib/attendance-estimate';
+import { countContractWorkDaysInMonth } from '@/lib/payroll-helpers';
 
 interface EmployeeContract {
   id: string;
@@ -34,13 +39,22 @@ interface Employee {
   firstNameKana?: string | null;
   lastNameKana?: string | null;
   department?: { name: string } | null;
-  position?: { name: string } | null;
+  position?: { name: string; allowance?: number | null } | null;
   hireDate: string;
   contractTypeId?: string;
   contractType?: { name: string } | null;
   contractStartDate?: string | null;
   contractEndDate?: string | null;
   employeeContracts?: EmployeeContract[];
+  workLimitVisa28h?: boolean;
+  workLimitIncomeCap80k?: boolean;
+  workLimitWeeklyHours?: number | null;
+  workLimitMonthlyIncome?: number | null;
+  salaryType?: string | null;
+  salary?: number | null;
+  hourlyRate?: number | null;
+  dailyRate?: number | null;
+  benefits?: { transportation?: number; housing?: number; meal?: number };
 }
 
 interface Holiday {
@@ -129,12 +143,30 @@ function isContractWorkDay(contract: EmployeeContract | null, dateStr: string): 
 }
 
 function calculateContractAwareOvertime(
-  record: AttendanceRecord | undefined,
+  record: {
+    checkIn: string | Date | null;
+    checkOut: string | Date | null;
+    breakStart?: string | Date | null;
+    breakEnd?: string | Date | null;
+    date: string | Date;
+  } | AttendanceRecord | null | undefined,
   contract: EmployeeContract | null,
   holiday: Holiday | null,
   policy: string
 ): number {
-  return sharedCalculateContractAwareOvertime(record, contract, holiday, policy);
+  if (!record) return 0;
+  return sharedCalculateContractAwareOvertime(
+    {
+      checkIn: record.checkIn,
+      checkOut: record.checkOut,
+      breakStart: record.breakStart ?? null,
+      breakEnd: record.breakEnd ?? null,
+      date: record.date,
+    },
+    contract,
+    holiday,
+    policy
+  );
 }
 
 function getWorkDayLabel(contract: EmployeeContract | null, holiday: Holiday | null, dateStr: string, locale: string) {
@@ -172,6 +204,12 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           if (parsed.roundingPolicy) {
             setRoundingPolicy(parsed.roundingPolicy);
           }
+          if (parsed.attendanceAutoScheduleEnabled !== undefined) {
+            setAutoScheduleFeatureEnabled(parsed.attendanceAutoScheduleEnabled !== false);
+          }
+          if (parsed.attendanceGrossEstimateEnabled !== undefined) {
+            setGrossEstimateFeatureEnabled(parsed.attendanceGrossEstimateEnabled !== false);
+          }
         } catch (e) {
           console.error('Failed to load company rounding policy:', e);
         }
@@ -185,8 +223,10 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           const data = await res.json();
           if (data.roundingPolicy) {
             setRoundingPolicy(data.roundingPolicy);
-            localStorage.setItem('company_info', JSON.stringify(data));
           }
+          setAutoScheduleFeatureEnabled(data.attendanceAutoScheduleEnabled !== false);
+          setGrossEstimateFeatureEnabled(data.attendanceGrossEstimateEnabled !== false);
+          localStorage.setItem('company_info', JSON.stringify(data));
         }
       } catch (e) {
         // ignore
@@ -205,6 +245,10 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [isPayrollLocked, setIsPayrollLocked] = useState(false);
+  const [lockedPayrollMonth, setLockedPayrollMonth] = useState<string | null>(null);
+  const [autoScheduling, setAutoScheduling] = useState(false);
+  const [autoScheduleFeatureEnabled, setAutoScheduleFeatureEnabled] = useState(true);
+  const [grossEstimateFeatureEnabled, setGrossEstimateFeatureEnabled] = useState(true);
 
   // Filters for Employee selector
   const [empSearch, setEmpSearch] = useState('');
@@ -303,16 +347,22 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     const checkPayrollLock = async () => {
       if (!selectedEmployee) return;
       try {
-        const monthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-        const res = await fetch(`/api/payroll?employeeId=${selectedEmployee.id}&month=${monthStr}`);
+        const payrollMonthStr = getPayrollMonthForAttendanceDate(new Date(selectedYear, selectedMonth - 1, 15));
+        const res = await fetch(`/api/payroll?employeeId=${selectedEmployee.id}&month=${payrollMonthStr}`);
         if (res.ok) {
           const data = await res.json();
-          const recordsList = data.data || data || [];
-          const isLocked = recordsList.some((r: any) => r.status === 'APPROVED' || r.status === 'PAID');
-          setIsPayrollLocked(isLocked);
+          const recordsList = Array.isArray(data) ? data : (data.data || []);
+          const lockedRecord = recordsList.find((r: { status: string }) => r.status === 'APPROVED' || r.status === 'PAID');
+          setIsPayrollLocked(!!lockedRecord);
+          setLockedPayrollMonth(lockedRecord ? payrollMonthStr : null);
+        } else {
+          setIsPayrollLocked(false);
+          setLockedPayrollMonth(null);
         }
       } catch (e) {
         console.error('Failed to check payroll status:', e);
+        setIsPayrollLocked(false);
+        setLockedPayrollMonth(null);
       }
     };
     checkPayrollLock();
@@ -444,6 +494,43 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
       contractRestWorkDays,
     };
   }, [monthRecords, roundingPolicy, selectedEmployee, holidays]);
+
+  const grossEstimate = useMemo(() => {
+    if (!selectedEmployee) return null;
+    const activeContract = selectedEmployee.employeeContracts?.find(c => c.isActive);
+    const contractDays = countContractWorkDaysInMonth(
+      activeContract?.workDays ?? [1, 2, 3, 4, 5],
+      selectedYear,
+      selectedMonth
+    );
+    return estimateGrossFromAttendance({
+      salaryType: selectedEmployee.salaryType || '時給',
+      salary: selectedEmployee.salary || 0,
+      hourlyRate: selectedEmployee.hourlyRate || 0,
+      dailyRate: selectedEmployee.dailyRate || 0,
+      records: monthRecords,
+      roundingPolicy,
+      contractWorkDaysInMonth: contractDays,
+      benefits: selectedEmployee.benefits,
+      positionAllowance: selectedEmployee.position?.allowance || 0,
+    });
+  }, [selectedEmployee, monthRecords, roundingPolicy, selectedYear, selectedMonth]);
+
+  const hasWorkLimits = !!(
+    selectedEmployee?.workLimitVisa28h || selectedEmployee?.workLimitIncomeCap80k
+  );
+
+  const weeklyWorkLimit = useMemo(() => {
+    if (!selectedEmployee?.workLimitVisa28h) return null;
+    const limits = resolveEmployeeWorkLimits(selectedEmployee);
+    if (limits.weeklyHours == null) return null;
+    const todayStr = dateOnly(new Date());
+    const contract = getActiveContractForDate(selectedEmployee, todayStr);
+    const fallbackHours = contract?.standardHoursPerDay ?? 8;
+    const empRecords = records.filter(r => r.employeeId === selectedEmployee.id);
+    const totalHours = sumWeeklyWorkedHours(empRecords, new Date(), { fallbackHoursPerDay: fallbackHours });
+    return { totalHours, limit: limits.weeklyHours, over: totalHours > limits.weeklyHours };
+  }, [selectedEmployee, records]);
 
   // Generate calendar days
   const daysInMonth = useMemo(() => {
@@ -707,9 +794,29 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
   }, [formDate, formCheckIn, formCheckOutTime, formCheckOutDate, formBreakStart, formBreakEnd, formHasBreak, formSplitShift, formNakanukeHours, roundingPolicy]);
 
   const calculatedOvertime = useMemo(() => {
-    const standardHours = 8;
-    return Math.max(0, Math.round((calculatedWorkHours - standardHours) * 10) / 10);
-  }, [calculatedWorkHours]);
+    if (!formDate) return 0;
+    const contract = getActiveContractForDate(selectedEmployee, formDate);
+    const holiday = getHolidayForDate(holidays, formDate);
+    const record = {
+      checkIn: formDate && formCheckIn ? `${formDate}T${formCheckIn}:00` : null,
+      checkOut: formCheckOutDate && formCheckOutTime ? `${formCheckOutDate}T${formCheckOutTime}:00` : null,
+      breakStart: formDate && formBreakStart && formHasBreak ? `${formDate}T${formBreakStart}:00` : null,
+      breakEnd: formDate && formBreakEnd && formHasBreak ? `${formDate}T${formBreakEnd}:00` : null,
+      date: formDate,
+    };
+    return calculateContractAwareOvertime(record, contract, holiday, roundingPolicy);
+  }, [
+    formDate,
+    formCheckIn,
+    formCheckOutTime,
+    formCheckOutDate,
+    formBreakStart,
+    formBreakEnd,
+    formHasBreak,
+    selectedEmployee,
+    holidays,
+    roundingPolicy,
+  ]);
 
   // Synchronize formOvertimeHours with calculatedOvertime unless overridden manually
   useEffect(() => {
@@ -753,18 +860,22 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     };
 
     try {
-      if (editingRecord) {
-        await fetch('/api/attendance', {
+      const saveRes = editingRecord
+        ? await fetch('/api/attendance', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...data, id: editingRecord.id }),
-        });
-      } else {
-        await fetch('/api/attendance', {
+        })
+        : await fetch('/api/attendance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         });
+
+      if (!saveRes.ok) {
+        const err = await saveRes.json().catch(() => ({}));
+        alert(err.error || err.message || getAttendanceText('punchSaveError', locale));
+        return;
       }
 
       // Fetch updated records
@@ -783,7 +894,92 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     }
   };
 
+  const handleAutoSchedule = async () => {
+    if (!selectedEmployee || isEmployeeMode || isPayrollLocked) return;
+    if (!hasWorkLimits) {
+      alert(getAttendanceText('autoScheduleNoLimits', locale));
+      return;
+    }
 
+    setAutoScheduling(true);
+    try {
+      const previewRes = await fetch(
+        `/api/attendance/auto-schedule?employeeId=${selectedEmployee.id}&year=${selectedYear}&month=${selectedMonth}`
+      );
+      const previewBody = await previewRes.json();
+      if (!previewRes.ok) {
+        throw new Error(previewBody.error || getAttendanceText('autoScheduleError', locale));
+      }
+
+      const preview = previewBody.days?.length
+        ? getAttendanceText('autoSchedulePreview', locale)
+            .replace('{days}', String(previewBody.days.length))
+            .replace('{hours}', String(previewBody.summary?.totalHours ?? 0))
+            .replace('{gross}', String(previewBody.summary?.estimatedGross ?? 0))
+        : '';
+
+      if (!window.confirm(
+        getAttendanceText('autoScheduleConfirm', locale).replace('{preview}', preview)
+      )) {
+        return;
+      }
+
+      const res = await fetch('/api/attendance/auto-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: selectedEmployee.id,
+          year: selectedYear,
+          month: selectedMonth,
+          replaceExisting: true,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || getAttendanceText('autoScheduleError', locale));
+      }
+
+      const created = body.created ?? 0;
+      const summary = body.summary;
+      alert(
+        getAttendanceText('autoScheduleSuccess', locale)
+          .replace('{days}', String(created))
+          .replace('{gross}', String(summary?.estimatedGross ?? 0))
+      );
+
+      const refreshRes = await fetch(`/api/attendance?employeeId=${selectedEmployee.id}`);
+      const updatedRecords = await refreshRes.json();
+      setRecords(prev => {
+        const others = prev.filter(r => r.employeeId !== selectedEmployee.id);
+        return [...others, ...updatedRecords];
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : getAttendanceText('autoScheduleError', locale);
+      alert(msg);
+    } finally {
+      setAutoScheduling(false);
+    }
+  };
+
+  const handleClearAttendance = async () => {
+    if (!editingRecord || !selectedEmployee) return;
+    if (!window.confirm(getAttendanceText('modalClearConfirm', locale))) return;
+
+    try {
+      const res = await fetch(`/api/attendance?id=${editingRecord.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || err.message || getAttendanceText('modalClearError', locale));
+        return;
+      }
+
+      setRecords(prev => prev.filter(r => r.id !== editingRecord.id));
+      closeModal();
+    } catch (error) {
+      console.error('Failed to clear attendance:', error);
+      alert(getAttendanceText('modalClearError', locale));
+    }
+  };
 
   const getDayColor = (record: AttendanceRecord | undefined, holiday: Holiday | null, contractWorkDay: boolean, dateStr: string) => {
     const dObj = new Date(`${dateStr}T00:00:00`);
@@ -999,15 +1195,56 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
             { label: t('attendance.holidayWork'), value: `${monthlySummary.holidayWorkDays}${t('common.dayUnit')}`, color: monthlySummary.holidayWorkDays > 0 ? 'text-rose-650 font-black' : 'text-slate-750' },
             { label: t('attendance.contractRestWork'), value: `${monthlySummary.contractRestWorkDays}${t('common.dayUnit')}`, color: monthlySummary.contractRestWorkDays > 0 ? 'text-violet-650 font-black' : 'text-slate-750' },
             { label: t('attendance.lateDays'), value: `${monthlySummary.lateDays}${t('common.timesUnit')}`, color: monthlySummary.lateDays > 0 ? 'text-rose-650' : 'text-slate-750' },
-            { label: t('attendance.leaveDays'), value: `${monthlySummary.holidays}${t('common.dayUnit')}`, color: 'text-sky-650' }
+            { label: t('attendance.leaveDays'), value: `${monthlySummary.holidays}${t('common.dayUnit')}`, color: 'text-sky-650' },
+            ...(grossEstimateFeatureEnabled && grossEstimate ? [
+              {
+                label: getAttendanceText('estimatedWorkHours', locale),
+                value: `${grossEstimate.workHours}h`,
+                color: 'text-indigo-700 font-black',
+                title: getAttendanceText('estimatedGrossHint', locale),
+              },
+              {
+                label: getAttendanceText('estimatedGross', locale),
+                value: formatCurrency(grossEstimate.totalGross),
+                color: grossEstimate.totalGross > (selectedEmployee.workLimitMonthlyIncome ?? Infinity) ? 'text-rose-600 font-black' : 'text-violet-700 font-black',
+                title: getAttendanceText('estimatedGrossHint', locale),
+              },
+            ] : []),
           ].map((stat, i) => (
-            <div key={i} className="text-center px-4 py-1.5 border-r border-slate-200 dark:border-slate-800/80 last:border-0">
+            <div key={i} className="text-center px-4 py-1.5 border-r border-slate-200 dark:border-slate-800/80 last:border-0" title={'title' in stat ? stat.title : undefined}>
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{stat.label}</p>
               <p className={`text-sm font-black mt-0.5 ${stat.color}`}>{stat.value}</p>
             </div>
           ))}
         </div>
       </div>
+
+      {(weeklyWorkLimit || (grossEstimateFeatureEnabled && grossEstimate)) && (
+        <div className="space-y-3">
+          {weeklyWorkLimit && (
+            <div className={`p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-3 ${weeklyWorkLimit.over ? 'bg-rose-50 border-rose-200 text-rose-800' : weeklyWorkLimit.totalHours >= weeklyWorkLimit.limit * 0.85 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
+              <div className="flex items-center gap-2 text-sm font-bold">
+                <span>{t('client.workLimitWeekUsage')}:</span>
+                <span className="font-black text-base">{weeklyWorkLimit.totalHours}h / {weeklyWorkLimit.limit}h</span>
+              </div>
+              <p className="text-xs font-semibold opacity-90">
+                {t('client.workLimitVisa28hOn').replace('{hours}', String(weeklyWorkLimit.limit))}
+                {weeklyWorkLimit.over ? ' — Vượt giới hạn luật Nhật / 上限超過' : ''}
+              </p>
+            </div>
+          )}
+          {grossEstimateFeatureEnabled && grossEstimate && selectedEmployee.workLimitIncomeCap80k && selectedEmployee.workLimitMonthlyIncome != null && (
+            <div className={`p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-3 ${grossEstimate.totalGross > selectedEmployee.workLimitMonthlyIncome ? 'bg-rose-50 border-rose-200 text-rose-800' : grossEstimate.totalGross >= selectedEmployee.workLimitMonthlyIncome * 0.85 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-violet-50 border-violet-200 text-violet-800'}`}>
+              <p className="text-sm font-bold">
+                {getAttendanceText('incomeCapProgress', locale)
+                  .replace('{current}', formatCurrency(grossEstimate.totalGross))
+                  .replace('{limit}', formatCurrency(selectedEmployee.workLimitMonthlyIncome))}
+              </p>
+              <p className="text-xs font-semibold opacity-90">{getAttendanceText('estimatedGrossHint', locale)}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1053,29 +1290,87 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                 </div>
               </div>
 
-              {/* Monthly Shift Pattern Settings Button */}
-              {!isEmployeeMode && (
-                <button
-                  onClick={() => {
-                    if (isPayrollLocked) {
-                      alert('この月の給与計算は確定済みのため、シフトパターンの変更はできません。');
-                      return;
-                    }
-                    setShowSettingsDrawer(!showSettingsDrawer);
-                  }}
-                  disabled={isPayrollLocked}
-                  className={`px-3.5 py-2 border rounded-xl text-xs font-bold outline-none transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                    isPayrollLocked
-                      ? 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-350 dark:text-slate-600 cursor-not-allowed'
-                      : showSettingsDrawer 
-                        ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900 text-blue-650 dark:text-blue-400' 
-                        : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-750'
-                  }`}
-                >
-                  {getAttendanceText('patternSettings', locale)}
-                </button>
-              )}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {!isEmployeeMode && autoScheduleFeatureEnabled && hasWorkLimits && (
+                  <button
+                    type="button"
+                    onClick={handleAutoSchedule}
+                    disabled={isPayrollLocked || autoScheduling}
+                    className={`px-3.5 py-2 border rounded-xl text-xs font-bold outline-none transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isPayrollLocked || autoScheduling
+                        ? 'border-slate-100 bg-slate-50 text-slate-350 cursor-not-allowed'
+                        : 'border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100'
+                    }`}
+                  >
+                    {autoScheduling ? '...' : getAttendanceText('autoScheduleBtn', locale)}
+                  </button>
+                )}
+                {!isEmployeeMode && (
+                  <button
+                    onClick={() => {
+                      if (isPayrollLocked) {
+                        alert('この月の給与計算は確定済みのため、シフトパターンの変更はできません。');
+                        return;
+                      }
+                      setShowSettingsDrawer(!showSettingsDrawer);
+                    }}
+                    disabled={isPayrollLocked}
+                    className={`px-3.5 py-2 border rounded-xl text-xs font-bold outline-none transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isPayrollLocked
+                        ? 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-350 dark:text-slate-600 cursor-not-allowed'
+                        : showSettingsDrawer 
+                          ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900 text-blue-650 dark:text-blue-400' 
+                          : 'border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-750'
+                    }`}
+                  >
+                    {getAttendanceText('patternSettings', locale)}
+                  </button>
+                )}
+              </div>
               
+              <ExportButtons
+                data={monthRecords.map(rec => {
+                  const empName = rec.employee
+                    ? `${rec.employee.lastName} ${rec.employee.firstName}`
+                    : selectedEmployee
+                      ? `${selectedEmployee.lastName} ${selectedEmployee.firstName}`
+                      : '';
+                  const recordDate = dateOnly(rec.date);
+                  const contract = getActiveContractForDate(selectedEmployee, recordDate);
+                  const holiday = getHolidayForDate(holidays, recordDate);
+                  const workHours = calculateRecordWorkHours(rec.checkIn, rec.checkOut, rec.breakStart, rec.breakEnd, roundingPolicy);
+                  const overtimeHours = calculateContractAwareOvertime(rec, contract, holiday, roundingPolicy);
+                  const formatTime = (value: string | null) => {
+                    if (!value) return '';
+                    const d = new Date(value);
+                    if (isNaN(d.getTime())) return '';
+                    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                  };
+
+                  return {
+                    employeeName: empName,
+                    date: recordDate,
+                    checkIn: formatTime(rec.checkIn),
+                    checkOut: formatTime(rec.checkOut),
+                    status: getStatusLabel(rec.status),
+                    workHours: Math.round(workHours * 10) / 10,
+                    overtimeHours: Math.round(overtimeHours * 10) / 10,
+                    notes: rec.notes || '',
+                  };
+                })}
+                columns={[
+                  { header: t('common.employee'), key: 'employeeName' },
+                  { header: getAttendanceText('modalDate', locale), key: 'date' },
+                  { header: getAttendanceText('modalClockIn', locale), key: 'checkIn' },
+                  { header: getAttendanceText('modalClockOutTime', locale), key: 'checkOut' },
+                  { header: t('common.status'), key: 'status' },
+                  { header: t('attendance.workHours'), key: 'workHours' },
+                  { header: t('attendance.otHours'), key: 'overtimeHours' },
+                  { header: getAttendanceText('modalNotes', locale), key: 'notes' },
+                ]}
+                fileName={`attendance_${selectedYear}-${String(selectedMonth).padStart(2, '0')}`}
+              />
+
               {/* View Toggle */}
               <div className="flex bg-slate-100 dark:bg-slate-850 rounded-xl p-0.5 border border-slate-200 dark:border-slate-800 shadow-inner">
                  <button 
@@ -1202,7 +1497,10 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
             {isPayrollLocked && (
               <div className="mb-4 p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/60 rounded-xl text-red-650 dark:text-red-400 text-xs font-bold flex items-center gap-2 shadow-sm animate-pulse">
                 <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                <span>この月の給与計算は確定済みのため、勤怠データの編集および ca Cài đặt はロックされています。 (Bảng lương tháng này đã chốt, dữ liệu chấm công bị khóa.)</span>
+                <span>
+                  給与 {lockedPayrollMonth ?? '—'} が承認/支払済みのため、この勤怠月（{selectedYear}-{String(selectedMonth).padStart(2, '0')}）は編集できません。給与画面で「未確定」に戻してから修正してください。
+                  {' '}(Bảng lương {lockedPayrollMonth ?? ''} đã chốt — hủy chốt trước khi sửa chấm công.)
+                </span>
               </div>
             )}
 
@@ -1739,15 +2037,26 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
                 />
               </div>
 
-              <div className="flex gap-2.5 border-t border-slate-100 pt-4 mt-6">
-                {isEmployeeMode ? (
-                  <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-sm cursor-pointer text-center">{getAttendanceText('modalClose', locale)}</button>
-                ) : (
-                  <>
-                    <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer">{getAttendanceText('modalCancel', locale)}</button>
-                    <button type="submit" className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-sm cursor-pointer">{getAttendanceText('modalSave', locale)}</button>
-                  </>
+              <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-4 mt-6">
+                {!isEmployeeMode && editingRecord && !isPayrollLocked && (
+                  <button
+                    type="button"
+                    onClick={handleClearAttendance}
+                    className="w-full px-4 py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    {getAttendanceText('modalClearPunch', locale)}
+                  </button>
                 )}
+                <div className="flex gap-2.5">
+                  {isEmployeeMode ? (
+                    <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-sm cursor-pointer text-center">{getAttendanceText('modalClose', locale)}</button>
+                  ) : (
+                    <>
+                      <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer">{getAttendanceText('modalCancel', locale)}</button>
+                      <button type="submit" disabled={isPayrollLocked} className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black shadow-sm cursor-pointer">{getAttendanceText('modalSave', locale)}</button>
+                    </>
+                  )}
+                </div>
               </div>
             </form>
           </div>

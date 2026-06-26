@@ -75,6 +75,10 @@ export const createEmployeeSchema = z.object({
   residenceExpiry: dateSchema,
   workRestriction: z.string().optional().nullable(),
   residenceCardImage: z.string().optional().nullable(),
+  workLimitVisa28h: z.boolean().optional().default(false),
+  workLimitIncomeCap80k: z.boolean().optional().default(false),
+  workLimitWeeklyHours: z.number().min(0).max(168).optional().nullable(),
+  workLimitMonthlyIncome: z.number().min(0).optional().nullable(),
   contractTypeId: z.string().min(1, '雇用形態 is required'),
   contractStartDate: dateSchema,
   contractEndDate: dateSchema,
@@ -113,3 +117,32 @@ export const employeeQuerySchema = z.object({
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
 export type EmployeeQueryInput = z.infer<typeof employeeQuerySchema>;
+
+/** Strip relation metadata before Prisma nested create (id/employeeId cause validation errors). */
+export function mapDependentForCreate(d: z.infer<typeof dependentSchema>) {
+  return {
+    name: d.name,
+    relationship: d.relationship,
+    birthDate: d.birthDate ? new Date(d.birthDate) : null,
+    gender: d.gender ?? null,
+    cohabitation: d.cohabitation ?? '同居',
+  };
+}
+
+export function mapEducationForCreate(e: z.infer<typeof educationSchema>) {
+  return {
+    school: e.school,
+    degree: e.degree ?? null,
+    major: e.major ?? null,
+    graduationYear: e.graduationYear ?? null,
+  };
+}
+
+export function mapCertificationForCreate(c: z.infer<typeof certificationSchema>) {
+  return {
+    name: c.name,
+    issuer: c.issuer ?? null,
+    acquiredDate: c.acquiredDate ? new Date(c.acquiredDate) : null,
+    expiryDate: c.expiryDate ? new Date(c.expiryDate) : null,
+  };
+}

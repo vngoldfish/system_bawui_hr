@@ -104,7 +104,9 @@ export const financeTranslations = {
             pdfDownloadBtn: 'PDFダウンロード',
             appliedSalary: '今月の適用給与',
             profileSalary: '現在の登録給与',
-            salaryMismatchAlert: '今月の基本給が現在の登録給与と異なります'
+            salaryMismatchAlert: '今月の基本給が現在の登録給与と異なります',
+            incomeCapAlert: '月収が被扶養者維持の上限を超えています',
+            incomeCapDetail: '総支給額 {gross} / 上限 {limit}'
         },
         salaryTable: {
             title: '給与テーブル管理',
@@ -404,7 +406,9 @@ export const financeTranslations = {
             pdfDownloadBtn: 'Download PDF',
             appliedSalary: 'Applied Base Salary',
             profileSalary: 'Profile Salary',
-            salaryMismatchAlert: 'This month\'s base salary differs from the current profile salary'
+            salaryMismatchAlert: 'This month\'s base salary differs from the current profile salary',
+            incomeCapAlert: 'Monthly gross exceeds dependent-status income cap',
+            incomeCapDetail: 'Gross {gross} / cap {limit}'
         },
         salaryTable: {
             title: 'Salary Table Settings',
@@ -704,7 +708,9 @@ export const financeTranslations = {
             pdfDownloadBtn: 'Tải PDF',
             appliedSalary: 'Lương áp dụng tháng này',
             profileSalary: 'Lương hồ sơ hiện tại',
-            salaryMismatchAlert: 'Mức lương cơ bản tháng này khác với hồ sơ hiện tại'
+            salaryMismatchAlert: 'Mức lương cơ bản tháng này khác với hồ sơ hiện tại',
+            incomeCapAlert: 'Tổng thu nhập tháng vượt trần giữ người phụ thuộc BH',
+            incomeCapDetail: 'Tổng gross {gross} / trần {limit}'
         },
         salaryTable: {
             title: 'Thiết lập bảng lương',
@@ -999,7 +1005,9 @@ export const financeTranslations = {
             pdfDownloadBtn: '下载 PDF',
             appliedSalary: '本月适用工资',
             profileSalary: '当前档案工资',
-            salaryMismatchAlert: '本月基本工资与当前档案工资不一致'
+            salaryMismatchAlert: '本月基本工资与当前档案工资不一致',
+            incomeCapAlert: '月总收入超过被扶养人维持上限',
+            incomeCapDetail: '总支付 {gross} / 上限 {limit}'
         },
         salaryTable: {
             title: '工资标准表设置',
@@ -1294,7 +1302,9 @@ export const financeTranslations = {
             pdfDownloadBtn: 'ดาวน์โหลด PDF',
             appliedSalary: 'เงินเดือนพื้นฐานที่ใช้เดือนนี้',
             profileSalary: 'เงินเดือนในประวัติพนักงาน',
-            salaryMismatchAlert: 'เงินเดือนพื้นฐานเดือนนี้ต่างจากเงินเดือนปัจจุบันในข้อมูลพนักงาน'
+            salaryMismatchAlert: 'เงินเดือนพื้นฐานเดือนนี้ต่างจากเงินเดือนปัจจุบันในข้อมูลพนักงาน',
+            incomeCapAlert: 'รายได้รวมรายเดือนเกินเพดานรักษาสถานะผู้อยู่ในอุปการะ',
+            incomeCapDetail: 'รวม {gross} / เพดาน {limit}'
         },
         salaryTable: {
             title: 'การจัดการตารางเงินเดือน',

@@ -146,6 +146,10 @@ export interface Employee {
   residenceExpiry: string | null;
   workRestriction: string | null;
   residenceCardImage: string | null;
+  workLimitVisa28h?: boolean;
+  workLimitIncomeCap80k?: boolean;
+  workLimitWeeklyHours?: number | null;
+  workLimitMonthlyIncome?: number | null;
   contractTypeId: string;
   contractType: ContractType;
   contractStartDate: string | null;
@@ -199,7 +203,7 @@ export interface PayrollRecord {
   insurance: number;
   netSalary: number;
   paymentDate: string;
-  status: 'PENDING' | 'PAID' | 'CANCELLED';
+  status: 'PENDING' | 'CALCULATED' | 'APPROVED' | 'PAID' | 'CANCELLED';
   createdAt: string;
   updatedAt: string;
 }

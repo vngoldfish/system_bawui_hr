@@ -73,7 +73,9 @@ export function proxy(request: NextRequest) {
     // 4. Enforce route guarding maps
     const guards: Record<string, string> = {
       '/roles': 'settings:view',
+      '/settings': 'settings:view',
       '/company': 'settings:view',
+      '/api/settings': 'settings:view',
       '/audit-logs': 'audit_logs:view',
       '/salary-table': 'payroll:view',
       '/payment-methods': 'payroll:view',
@@ -103,6 +105,7 @@ export function proxy(request: NextRequest) {
       '/api/employees': 'employees:view',
       '/api/upload': 'employees:view',
       '/api/payroll': 'payroll:view',
+      '/api/payroll-rates': 'payroll:view',
       '/api/overtime': 'attendance:view',
     };
 

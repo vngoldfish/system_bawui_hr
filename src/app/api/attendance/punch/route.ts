@@ -5,6 +5,7 @@ import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
 import { isRateLimited } from '@/lib/rate-limiter';
 import { calculateContractAwareOvertime } from '@/lib/attendance-helpers';
+import { getPayrollMonthForAttendanceDate } from '@/lib/payroll-helpers';
 
 
 export async function GET(request: NextRequest) {
@@ -51,12 +52,12 @@ export async function POST(request: NextRequest) {
     const nowCheck = new Date();
     const jstStrCheck = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(nowCheck);
     const todayStartCheck = new Date(`${jstStrCheck}T00:00:00+09:00`);
-    const monthStrCheck = `${todayStartCheck.getFullYear()}-${String(todayStartCheck.getMonth() + 1).padStart(2, '0')}`;
+    const payrollMonthCheck = getPayrollMonthForAttendanceDate(todayStartCheck);
 
     const payrollRecord = await prisma.payrollRecord.findFirst({
       where: {
         employeeId,
-        month: monthStrCheck,
+        month: payrollMonthCheck,
         status: {
           in: ['APPROVED', 'PAID']
         }
@@ -236,6 +237,66 @@ export async function POST(request: NextRequest) {
     }
 
     return successResponse({ success: true, data: record });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+/** Reset today's punch — delete record so user can punch again. */
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = getSessionUser(request);
+    if (!user) {
+      return errorResponse('Unauthorized', 401);
+    }
+    const employeeId = user.id;
+
+    const now = new Date();
+    const jstStr = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(now);
+    const todayStart = new Date(`${jstStr}T00:00:00+09:00`);
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    const payrollMonth = getPayrollMonthForAttendanceDate(todayStart);
+    const payrollRecord = await prisma.payrollRecord.findFirst({
+      where: {
+        employeeId,
+        month: payrollMonth,
+        status: { in: ['APPROVED', 'PAID'] },
+      },
+    });
+    if (payrollRecord) {
+      return errorResponse(
+        'この月の給与計算がすでに確定されているため、打刻を取り消せません。 (Bảng lương tháng này đã chốt, không thể hủy chấm công.)',
+        400
+      );
+    }
+
+    const record = await prisma.attendanceRecord.findFirst({
+      where: {
+        employeeId,
+        date: { gte: todayStart, lt: todayEnd },
+      },
+    });
+
+    if (!record) {
+      return successResponse({ success: true, data: null });
+    }
+
+    await prisma.attendanceRecord.delete({ where: { id: record.id } });
+
+    logDatabaseChange({
+      request,
+      action: 'DELETE',
+      model: 'AttendanceRecord',
+      recordId: record.id,
+      details: {
+        employeeId: record.employeeId,
+        date: record.date,
+        reason: 'punch_reset',
+      },
+    });
+
+    return successResponse({ success: true, data: null });
   } catch (error) {
     return handleApiError(error);
   }

@@ -62,6 +62,8 @@ export async function GET(_request: NextRequest) {
           payday: '25',
           roundingPolicy: 'exact',
           healthInsuranceRate: 9.98,
+          attendanceAutoScheduleEnabled: true,
+          attendanceGrossEstimateEnabled: true,
         },
       });
     }

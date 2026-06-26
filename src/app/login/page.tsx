@@ -1,8 +1,10 @@
 import { prisma } from '@/lib/prisma';
 import LoginForm from '@/components/auth/LoginForm';
 import { Suspense } from 'react';
+import { connection } from 'next/server';
 
 async function LoginLoader() {
+  await connection();
   let companyName = '株式会社ロング';
   try {
     const company = await prisma.company.findFirst();

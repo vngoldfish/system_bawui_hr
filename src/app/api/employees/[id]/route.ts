@@ -1,6 +1,11 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { updateEmployeeSchema } from '@/lib/validations/employee';
+import {
+  mapCertificationForCreate,
+  mapDependentForCreate,
+  mapEducationForCreate,
+  updateEmployeeSchema,
+} from '@/lib/validations/employee';
 import { syncEmployeeSalaries } from '@/lib/payroll-calculator';
 import { successResponse, errorResponse, handleApiError } from '@/lib/api-utils';
 import { logDatabaseChange } from '@/lib/audit-logger';
@@ -129,6 +134,14 @@ export async function PUT(
     if (employeeData.residenceCardIssueDate !== undefined) updateData.residenceCardIssueDate = employeeData.residenceCardIssueDate ? new Date(employeeData.residenceCardIssueDate) : null;
     if (employeeData.residenceExpiry !== undefined) updateData.residenceExpiry = employeeData.residenceExpiry ? new Date(employeeData.residenceExpiry) : null;
     if (employeeData.workRestriction !== undefined) updateData.workRestriction = employeeData.workRestriction;
+    if (employeeData.workLimitVisa28h !== undefined) updateData.workLimitVisa28h = !!employeeData.workLimitVisa28h;
+    if (employeeData.workLimitIncomeCap80k !== undefined) updateData.workLimitIncomeCap80k = !!employeeData.workLimitIncomeCap80k;
+    if (employeeData.workLimitWeeklyHours !== undefined) {
+      updateData.workLimitWeeklyHours = employeeData.workLimitWeeklyHours != null ? Number(employeeData.workLimitWeeklyHours) : null;
+    }
+    if (employeeData.workLimitMonthlyIncome !== undefined) {
+      updateData.workLimitMonthlyIncome = employeeData.workLimitMonthlyIncome != null ? Number(employeeData.workLimitMonthlyIncome) : null;
+    }
     if (contractTypeId !== undefined) updateData.contractType = { connect: { id: contractTypeId } };
     if (employeeData.contractStartDate !== undefined) updateData.contractStartDate = employeeData.contractStartDate ? new Date(employeeData.contractStartDate) : null;
     if (employeeData.contractEndDate !== undefined) updateData.contractEndDate = employeeData.contractEndDate ? new Date(employeeData.contractEndDate) : null;
@@ -342,26 +355,19 @@ export async function PUT(
         ...(dependents !== undefined && {
           dependents: {
             deleteMany: {},
-            create: dependents.map(d => ({
-              ...d,
-              birthDate: d.birthDate ? new Date(d.birthDate) : null,
-            })),
+            create: dependents.map(mapDependentForCreate),
           },
         }),
         ...(education !== undefined && {
           education: {
             deleteMany: {},
-            create: education,
+            create: education.map(mapEducationForCreate),
           },
         }),
         ...(certifications !== undefined && {
           certifications: {
             deleteMany: {},
-            create: certifications.map(c => ({
-              ...c,
-              acquiredDate: c.acquiredDate ? new Date(c.acquiredDate) : null,
-              expiryDate: c.expiryDate ? new Date(c.expiryDate) : null,
-            })),
+            create: certifications.map(mapCertificationForCreate),
           },
         }),
       },

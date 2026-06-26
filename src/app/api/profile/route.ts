@@ -67,7 +67,7 @@ export async function PUT(request: NextRequest) {
     if (address !== undefined) updateData.address = typeof address === 'string' ? address.trim() : '';
     if (avatar !== undefined) updateData.avatar = typeof avatar === 'string' ? avatar.trim() : '';
     if (language !== undefined) {
-      if (typeof language === 'string' && ['ja', 'en', 'vi', 'zh'].includes(language)) {
+      if (typeof language === 'string' && ['ja', 'en', 'vi', 'zh', 'th'].includes(language)) {
         updateData.language = language;
       }
     }

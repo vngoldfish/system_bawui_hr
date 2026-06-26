@@ -3,17 +3,28 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import Card from '@/components/common/Card';
+import Portal from '@/components/common/Portal';
 import ExportButtons from '@/components/common/ExportButtons';
 import { formatCurrency } from '@/lib/utils';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { useI18n } from '@/lib/i18n';
-import { calculatePayrollDetails } from '@/lib/payroll-calculator';
+import { calculatePayrollDetails, type PayrollRateSettings } from '@/lib/payroll-calculator';
+import { aggregateAttendanceStats, countContractWorkDaysInMonth, getActiveContractForDate, getAttendanceMonthForPayroll, getWorkingMonthDateRange } from '@/lib/payroll-helpers';
+import { checkMonthlyIncomeCap, resolveEmployeeWorkLimits } from '@/lib/work-limit';
 
 interface Employee {
   id: string; employeeCode: string; firstName: string; lastName: string; firstNameKana: string; lastNameKana: string;
   department: string; position: string; positionAllowance?: number; salary: number; salaryType: string; hourlyRate: number; dailyRate: number;
-  contractType: string; benefits: {
+  contractType: string;
+  employeeContracts?: Array<{
+    workDays: number[] | unknown;
+    isActive: boolean;
+    startDate: string;
+    endDate?: string | null;
+    standardHoursPerDay?: number;
+  }>;
+  benefits: {
     healthInsurance: boolean; pension: boolean; employmentInsurance: boolean; workersComp: boolean;
     transportation: number; housing: number; meal: number;
     residentTax?: boolean;
@@ -28,6 +39,10 @@ interface Employee {
     gender: string | null;
     cohabitation: string;
   }>;
+  workLimitVisa28h?: boolean;
+  workLimitIncomeCap80k?: boolean;
+  workLimitWeeklyHours?: number | null;
+  workLimitMonthlyIncome?: number | null;
 }
 
 interface PayrollRecord {
@@ -88,6 +103,20 @@ const salaryTypeColor = (t: string) =>
   t === '日給' ? 'bg-green-100 text-green-700' :
   t === '時給' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700';
 
+/** Chỉ cảnh báo lệch lương cho nhân viên lương tháng (月給). 時給/日給 tính từ giờ/ngày × chấm công. */
+function shouldShowSalaryMismatch(record: { baseSalary: number }, employee: { salary: number; salaryType?: string }) {
+  if (employee.salaryType === '時給' || employee.salaryType === '日給') return false;
+  return record.baseSalary !== employee.salary;
+}
+
+function getIncomeCapWarning(
+  record: { totalGross: number },
+  employee: Pick<Employee, 'workLimitVisa28h' | 'workLimitIncomeCap80k' | 'workLimitWeeklyHours' | 'workLimitMonthlyIncome'>
+) {
+  const limits = resolveEmployeeWorkLimits(employee);
+  return checkMonthlyIncomeCap({ limits, currentMonthGross: record.totalGross });
+}
+
 function FilterDropdown({ options, selected, onSelect, onClose }: {
   options: { value: string; label: string }[]; selected: string[];
   onSelect: (values: string[]) => void; onClose: () => void;
@@ -116,6 +145,49 @@ function FilterDropdown({ options, selected, onSelect, onClose }: {
   );
 }
 
+const DEFAULT_PAYROLL_COLUMN_WIDTHS: Record<string, number> = {
+  name: 14,
+  salaryType: 7,
+  workDays: 6,
+  workHours: 6,
+  overtimeHours: 6,
+  baseSalary: 8,
+  overtimePay: 7,
+  allowances: 8,
+  bonus: 7,
+  deductions: 8,
+  netSalary: 9,
+  companyCost: 9,
+  status: 8,
+};
+
+const PAYROLL_ACTION_COL_WEIGHT = 12;
+
+const DEFAULT_PAYROLL_VISIBLE_COLUMNS: Record<string, boolean> = {
+  name: true,
+  salaryType: true,
+  workDays: true,
+  workHours: true,
+  overtimeHours: true,
+  baseSalary: true,
+  overtimePay: true,
+  allowances: true,
+  bonus: true,
+  deductions: true,
+  netSalary: true,
+  companyCost: true,
+  status: true,
+};
+
+function ColumnHeaderLabel({ label, align = 'left' }: { label: string; align?: 'left' | 'right' | 'center' }) {
+  const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
+  return (
+    <span className={`block truncate pr-3 uppercase ${alignClass}`} title={label}>
+      {label}
+    </span>
+  );
+}
+
 function FilterTh({ label, filterKey, options, activeFilter, columnFilters, onFilterChange, onActiveFilterChange, widthClass }: {
   label: string; filterKey: string; options: { value: string; label: string }[];
   activeFilter: string | null; columnFilters: Record<string, string[]>;
@@ -125,21 +197,64 @@ function FilterTh({ label, filterKey, options, activeFilter, columnFilters, onFi
   const hasFilter = (columnFilters[filterKey]?.length ?? 0) > 0;
   const isActive = activeFilter === filterKey;
   return (
-    <th className={`px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase cursor-pointer select-none relative whitespace-nowrap ${widthClass || ''}`}
-      onDoubleClick={() => onActiveFilterChange(isActive ? null : filterKey)} title="ダブルクリックでフィルター">
-      <div className="flex items-center gap-1">
-        <span>{label}</span>
-        {hasFilter && <svg className="w-3.5 h-3.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" /></svg>}
+    <div
+      className={`cursor-pointer select-none relative min-w-0 ${widthClass || ''}`}
+      onDoubleClick={() => onActiveFilterChange(isActive ? null : filterKey)}
+      title="ダブルクリックでフィルター"
+    >
+      <div className="flex items-center gap-1 min-w-0 pr-3">
+        <span className="truncate uppercase" title={label}>{label}</span>
+        {hasFilter && <svg className="w-3.5 h-3.5 text-blue-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" /></svg>}
       </div>
       {isActive && <FilterDropdown options={options} selected={columnFilters[filterKey] || []} onSelect={vals => onFilterChange(filterKey, vals)} onClose={() => onActiveFilterChange(null)} />}
-    </th>
+    </div>
   );
 }
 
-function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, onClose }: { 
+function normalizePayrollRecord(record: PayrollRecord): PayrollRecord {
+  const allowances = record.allowances ?? (record as PayrollRecord & { bonus?: number }).bonus ?? 0;
+  const baseSalary = record.baseSalary ?? 0;
+  const overtimePay = record.overtimePay ?? 0;
+  const deductions = record.deductions ?? 0;
+  const tax = record.tax ?? ((record.incomeTax ?? 0) + (record.residentTax ?? 0));
+  const insurance = record.insurance ?? (
+    (record.healthInsuranceEmployee ?? record.healthInsurance ?? 0)
+    + (record.nursingCareInsurance ?? 0)
+    + (record.pensionEmployee ?? record.pension ?? 0)
+    + (record.employmentInsuranceEmployee ?? record.employmentInsurance ?? 0)
+  );
+  const totalGross = record.totalGross ?? (baseSalary + overtimePay + allowances);
+  const totalDeductions = record.totalDeductions ?? (deductions + tax + insurance);
+  const workDays = record.workDays ?? 0;
+
+  return {
+    ...record,
+    allowances,
+    baseSalary,
+    overtimePay,
+    deductions,
+    tax,
+    insurance,
+    totalGross,
+    totalDeductions,
+    netSalary: record.netSalary ?? (totalGross - totalDeductions),
+    workDays,
+    workHours: record.workHours ?? workDays * 8,
+    overtimeHours: record.overtimeHours ?? 0,
+    absentDays: record.absentDays ?? 0,
+    healthInsurance: record.healthInsurance ?? ((record.healthInsuranceEmployee ?? 0) + (record.nursingCareInsurance ?? 0)),
+    pension: record.pension ?? (record.pensionEmployee ?? 0),
+    employmentInsurance: record.employmentInsurance ?? (record.employmentInsuranceEmployee ?? 0),
+    incomeTax: record.incomeTax ?? 0,
+    residentTax: record.residentTax ?? 0,
+  };
+}
+
+function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = false, onSave, onClose }: { 
   record: PayrollRecord; 
   employee: Employee; 
   companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null };
+  rateSettings?: PayrollRateSettings;
   isAdmin?: boolean;
   onSave?: (updated: PayrollRecord) => void;
   onClose: () => void 
@@ -154,7 +269,9 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
   const houseAllow = employee.benefits?.housing || 0;
   const mealAllow = employee.benefits?.meal || 0;
   const fixedAllowances = transAllow + houseAllow + mealAllow;
-  const displayBonus = Math.max(0, record.allowances - fixedAllowances);
+  const recordAllowances = record.allowances ?? (record as PayrollRecord & { bonus?: number }).bonus ?? 0;
+  const displayBonus = Math.max(0, recordAllowances - fixedAllowances);
+  const incomeCapCheck = getIncomeCapWarning(record, employee);
 
   // Company contributions display
   const companyHealthIns = record.healthInsuranceCompany || 0;
@@ -206,7 +323,8 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
     const houseAllow = employee.benefits?.housing || 0;
     const mealAllow = employee.benefits?.meal || 0;
     const fixedAllowances = transAllow + houseAllow + mealAllow;
-    const displayBonus = Math.max(0, record.allowances - fixedAllowances);
+    const syncedAllowances = record.allowances ?? (record as PayrollRecord & { bonus?: number }).bonus ?? 0;
+    const displayBonus = Math.max(0, syncedAllowances - fixedAllowances);
 
     setEditFields({
       baseSalary: record.baseSalary,
@@ -257,6 +375,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
       customAllowances: editFields.transportation + editFields.housing + editFields.meal + editFields.allowances,
       customBonus: editFields.bonus,
       companyRate: companyInfo?.healthInsuranceRate,
+      rateSettings,
       positionAllowance: employee.positionAllowance || 0,
     });
 
@@ -424,7 +543,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
     return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
   };
 
-  const displayAllowances = record.allowances - displayBonus;
+  const displayAllowances = recordAllowances - displayBonus;
 
   const currentBase = (isEditing ? editFields.baseSalary : record.baseSalary) || 0;
   const currentOTPay = (isEditing ? editFields.overtimePay : record.overtimePay) || 0;
@@ -451,7 +570,8 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
   const currentCompanyTotalCost = currentCompanyHealthIns + currentCompanyPension + currentCompanyEmpIns + currentCompanyWorkersComp;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 print:p-0 print:bg-white print:static" onClick={onClose}>
+    <Portal>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4 print:p-0 print:bg-white print:static" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible print:shadow-none print:rounded-none print:w-full print:p-0" onClick={e => e.stopPropagation()}>
         
         {/* Action Toolbar */}
@@ -552,7 +672,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
         </div>
 
         {/* Payslip Print Sheet */}
-        {record.baseSalary !== employee.salary && (
+        {shouldShowSalaryMismatch(record, employee) && (
           <div className="mx-8 mt-6 -mb-2 p-4 bg-amber-50 border border-amber-250 text-amber-800 rounded-xl flex items-start gap-2.5 text-xs font-semibold print:hidden shadow-sm">
             <svg className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -561,6 +681,21 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
               <p className="font-bold text-sm text-amber-900">{t('payroll.salaryMismatchAlert')}</p>
               <p className="text-xs text-amber-700 mt-1 font-medium">
                 {t('payroll.appliedSalary')}: <span className="font-bold text-slate-800">{formatCurrency(record.baseSalary)}</span> | {t('payroll.profileSalary')}: <span className="font-bold text-slate-800">{formatCurrency(employee.salary)}</span>
+              </p>
+            </div>
+          </div>
+        )}
+        {!incomeCapCheck.ok && (
+          <div className="mx-8 mt-4 -mb-2 p-4 bg-violet-50 border border-violet-200 text-violet-800 rounded-xl flex items-start gap-2.5 text-xs font-semibold print:hidden shadow-sm">
+            <svg className="w-4.5 h-4.5 text-violet-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <p className="font-bold text-sm text-violet-900">{t('payroll.incomeCapAlert')}</p>
+              <p className="text-xs text-violet-700 mt-1 font-medium">
+                {t('payroll.incomeCapDetail')
+                  .replace('{gross}', formatCurrency(incomeCapCheck.total))
+                  .replace('{limit}', formatCurrency(incomeCapCheck.limit))}
               </p>
             </div>
           </div>
@@ -705,7 +840,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                     <td className="border border-slate-300 p-2.5 text-slate-600 print:text-black print:border-black">
                       <div className="flex flex-col">
                         <span>{t('payroll.baseSalarySubject')}</span>
-                        {!isEditing && record.baseSalary !== employee.salary && (
+                        {!isEditing && shouldShowSalaryMismatch(record, employee) && (
                           <span className="text-[10px] text-amber-600 font-normal print:hidden">
                             ({t('payroll.profileSalary')}: {formatCurrency(employee.salary)})
                           </span>
@@ -723,7 +858,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                       ) : (
                         <div className="flex flex-col items-end">
                           <span>{formatCurrency(record.baseSalary)}</span>
-                          {record.baseSalary !== employee.salary && (
+                          {shouldShowSalaryMismatch(record, employee) && (
                             <span className="text-[10px] text-amber-650 font-bold block mt-0.5 print:hidden">
                               ⚠️
                             </span>
@@ -979,7 +1114,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                       className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
                     />
                   ) : (
-                    <span>¥{companyHealthIns.toLocaleString()}</span>
+                    <span>{formatCurrency(companyHealthIns)}</span>
                   )}
                 </div>
                 <div className="flex justify-between items-center">
@@ -992,7 +1127,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                       className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
                     />
                   ) : (
-                    <span>¥{companyPension.toLocaleString()}</span>
+                    <span>{formatCurrency(companyPension)}</span>
                   )}
                 </div>
                 <div className="flex justify-between items-center">
@@ -1005,7 +1140,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                       className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
                     />
                   ) : (
-                    <span>¥{companyEmpIns.toLocaleString()}</span>
+                    <span>{formatCurrency(companyEmpIns)}</span>
                   )}
                 </div>
                 <div className="flex justify-between items-center">
@@ -1018,12 +1153,12 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
                       className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
                     />
                   ) : (
-                    <span>¥{companyWorkersComp.toLocaleString()}</span>
+                    <span>{formatCurrency(companyWorkersComp)}</span>
                   )}
                 </div>
                 <div className="flex justify-between pt-2 border-t font-semibold text-blue-700">
                   <span>総額 会社負担</span>
-                  <span>¥{currentCompanyTotalCost.toLocaleString()}</span>
+                  <span>{formatCurrency(currentCompanyTotalCost)}</span>
                 </div>
               </div>
             </div>
@@ -1032,12 +1167,12 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
             <div className="mt-4 pt-4 border-t border-slate-200">
               <div className="text-sm font-semibold text-slate-700 mb-2">【従業員負担分】</div>
               <div className="space-y-1 text-sm">
-                <div className="flex justify-between"><span className="text-slate-600">健康保険 従業員負担</span><span>¥{empHealthIns.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">厚生年金 従業員負担</span><span>¥{empPension.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">雇用保険 従業員負担</span><span>¥{empEmpIns.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">介護保険</span><span>¥{nursingCare.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">住民税</span><span>¥{resTax.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">所得税</span><span>¥{incTax.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">健康保険 従業員負担</span><span>{formatCurrency(empHealthIns)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">厚生年金 従業員負担</span><span>{formatCurrency(empPension)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">雇用保険 従業員負担</span><span>{formatCurrency(empEmpIns)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">介護保険</span><span>{formatCurrency(nursingCare)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">住民税</span><span>{formatCurrency(resTax)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">所得税</span><span>{formatCurrency(incTax)}</span></div>
               </div>
             </div>
 
@@ -1108,6 +1243,7 @@ function PayslipModal({ record, employee, companyInfo, isAdmin = false, onSave, 
 
       </div>
     </div>
+    </Portal>
   );
 }
 
@@ -1137,6 +1273,14 @@ export default function PayrollClient({
     s === 'CALCULATED' ? t('payroll.statusCalculated') :
     s === 'PENDING' ? t('payroll.statusPending') : s;
   const [records, setRecords] = useState(initialRecords);
+  const [rateStatus, setRateStatus] = useState<{
+    isStale: boolean;
+    message?: string;
+    fiscalYear?: number;
+    lastVerifiedAt?: string | null;
+  } | null>(null);
+  const [rateSettings, setRateSettings] = useState<PayrollRateSettings | undefined>(undefined);
+  const [workingMonthAttendance, setWorkingMonthAttendance] = useState<Array<{ employeeId: string }>>([]);
   const [viewType, setViewType] = useState<'month' | 'employee'>('month');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(() => employees[0]?.id || '');
   const [empCodeInput, setEmpCodeInput] = useState(() => employees[0]?.employeeCode || '');
@@ -1147,11 +1291,57 @@ export default function PayrollClient({
     return `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   }, [selectedYear, selectedMonth]);
 
-  const workingMonthStr = useMemo(() => {
-    const [year, month] = targetMonthStr.split('-').map(Number);
-    const prevDate = new Date(year, month - 2, 1);
-    return `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-  }, [targetMonthStr]);
+  const workingMonthStr = useMemo(() => getAttendanceMonthForPayroll(targetMonthStr), [targetMonthStr]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch('/api/payroll-rates/status').then(r => (r.ok ? r.json() : null)),
+      fetch('/api/payroll-rates').then(r => (r.ok ? r.json() : null)),
+    ])
+      .then(([statusPayload, ratesPayload]) => {
+        if (cancelled) return;
+        const status = statusPayload?.data ?? statusPayload;
+        const rates = ratesPayload?.data ?? ratesPayload;
+        if (status) {
+          setRateStatus({
+            isStale: !!status.isStale,
+            message: status.message,
+            fiscalYear: status.fiscalYear,
+            lastVerifiedAt: status.lastVerifiedAt,
+          });
+        }
+        if (rates) {
+          setRateSettings({
+            healthInsuranceRate: rates.healthInsuranceRate,
+            nursingCareRate: rates.nursingCareRate,
+            pensionRate: rates.pensionRate,
+            employmentInsuranceEmployeeRate: rates.employmentInsuranceEmployee,
+            employmentInsuranceCompanyRate: rates.employmentInsuranceCompany,
+            workersCompRate: rates.workersCompRate,
+            incomeTaxTable: rates.incomeTaxTable ?? undefined,
+          });
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (isEmployeeMode) return;
+    let cancelled = false;
+    fetch(`/api/attendance?month=${workingMonthStr}`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(payload => {
+        if (cancelled || !payload) return;
+        const list = payload.data || payload || [];
+        setWorkingMonthAttendance(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setWorkingMonthAttendance([]);
+      });
+    return () => { cancelled = true; };
+  }, [workingMonthStr, isEmployeeMode]);
 
   const startMonth = useMemo(() => {
     return targetMonthStr;
@@ -1171,8 +1361,11 @@ export default function PayrollClient({
   const allPayrollColumns = [
     { key: 'name', label: t('payroll.colName') },
     { key: 'salaryType', label: t('payroll.contractSalaryType') },
+    { key: 'workDays', label: t('payroll.workDays') },
+    { key: 'workHours', label: t('payroll.actualHours') },
+    { key: 'overtimeHours', label: t('payroll.overtimeHours') },
     { key: 'baseSalary', label: t('payroll.baseSalarySubject') },
-    { key: 'overtimePay', label: t('payroll.overtimeHours') },
+    { key: 'overtimePay', label: t('payroll.overtimeSubject') },
     { key: 'allowances', label: t('payroll.colAllowance') },
     { key: 'bonus', label: '賞与' },
     { key: 'deductions', label: t('payroll.colDeduction') },
@@ -1181,19 +1374,17 @@ export default function PayrollClient({
     { key: 'status', label: t('payroll.colStatus') },
   ];
 
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('payroll_visible_columns');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
-      }
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(DEFAULT_PAYROLL_VISIBLE_COLUMNS);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('payroll_visible_columns');
+    if (!saved) return;
+    try {
+      setVisibleColumns((prev) => ({ ...prev, ...JSON.parse(saved) }));
+    } catch {
+      // ignore invalid saved state
     }
-    return {
-      name: true, salaryType: true, baseSalary: true, overtimePay: true,
-      allowances: true, bonus: true, deductions: true, netSalary: true,
-      companyCost: true, status: true,
-    };
-  });
+  }, []);
 
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev => {
@@ -1205,26 +1396,23 @@ export default function PayrollClient({
 
   const activeColumns = allPayrollColumns.filter(c => visibleColumns[c.key]);
 
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('payroll_column_widths');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(DEFAULT_PAYROLL_COLUMN_WIDTHS);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('payroll_column_widths');
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as Record<string, number>;
+      const hasLegacyPixels = Object.values(parsed).some((v) => typeof v === 'number' && v > 50);
+      if (hasLegacyPixels) {
+        localStorage.removeItem('payroll_column_widths');
+        return;
       }
+      setColumnWidths((prev) => ({ ...DEFAULT_PAYROLL_COLUMN_WIDTHS, ...parsed }));
+    } catch {
+      // ignore invalid saved state
     }
-    return {
-      name: 140,
-      salaryType: 90,
-      baseSalary: 100,
-      overtimePay: 90,
-      allowances: 95,
-      bonus: 90,
-      deductions: 95,
-      netSalary: 105,
-      companyCost: 95,
-      status: 85,
-    };
-  });
+  }, []);
 
   const [payrollLayoutView, setPayrollLayoutView] = useState<'table' | 'card'>('table');
   const [showColumnSettings, setShowColumnSettings] = useState(false);
@@ -1233,11 +1421,11 @@ export default function PayrollClient({
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
-    const startWidth = columnWidths[colKey] || 100;
+    const startWidth = columnWidths[colKey] || 8;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX;
-      const newWidth = Math.max(50, startWidth + deltaX);
+      const newWidth = Math.max(5, startWidth + deltaX / 20);
       setColumnWidths(prev => {
         const updated = { ...prev, [colKey]: newWidth };
         localStorage.setItem('payroll_column_widths', JSON.stringify(updated));
@@ -1254,11 +1442,21 @@ export default function PayrollClient({
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const totalTableWidth = activeColumns.reduce((sum, col) => sum + (columnWidths[col.key] || 100), 0) + 110;
+  const actionColWeight = !isEmployeeMode ? PAYROLL_ACTION_COL_WEIGHT : 6;
+  const columnWeightTotal = useMemo(
+    () => activeColumns.reduce((sum, col) => sum + (columnWidths[col.key] || 8), 0) + actionColWeight,
+    [activeColumns, columnWidths, actionColWeight]
+  );
+  const colWidthPercent = (key: string) => `${((columnWidths[key] || 8) / columnWeightTotal) * 100}%`;
+  const actionColPercent = `${(actionColWeight / columnWeightTotal) * 100}%`;
 
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
   const [selectedPayslip, setSelectedPayslip] = useState<PayrollRecord | null>(null);
+
+  const openPayslipDetail = (record: PayrollRecord) => {
+    setSelectedPayslip(normalizePayrollRecord(record));
+  };
   const [calculating, setCalculating] = useState(false);
   const [selectedAttendanceCheck, setSelectedAttendanceCheck] = useState<{ employeeId: string; month: string; employeeName: string } | null>(null);
 
@@ -1293,17 +1491,25 @@ export default function PayrollClient({
       if (status === 'PAID') {
         return r.status === 'APPROVED';
       }
+      if (status === 'CALCULATED') {
+        return r.status === 'APPROVED' || r.status === 'PAID';
+      }
       return false;
     });
 
     if (targets.length === 0) {
-      alert('対象となるデータがありません。');
+      alert(locale === 'vi' ? 'Không có bản ghi phù hợp.' : '対象となるデータがありません。');
       return;
     }
 
-    const confirmMsg = status === 'APPROVED' 
-      ? `選択された月内の ${targets.length} 件の給与明細を一括で「承認」しますか？`
-      : `選択された月内の ${targets.length} 件の給与明細を一括で「支払い済み」にしますか？`;
+    const confirmMsg =
+      status === 'APPROVED'
+        ? `選択された月内の ${targets.length} 件の給与明細を一括で「承認」しますか？`
+        : status === 'PAID'
+          ? `選択された月内の ${targets.length} 件の給与明細を一括で「支払い済み」にしますか？`
+          : locale === 'vi'
+            ? `Hủy chốt ${targets.length} bảng lương? Có thể sửa lại chấm công và tính lương.`
+            : `選択された月内の ${targets.length} 件を一括で「未確定」に戻しますか？勤怠・明細の修正が可能になります。`;
 
     if (!confirm(confirmMsg)) return;
 
@@ -1322,10 +1528,18 @@ export default function PayrollClient({
       setRecords(prev => prev.map(r => ids.includes(r.id) ? { 
         ...r, 
         status, 
-        paymentDate: status === 'PAID' ? today.toISOString() : r.paymentDate 
+        paymentDate: status === 'PAID' ? today.toISOString() : status === 'CALCULATED' ? undefined : r.paymentDate 
       } : r));
       
-      alert(status === 'APPROVED' ? '一括承認が完了しました。' : '一括支払処理が完了しました。');
+      alert(
+        status === 'APPROVED'
+          ? '一括承認が完了しました。'
+          : status === 'PAID'
+            ? '一括支払処理が完了しました。'
+            : locale === 'vi'
+              ? 'Đã hủy chốt hàng loạt. Có thể sửa chấm công và tính lại lương.'
+              : '一括未確定に戻しました。勤怠・明細の修正が可能です。'
+      );
     } catch (e: any) {
       alert('Error batch updating status: ' + e.message);
     }
@@ -1340,49 +1554,65 @@ export default function PayrollClient({
   const handleCalculate = async () => {
     setCalculating(true);
     try {
-      // Fetch actual attendance records for the selected workingMonthStr
-      const res = await fetch(`/api/attendance?month=${workingMonthStr}`);
-      if (!res.ok) {
+      const [attendanceRes, salaryRes] = await Promise.all([
+        fetch(`/api/attendance?month=${workingMonthStr}`),
+        fetch(`/api/salary-adjustments/effective?month=${endMonth}`),
+      ]);
+
+      if (!attendanceRes.ok) {
         throw new Error('Failed to fetch attendance data');
       }
-      const attendanceData = await res.json();
+      if (!salaryRes.ok) {
+        throw new Error('Failed to fetch effective salary data');
+      }
+
+      const attendanceData = await attendanceRes.json();
       const attendanceList = attendanceData.data || attendanceData || [];
+      const salaryData = await salaryRes.json();
+      const effectiveSalaries = salaryData.data || salaryData || {};
+
+      const [workingYear, workingMonth] = workingMonthStr.split('-').map(Number);
 
       const newRecordsData = employees
-        .filter(e => e.salary > 0 || e.hourlyRate > 0 || e.dailyRate > 0)
-        .map(emp => {
-          // Filter attendance for this specific employee
+        .filter(emp => {
           const empAttendance = Array.isArray(attendanceList)
-            ? attendanceList.filter((a: any) => a.employeeId === emp.id)
+            ? attendanceList.filter((a: { employeeId: string }) => a.employeeId === emp.id)
+            : [];
+          return empAttendance.length > 0;
+        })
+        .map(emp => {
+          const empAttendance = Array.isArray(attendanceList)
+            ? attendanceList.filter((a: { employeeId: string }) => a.employeeId === emp.id)
             : [];
 
-          // Compute actual work days (PRESENT or LATE)
-          const workDays = empAttendance.length > 0
-            ? empAttendance.filter((a: any) => a.status === 'PRESENT' || a.status === 'LATE').length
-            : 22; // default fallback if no attendance recorded
+          const attendanceStats = aggregateAttendanceStats(empAttendance);
+          const midMonthDate = `${workingYear}-${String(workingMonth).padStart(2, '0')}-15`;
+          const activeContract = getActiveContractForDate(emp.employeeContracts, midMonthDate);
+          const fallbackWorkDays = countContractWorkDaysInMonth(activeContract?.workDays, workingYear, workingMonth);
 
-          const absentDays = empAttendance.length > 0
-            ? empAttendance.filter((a: any) => a.status === 'ABSENT').length
-            : 0;
+          const workDays = attendanceStats.workDays > 0 ? attendanceStats.workDays : (attendanceStats.absentDays > 0 || attendanceStats.overtimeHours > 0 ? 0 : fallbackWorkDays);
+          const absentDays = attendanceStats.absentDays;
+          const overtimeHours = Math.round(attendanceStats.overtimeHours * 10) / 10;
 
-          // Compute actual overtime hours
-          const rawOvertimeHours = empAttendance.length > 0
-            ? empAttendance.reduce((sum: number, a: any) => sum + (a.overtimeHours || 0), 0)
-            : 0;
-          const overtimeHours = Math.round(rawOvertimeHours * 10) / 10;
-
-          const payrollDetails = calculatePayrollDetails({
+          const effective = effectiveSalaries[emp.id] || {
             baseSalary: emp.salary || 0,
-            salaryType: emp.salaryType || '月給',
-            workDays,
             hourlyRate: emp.hourlyRate || 0,
             dailyRate: emp.dailyRate || 0,
+          };
+
+          const payrollDetails = calculatePayrollDetails({
+            baseSalary: effective.baseSalary || 0,
+            salaryType: emp.salaryType || '月給',
+            workDays,
+            hourlyRate: effective.hourlyRate || 0,
+            dailyRate: effective.dailyRate || 0,
             overtimeHours,
             benefits: emp.benefits,
             birthDate: emp.birthDate,
             month: endMonth,
             dependents: emp.dependents,
             companyRate: companyInfo?.healthInsuranceRate,
+            rateSettings,
             positionAllowance: emp.positionAllowance || 0,
           });
 
@@ -1397,7 +1627,7 @@ export default function PayrollClient({
             insurance: payrollDetails.healthInsurance + payrollDetails.pension + payrollDetails.employmentInsurance,
             netSalary: payrollDetails.netSalary,
             paymentDate: `${endMonth}-25`,
-            status: 'APPROVED' as const, // Automatically approve calculations when calculated and saved
+            status: 'CALCULATED' as const,
             // Extra client-only fields to match state type:
             healthInsurance: payrollDetails.healthInsurance,
             pension: payrollDetails.pension,
@@ -1415,13 +1645,22 @@ export default function PayrollClient({
           };
         });
 
+      if (newRecordsData.length === 0) {
+        alert(
+          locale === 'vi'
+            ? `Không có nhân viên nào có chấm công tháng ${workingMonthStr}. Vui lòng nhập chấm công trước khi tính lương tháng ${endMonth}.`
+            : `${workingMonthStr}の勤怠データがありません。${endMonth}の給与を計算する前に勤怠を入力してください。`
+        );
+        return;
+      }
+
       // Batch save calculated records to database
       const saveRes = await fetch('/api/payroll', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newRecordsData),
+        body: JSON.stringify({ records: newRecordsData, syncMonth: endMonth }),
       });
 
       if (!saveRes.ok) {
@@ -1471,6 +1710,18 @@ export default function PayrollClient({
     return records.filter(r => r.month >= startMonth && r.month <= endMonth);
   }, [records, startMonth, endMonth, isEmployeeMode, viewType, selectedEmployeeId]);
 
+  const employeesMissingPayroll = useMemo(() => {
+    if (isEmployeeMode || viewType !== 'month') return [];
+    const attendedIds = new Set(workingMonthAttendance.map(a => a.employeeId));
+    const payrollIds = new Set(monthRecords.map(r => r.employeeId));
+    return employees.filter(emp => attendedIds.has(emp.id) && !payrollIds.has(emp.id));
+  }, [workingMonthAttendance, monthRecords, employees, isEmployeeMode, viewType]);
+
+  const batchRevertableCount = useMemo(() => {
+    if (isEmployeeMode || viewType !== 'month') return 0;
+    return monthRecords.filter(r => r.status === 'APPROVED' || r.status === 'PAID').length;
+  }, [monthRecords, isEmployeeMode, viewType]);
+
   const filtered = useMemo(() => {
     return monthRecords.filter(r => {
       const emp = employees.find(e => e.id === r.employeeId);
@@ -1509,7 +1760,24 @@ export default function PayrollClient({
   const activeFilterCount = Object.values(columnFilters).filter(v => v.length > 0).length;
 
   return (
-    <>
+    <div className="min-w-0 max-w-full space-y-6">
+      {rateStatus?.isStale && !isEmployeeMode && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-amber-900">⚠️ 税率設定の更新が必要です</p>
+            <p className="text-xs text-amber-800 mt-1">
+              {rateStatus.message || `現在の設定: ${rateStatus.fiscalYear}年度。給与規定表で最新税率を確認してください。`}
+            </p>
+          </div>
+          <a
+            href="/salary-table"
+            className="px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700"
+          >
+            給与規定表で確認
+          </a>
+        </div>
+      )}
+
       {/* View Type Selection & Filters */}
       {!isEmployeeMode && (
         <div className="space-y-4">
@@ -1565,14 +1833,29 @@ export default function PayrollClient({
                 </div>
               </div>
 
+              {viewType === 'month' && employeesMissingPayroll.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <p className="font-semibold">
+                    {locale === 'vi'
+                      ? `${employeesMissingPayroll.length} nhân viên đã điểm danh tháng ${workingMonthStr} nhưng chưa có bảng lương tháng ${endMonth}. Nhấn "${t('payroll.calculateBtn')}" để tạo.`
+                      : locale === 'ja'
+                      ? `${workingMonthStr}に勤怠がある${employeesMissingPayroll.length}名が${endMonth}の給与未計算です。「${t('payroll.calculateBtn')}」を実行してください。`
+                      : `${employeesMissingPayroll.length} employee(s) have attendance in ${workingMonthStr} but no payroll for ${endMonth}. Click "${t('payroll.calculateBtn')}".`}
+                  </p>
+                  <p className="mt-2 text-xs text-amber-800">
+                    {employeesMissingPayroll.map(emp => `${emp.lastName} ${emp.firstName} (${emp.employeeCode})`).join(' · ')}
+                  </p>
+                </div>
+              )}
+
               {viewType === 'month' && (
                 <div className="flex gap-2 flex-wrap items-center">
                   <button onClick={handleCalculate} disabled={calculating}
-                    className="px-4 py-2 bg-blue-650 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold disabled:opacity-50 cursor-pointer shadow-sm">
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold disabled:opacity-50 cursor-pointer shadow-sm">
                     {calculating ? t('payroll.calculating') : t('payroll.calculateBtn')}
                   </button>
                   <button onClick={() => handleBatchUpdateStatus('APPROVED')}
-                    className="px-4 py-2 bg-yellow-550 text-white rounded-lg hover:bg-yellow-600 transition-colors text-xs font-semibold cursor-pointer shadow-sm flex items-center gap-1">
+                    className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-xs font-semibold cursor-pointer shadow-sm flex items-center gap-1">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     全承認 (Approve All)
                   </button>
@@ -1581,6 +1864,16 @@ export default function PayrollClient({
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     全支払 (Pay All)
                   </button>
+                  {batchRevertableCount > 0 && (
+                    <button
+                      onClick={() => handleBatchUpdateStatus('CALCULATED')}
+                      className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors text-xs font-semibold cursor-pointer shadow-sm flex items-center gap-1"
+                      title={locale === 'vi' ? 'Hủy chốt tất cả — sửa lại chấm công' : '一括未確定 — 勤怠・明細を修正可能に'}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                      一括未確定 ({batchRevertableCount})
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1597,7 +1890,11 @@ export default function PayrollClient({
                       onChange={e => {
                         const val = e.target.value;
                         setEmpCodeInput(val);
-                        const matched = employees.find(emp => emp.employeeCode.toLowerCase() === val.trim().toLowerCase());
+                        const code = val.trim().toLowerCase();
+                        const matched = employees.find(emp => {
+                          const empCode = emp.employeeCode.toLowerCase();
+                          return empCode === code || empCode.startsWith(code) || code.startsWith(empCode);
+                        });
                         if (matched) {
                            setSelectedEmployeeId(matched.id);
                            setCurrentPage(1);
@@ -1752,7 +2049,7 @@ export default function PayrollClient({
       )}
 
       {/* Table */}
-      <Card title={
+      <Card className="min-w-0 max-w-full" title={
         isEmployeeMode 
           ? t('payroll.payslipHistory') 
           : viewType === 'employee'
@@ -1847,28 +2144,45 @@ export default function PayrollClient({
                     name: emp ? `${emp.lastName} ${emp.firstName}` : '',
                     month: getDisplayMonth(r.month, locale),
                     salaryType: translatedSalaryType,
+                    workDays: r.workDays,
+                    workHours: r.workHours != null ? Math.round(r.workHours * 10) / 10 : '',
+                    overtimeHours: r.overtimeHours,
                     baseSalary: formatCurrency(r.baseSalary), 
                     overtimePay: formatCurrency(r.overtimePay),
                     allowances: formatCurrency(displayAllowances),
                     bonus: formatCurrency(displayBonus),
                     totalGross: formatCurrency(r.totalGross),
+                    healthInsurance: formatCurrency(r.healthInsurance),
+                    pension: formatCurrency(r.pension),
+                    employmentInsurance: formatCurrency(r.employmentInsurance),
+                    incomeTax: formatCurrency(r.incomeTax),
+                    residentTax: formatCurrency(r.residentTax),
                     deductions: formatCurrency(r.totalDeductions), 
                     netSalary: formatCurrency(r.netSalary),
+                    companyCost: formatCurrency(r.totalCompanyCost || 0),
                     status: getStatusLabel(r.status),
                   };
                 })}
                 columns={viewType === 'employee' ? [
                   { header: t('payroll.processMonth'), key: 'month' }, { header: t('payroll.contractSalaryType'), key: 'salaryType' },
-                  { header: t('payroll.baseSalarySubject'), key: 'baseSalary' }, { header: t('payroll.overtimeHours'), key: 'overtimePay' },
+                  { header: t('payroll.workDays'), key: 'workDays' }, { header: t('payroll.actualHours'), key: 'workHours' }, { header: t('payroll.overtimeHours'), key: 'overtimeHours' },
+                  { header: t('payroll.baseSalarySubject'), key: 'baseSalary' }, { header: t('payroll.overtimeSubject'), key: 'overtimePay' },
                   { header: t('payroll.colAllowance'), key: 'allowances' }, { header: '賞与', key: 'bonus' }, { header: t('payroll.totalEarnings'), key: 'totalGross' },
+                  { header: t('payroll.healthInsSubject'), key: 'healthInsurance' }, { header: t('payroll.pensionSubject'), key: 'pension' },
+                  { header: t('payroll.employmentInsSubject'), key: 'employmentInsurance' }, { header: t('payroll.incomeTaxSubject'), key: 'incomeTax' },
+                  { header: t('payroll.residentTaxSubject'), key: 'residentTax' },
                   { header: t('payroll.deductions'), key: 'deductions' }, { header: t('payroll.colNet'), key: 'netSalary' },
-                  { header: t('payroll.colStatus'), key: 'status' },
+                  { header: '会社負担', key: 'companyCost' }, { header: t('payroll.colStatus'), key: 'status' },
                 ] : [
                   { header: t('payroll.colName'), key: 'name' }, { header: t('payroll.contractSalaryType'), key: 'salaryType' },
-                  { header: t('payroll.baseSalarySubject'), key: 'baseSalary' }, { header: t('payroll.overtimeHours'), key: 'overtimePay' },
+                  { header: t('payroll.workDays'), key: 'workDays' }, { header: t('payroll.actualHours'), key: 'workHours' }, { header: t('payroll.overtimeHours'), key: 'overtimeHours' },
+                  { header: t('payroll.baseSalarySubject'), key: 'baseSalary' }, { header: t('payroll.overtimeSubject'), key: 'overtimePay' },
                   { header: t('payroll.colAllowance'), key: 'allowances' }, { header: '賞与', key: 'bonus' }, { header: t('payroll.totalEarnings'), key: 'totalGross' },
+                  { header: t('payroll.healthInsSubject'), key: 'healthInsurance' }, { header: t('payroll.pensionSubject'), key: 'pension' },
+                  { header: t('payroll.employmentInsSubject'), key: 'employmentInsurance' }, { header: t('payroll.incomeTaxSubject'), key: 'incomeTax' },
+                  { header: t('payroll.residentTaxSubject'), key: 'residentTax' },
                   { header: t('payroll.deductions'), key: 'deductions' }, { header: t('payroll.colNet'), key: 'netSalary' },
-                  { header: t('payroll.colStatus'), key: 'status' },
+                  { header: '会社負担', key: 'companyCost' }, { header: t('payroll.colStatus'), key: 'status' },
                 ]}
                 fileName={viewType === 'employee' ? `${t('payroll.payslipTitle')}_${employees.find(e => e.id === selectedEmployeeId)?.lastName}_${employees.find(e => e.id === selectedEmployeeId)?.firstName}` : (startMonth === endMonth ? `${t('payroll.payslipTitle')}_${endMonth}` : `${t('payroll.payslipTitle')}_${startMonth}_to_${endMonth}`)}
               />
@@ -1877,53 +2191,61 @@ export default function PayrollClient({
         )}
 
         {payrollLayoutView === 'table' && (
-          <div className="overflow-x-auto border border-slate-200/65 rounded-2xl shadow-sm mb-5 bg-white">
-            <table className="table-fixed border-collapse" style={{ width: '100%', minWidth: `${totalTableWidth}px` }}>
+          <div className="w-full max-w-full min-w-0 overflow-hidden border border-slate-100 rounded-2xl shadow-sm mb-5 bg-white">
+            <table className="table-fixed w-full border-collapse">
               <colgroup>
                 {activeColumns.map(col => (
-                  <col key={col.key} style={{ width: `${columnWidths[col.key] || 100}px` }} />
+                  <col key={col.key} style={{ width: colWidthPercent(col.key) }} />
                 ))}
-                <col style={{ width: !isEmployeeMode ? '210px' : '90px' }} />
+                <col style={{ width: actionColPercent }} />
               </colgroup>
               <thead>
-                <tr className="bg-slate-50/90 border-b border-slate-200/60 text-slate-500 text-xs">
+                <tr className="bg-slate-50/90 border-b border-slate-100 text-slate-500 text-xs">
                   {activeColumns.map((col, idx) => {
                     const isFirst = idx === 0;
                     let stickyStyle: React.CSSProperties = {};
                     let stickyClass = "";
                     if (isFirst) {
                       stickyStyle = { position: 'sticky', left: 0, zIndex: 20 };
-                      stickyClass = "sticky left-0 bg-slate-50 z-20 border-r border-slate-250/80 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]";
+                      stickyClass = "sticky left-0 bg-slate-50 z-20 border-r border-slate-100";
                     }
 
+                    const isCenterAlign = ['workDays', 'workHours', 'overtimeHours', 'status'].includes(col.key);
                     const isRightAlign = ['baseSalary', 'overtimePay', 'allowances', 'bonus', 'deductions', 'netSalary', 'companyCost'].includes(col.key);
-                    const alignClass = isRightAlign ? 'text-right' : (col.key === 'status' ? 'text-center' : 'text-left');
+                    const alignClass = isRightAlign ? 'text-right' : (isCenterAlign ? 'text-center' : 'text-left');
 
                     return (
                       <th
                         key={col.key}
-                        className={`px-4 py-3.5 text-xs font-bold text-slate-500 uppercase whitespace-nowrap relative group ${stickyClass} ${alignClass}`}
-                        style={{ width: `${columnWidths[col.key] || 100}px`, ...stickyStyle }}
+                        className={`px-2 sm:px-3 py-3 text-xs font-bold text-slate-500 relative group overflow-hidden ${stickyClass} ${alignClass}`}
+                        style={stickyStyle}
                       >
                         {col.key === 'name' && !(isEmployeeMode || viewType === 'employee') ? (
                           <FilterTh label={t('payroll.colName')} filterKey="name" options={nameOptions} activeFilter={activeFilter} columnFilters={columnFilters} onFilterChange={handleColumnFilter} onActiveFilterChange={setActiveFilter} />
-                        ) : col.label}
+                        ) : (
+                          <ColumnHeaderLabel label={col.label} align={isRightAlign ? 'right' : isCenterAlign ? 'center' : 'left'} />
+                        )}
 
                         {/* Resizer Handle */}
                         <div
                           onMouseDown={(e) => handleResizeMouseDown(e, col.key)}
                           onClick={(e) => e.stopPropagation()}
-                          className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-slate-350 opacity-0 group-hover:opacity-100 active:opacity-100 hover:w-2 active:bg-blue-500 transition-all select-none z-30"
+                          className="absolute top-0 right-0 h-full w-px cursor-col-resize bg-slate-200/60 opacity-0 group-hover:opacity-100 active:opacity-100 active:bg-blue-300/70 hover:bg-blue-300/50 transition-opacity select-none z-30"
                         />
                       </th>
                     );
                   })}
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase whitespace-nowrap" style={{ width: !isEmployeeMode ? '210px' : '90px' }}>
-                    {!isEmployeeMode ? '操作' : t('payroll.detailBtn')}
+                  <th
+                    className="px-2 sm:px-3 py-3 text-center text-xs font-bold text-slate-500 uppercase sticky right-0 bg-slate-50/90 z-20 border-l border-slate-100 overflow-hidden"
+                    style={{ position: 'sticky', right: 0 }}
+                  >
+                    <span className="block truncate" title={!isEmployeeMode ? t('common.actions') : t('payroll.detailBtn')}>
+                      {!isEmployeeMode ? t('common.actions') : t('payroll.detailBtn')}
+                    </span>
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-slate-150">
+              <tbody className="bg-white divide-y divide-slate-100">
                 {paginated.length === 0 ? (
                   <tr>
                     <td colSpan={activeColumns.length + 1} className="px-4 py-12 text-center text-slate-400">
@@ -1932,55 +2254,86 @@ export default function PayrollClient({
                   </tr>
                 ) : paginated.map(record => {
                   const emp = employees.find(e => e.id === record.employeeId);
+                  const incomeCapWarning = emp ? getIncomeCapWarning(record, emp) : null;
                   const translatedSalaryType = record.salaryType === '月給' ? t('payroll.typeMonthly') : record.salaryType === '日給' ? t('payroll.typeDaily') : t('payroll.typeHourly');
                   
                   const transAllow = emp?.benefits?.transportation || 0;
                   const houseAllow = emp?.benefits?.housing || 0;
                   const mealAllow = emp?.benefits?.meal || 0;
                   const fixedAllowances = transAllow + houseAllow + mealAllow;
-                  const displayBonus = Math.max(0, record.allowances - fixedAllowances);
-                  const displayAllowances = record.allowances - displayBonus;
+                  const recordAllowances = record.allowances ?? 0;
+                  const displayBonus = Math.max(0, recordAllowances - fixedAllowances);
+                  const displayAllowances = recordAllowances - displayBonus;
 
                   return (
                     <tr key={record.id} className="hover:bg-slate-50 group">
                       {/* First Column Sticky */}
                       {visibleColumns.name && (
                         <td 
-                          className="px-4 py-3.5 whitespace-nowrap sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10 border-r border-slate-250/80 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]"
+                          className="px-2 sm:px-3 py-3 sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-10 border-r border-slate-100 overflow-hidden"
                           style={{ position: 'sticky', left: 0 }}
                         >
                           {(isEmployeeMode || viewType === 'employee') ? (
                             <span className="font-bold text-slate-800">{getDisplayMonth(record.month, locale)}</span>
                           ) : (
-                            <div className="flex items-center gap-2 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => openPayslipDetail(record)}
+                              className="flex items-center gap-2 min-w-0 text-left hover:text-blue-650 transition-colors cursor-pointer"
+                              title={t('payroll.detailBtn')}
+                            >
                               <div className="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-xs shrink-0 font-bold">{emp?.firstNameKana?.charAt(0).toUpperCase()}</div>
                               <div className="min-w-0">
-                                <span className="text-sm font-bold text-slate-800 block truncate">{emp?.lastName} {emp?.firstName}</span>
+                                <span className="text-sm font-bold text-slate-800 block truncate hover:underline">{emp?.lastName} {emp?.firstName}</span>
                                 {startMonth !== endMonth && (
                                   <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
                                     ({getDisplayMonth(record.month, locale)})
                                   </span>
                                 )}
                                 <p className="text-[10px] text-slate-400 truncate">{emp?.department}</p>
+                                {incomeCapWarning && !incomeCapWarning.ok && (
+                                  <span className="text-[10px] text-violet-600 font-bold mt-0.5 flex items-center gap-0.5" title={t('payroll.incomeCapAlert')}>
+                                    <span>⚠️</span>
+                                    <span>{t('payroll.incomeCapDetail').replace('{gross}', formatCurrency(incomeCapWarning.total)).replace('{limit}', formatCurrency(incomeCapWarning.limit))}</span>
+                                  </span>
+                                )}
                               </div>
-                            </div>
+                            </button>
                           )}
                         </td>
                       )}
 
                       {visibleColumns.salaryType && (
-                        <td className="px-4 py-3.5 whitespace-nowrap">
+                        <td className="px-2 sm:px-3 py-3 overflow-hidden">
                           <span className={`px-2 py-0.5 text-xs rounded ${salaryTypeColor(record.salaryType)}`}>
                             {translatedSalaryType}
                           </span>
                         </td>
                       )}
 
+                      {visibleColumns.workDays && (
+                        <td className="px-2 sm:px-3 py-3 text-sm text-center text-slate-700 font-mono overflow-hidden">
+                          {record.workDays ?? '-'}
+                        </td>
+                      )}
+
+                      {visibleColumns.workHours && (
+                        <td className="px-2 sm:px-3 py-3 text-sm text-center text-slate-700 font-mono overflow-hidden">
+                          {record.workHours != null ? `${Math.round(record.workHours * 10) / 10}${t('payroll.hoursUnit')}` : '-'}
+                        </td>
+                      )}
+
+                      {visibleColumns.overtimeHours && (
+                        <td className="px-2 sm:px-3 py-3 text-sm text-center text-orange-600 font-mono font-semibold overflow-hidden">
+                          {(record.overtimeHours || 0) > 0 ? `${Math.round((record.overtimeHours || 0) * 10) / 10}${t('payroll.hoursUnit')}` : '-'}
+                        </td>
+                      )}
+
                       {visibleColumns.baseSalary && (
-                        <td className="px-4 py-3.5 text-sm text-right text-slate-650 font-mono whitespace-nowrap">
+                        <td className="px-2 sm:px-3 py-3 text-sm text-right text-slate-650 font-mono overflow-hidden">
                           <div className="inline-flex flex-col items-end justify-center">
                             <span className="font-semibold">{formatCurrency(record.baseSalary)}</span>
-                            {emp && record.baseSalary !== emp.salary && (
+                            {emp && shouldShowSalaryMismatch(record, emp) && (
                               <span className="text-[10px] text-amber-605 font-sans font-bold mt-0.5 flex items-center gap-0.5" title={`${t('payroll.profileSalary')}: ${formatCurrency(emp.salary)}`}>
                                 <span className="text-amber-500">⚠️</span>
                                 <span>({formatCurrency(emp.salary)})</span>
@@ -1991,43 +2344,43 @@ export default function PayrollClient({
                       )}
 
                       {visibleColumns.overtimePay && (
-                        <td className="px-4 py-3.5 text-sm text-right text-slate-650 font-mono whitespace-nowrap">
+                        <td className="px-2 sm:px-3 py-3 text-sm text-right text-slate-650 font-mono overflow-hidden">
                           {record.overtimePay > 0 ? formatCurrency(record.overtimePay) : '-'}
                         </td>
                       )}
 
                       {visibleColumns.allowances && (
-                        <td className="px-4 py-3.5 text-sm text-right text-slate-650 font-mono whitespace-nowrap">
+                        <td className="px-2 sm:px-3 py-3 text-sm text-right text-slate-650 font-mono overflow-hidden">
                           {displayAllowances > 0 ? formatCurrency(displayAllowances) : '-'}
                         </td>
                       )}
 
                       {visibleColumns.bonus && (
-                        <td className="px-4 py-3.5 text-sm text-right text-slate-650 font-mono whitespace-nowrap">
+                        <td className="px-2 sm:px-3 py-3 text-sm text-right text-slate-650 font-mono overflow-hidden">
                           {displayBonus > 0 ? formatCurrency(displayBonus) : '-'}
                         </td>
                       )}
 
                       {visibleColumns.deductions && (
-                        <td className="px-4 py-3.5 text-sm text-right text-rose-600 font-mono whitespace-nowrap">
+                        <td className="px-2 sm:px-3 py-3 text-sm text-right text-rose-600 font-mono overflow-hidden">
                           {formatCurrency(record.totalDeductions)}
                         </td>
                       )}
 
                       {visibleColumns.netSalary && (
-                        <td className="px-4 py-3.5 text-sm text-right font-bold text-slate-850 font-mono whitespace-nowrap">
+                        <td className="px-2 sm:px-3 py-3 text-sm text-right font-bold text-slate-850 font-mono overflow-hidden">
                           {formatCurrency(record.netSalary)}
                         </td>
                       )}
 
                       {visibleColumns.companyCost && (
-                        <td className="px-4 py-3.5 text-sm text-right text-blue-700 font-mono whitespace-nowrap">
-                          ¥{record.totalCompanyCost?.toLocaleString() || '-'}
+                        <td className="px-2 sm:px-3 py-3 text-sm text-right text-blue-700 font-mono overflow-hidden">
+                          {record.totalCompanyCost != null ? formatCurrency(record.totalCompanyCost) : '-'}
                         </td>
                       )}
 
                       {visibleColumns.status && (
-                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                        <td className="px-2 sm:px-3 py-3 text-center overflow-hidden">
                           <span className={`px-2 py-0.5 text-xs rounded ${statusColor(record.status)}`}>
                             {getStatusLabel(record.status)}
                           </span>
@@ -2035,16 +2388,14 @@ export default function PayrollClient({
                       )}
 
                       {/* Action cell */}
-                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                        <div className="flex gap-1.5 justify-center items-center">
-                          {emp && (
-                            <button onClick={() => setSelectedPayslip(record)}
-                              className="px-2.5 py-1 text-xs bg-blue-50 text-blue-650 rounded hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap font-medium"
-                              title={t('payroll.detailBtn')}
-                            >
-                              明細
-                            </button>
-                          )}
+                      <td className="px-1 sm:px-2 py-3 text-center sticky right-0 bg-white group-hover:bg-slate-50 z-10 border-l border-slate-100 overflow-hidden" style={{ position: 'sticky', right: 0 }}>
+                        <div className="flex flex-wrap gap-0.5 justify-center items-center">
+                          <button onClick={() => openPayslipDetail(record)}
+                            className="px-1.5 py-0.5 text-[10px] sm:text-xs bg-blue-50 text-blue-650 rounded hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap font-medium"
+                            title={t('payroll.detailBtn')}
+                          >
+                            明細
+                          </button>
                           {!isEmployeeMode && emp && (
                             <>
                               <button 
@@ -2053,7 +2404,7 @@ export default function PayrollClient({
                                   month: record.month, 
                                   employeeName: `${emp.lastName} ${emp.firstName}` 
                                 })}
-                                className="px-2 py-1 text-xs bg-slate-100 text-slate-650 hover:bg-slate-200 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                                className="px-1.5 py-0.5 text-[10px] sm:text-xs bg-slate-100 text-slate-650 hover:bg-slate-200 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
                                 title="勤怠実績確認"
                               >
                                 勤怠
@@ -2061,7 +2412,7 @@ export default function PayrollClient({
                               {(record.status === 'PENDING' || record.status === 'CALCULATED') && (
                                 <button 
                                   onClick={() => handleUpdateStatus(record.id, 'APPROVED')}
-                                  className="px-2 py-1 text-xs bg-yellow-50 text-yellow-750 hover:bg-yellow-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                                  className="px-1.5 py-0.5 text-[10px] sm:text-xs bg-yellow-50 text-yellow-750 hover:bg-yellow-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
                                 >
                                   承認
                                 </button>
@@ -2069,7 +2420,7 @@ export default function PayrollClient({
                               {record.status === 'APPROVED' && (
                                 <button 
                                   onClick={() => handleUpdateStatus(record.id, 'PAID')}
-                                  className="px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                                  className="px-1.5 py-0.5 text-[10px] sm:text-xs bg-green-50 text-green-700 hover:bg-green-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
                                 >
                                   支払
                                 </button>
@@ -2081,7 +2432,7 @@ export default function PayrollClient({
                                       handleUpdateStatus(record.id, 'CALCULATED');
                                     }
                                   }}
-                                  className="px-2 py-1 text-xs bg-red-50 text-red-750 hover:bg-red-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
+                                  className="px-1.5 py-0.5 text-[10px] sm:text-xs bg-red-50 text-red-750 hover:bg-red-105 rounded transition-colors cursor-pointer whitespace-nowrap font-medium"
                                 >
                                   未確定
                                 </button>
@@ -2097,7 +2448,7 @@ export default function PayrollClient({
               <tfoot>
                 <tr className="bg-slate-100/80 font-bold border-t border-slate-200">
                   <td colSpan={activeColumns.length} className="px-4 py-3 text-right text-xs text-slate-500 uppercase">会社負担 合計</td>
-                  <td className="px-4 py-3 text-right text-sm text-blue-700 font-mono">¥{filtered.reduce((sum, r) => sum + ((r as any).totalCompanyCost || 0), 0).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right text-sm text-blue-700 font-mono">{formatCurrency(filtered.reduce((sum, r) => sum + ((r as any).totalCompanyCost || 0), 0))}</td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -2119,8 +2470,9 @@ export default function PayrollClient({
               const houseAllow = emp?.benefits?.housing || 0;
               const mealAllow = emp?.benefits?.meal || 0;
               const fixedAllowances = transAllow + houseAllow + mealAllow;
-              const displayBonus = Math.max(0, record.allowances - fixedAllowances);
-              const displayAllowances = record.allowances - displayBonus;
+              const recordAllowances = record.allowances ?? 0;
+              const displayBonus = Math.max(0, recordAllowances - fixedAllowances);
+              const displayAllowances = recordAllowances - displayBonus;
 
               return (
                 <div key={record.id} className="bg-white border border-slate-200/70 rounded-2xl p-5 shadow-premium hover:shadow-premium-hover transition-all duration-200 relative group animate-fadeIn">
@@ -2154,12 +2506,30 @@ export default function PayrollClient({
                         <span className="font-semibold text-slate-800">{translatedSalaryType}</span>
                       </div>
                     )}
+                    {visibleColumns.workDays && (
+                      <div>
+                        <span className="text-slate-400 font-bold block mb-0.5">{t('payroll.workDays')}</span>
+                        <span className="font-semibold text-slate-800 font-mono">{record.workDays ?? '-'} {t('payroll.daysUnit')}</span>
+                      </div>
+                    )}
+                    {visibleColumns.workHours && (
+                      <div>
+                        <span className="text-slate-400 font-bold block mb-0.5">{t('payroll.actualHours')}</span>
+                        <span className="font-semibold text-slate-800 font-mono">{record.workHours != null ? `${Math.round(record.workHours * 10) / 10}${t('payroll.hoursUnit')}` : '-'}</span>
+                      </div>
+                    )}
+                    {visibleColumns.overtimeHours && (
+                      <div>
+                        <span className="text-slate-400 font-bold block mb-0.5">{t('payroll.overtimeHours')}</span>
+                        <span className="font-semibold text-orange-600 font-mono">{(record.overtimeHours || 0) > 0 ? `${Math.round((record.overtimeHours || 0) * 10) / 10}${t('payroll.hoursUnit')}` : '-'}</span>
+                      </div>
+                    )}
                     {visibleColumns.baseSalary && (
                       <div>
                         <span className="text-slate-400 font-bold block mb-0.5">基本給 (Lương cơ bản)</span>
                         <div className="flex flex-col">
                           <span className="font-semibold text-slate-800 font-mono">{formatCurrency(record.baseSalary)}</span>
-                          {emp && record.baseSalary !== emp.salary && (
+                          {emp && shouldShowSalaryMismatch(record, emp) && (
                             <span className="text-[10px] text-amber-655 font-sans font-bold flex items-center gap-0.5 mt-0.5" title={`${t('payroll.profileSalary')}: ${formatCurrency(emp.salary)}`}>
                               ⚠️ {t('payroll.profileSalary')}: {formatCurrency(emp.salary)}
                             </span>
@@ -2194,7 +2564,7 @@ export default function PayrollClient({
                     {visibleColumns.companyCost && (
                       <div>
                         <span className="text-slate-400 font-bold block mb-0.5">会社負担 (Công ty trả)</span>
-                        <span className="font-semibold text-blue-650 font-mono">¥{record.totalCompanyCost?.toLocaleString() || '-'}</span>
+                        <span className="font-semibold text-blue-650 font-mono">{record.totalCompanyCost != null ? formatCurrency(record.totalCompanyCost) : '-'}</span>
                       </div>
                     )}
                     
@@ -2208,7 +2578,7 @@ export default function PayrollClient({
 
                   <div className="flex justify-end gap-2 mt-4 pt-3.5 border-t border-slate-100">
                     <button
-                      onClick={() => setSelectedPayslip(record)}
+                      onClick={() => openPayslipDetail(record)}
                       className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-black transition-all cursor-pointer"
                     >
                       {t('payroll.detailBtn')}
@@ -2289,19 +2659,36 @@ export default function PayrollClient({
       {/* Payslip Modal */}
       {selectedPayslip && (() => {
         const emp = employees.find(e => e.id === selectedPayslip.employeeId);
-        return emp ? (
+        if (!emp) {
+          return (
+            <Portal>
+              <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4" onClick={() => setSelectedPayslip(null)}>
+                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                  <h3 className="text-lg font-bold text-slate-800 mb-2">Không thể mở chi tiết lương</h3>
+                  <p className="text-sm text-slate-600 mb-4">Không tìm thấy thông tin nhân viên cho bản ghi này. Vui lòng tải lại trang.</p>
+                  <button onClick={() => setSelectedPayslip(null)} className="px-4 py-2 bg-blue-650 text-white rounded-lg text-sm font-semibold cursor-pointer">
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </Portal>
+          );
+        }
+        return (
           <PayslipModal 
             record={selectedPayslip} 
             employee={emp} 
-            companyInfo={companyInfo} 
+            companyInfo={companyInfo}
+            rateSettings={rateSettings}
             isAdmin={!isEmployeeMode}
             onSave={(updated) => {
-              setRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
-              setSelectedPayslip(updated);
+              const normalized = normalizePayrollRecord(updated);
+              setRecords(prev => prev.map(r => r.id === normalized.id ? normalized : r));
+              setSelectedPayslip(normalized);
             }}
             onClose={() => setSelectedPayslip(null)} 
           />
-        ) : null;
+        );
       })()}
 
       {/* Attendance Check Modal */}
@@ -2313,13 +2700,13 @@ export default function PayrollClient({
           onClose={() => setSelectedAttendanceCheck(null)}
         />
       )}
-    </>
+    </div>
   );
 }
 
 function AttendanceCheckModal({ 
   employeeId, 
-  month, 
+  month: payrollMonth, 
   employeeName, 
   onClose 
 }: { 
@@ -2332,14 +2719,22 @@ function AttendanceCheckModal({
   const [attendance, setAttendance] = useState<any[]>([]);
   const { t: _t, locale: _locale } = useI18n();
 
+  const attendanceMonth = useMemo(() => getAttendanceMonthForPayroll(payrollMonth), [payrollMonth]);
+  const attendancePeriod = useMemo(() => {
+    const { start, end } = getWorkingMonthDateRange(payrollMonth);
+    const fmt = (d: Date) => `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+    return `${fmt(start)} ～ ${fmt(end)}`;
+  }, [payrollMonth]);
+
   useEffect(() => {
     const fetchAttendance = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/attendance?employeeId=${employeeId}&month=${month}`);
+        const res = await fetch(`/api/attendance?employeeId=${employeeId}&month=${attendanceMonth}`);
         if (res.ok) {
           const json = await res.json();
-          setAttendance(json.data || json || []);
+          const rows = Array.isArray(json) ? json : (json.data ?? []);
+          setAttendance(Array.isArray(rows) ? rows : []);
         }
       } catch (e) {
         console.error(e);
@@ -2348,7 +2743,7 @@ function AttendanceCheckModal({
       }
     };
     fetchAttendance();
-  }, [employeeId, month]);
+  }, [employeeId, attendanceMonth]);
 
   const stats = useMemo(() => {
     const totalDays = attendance.length;
@@ -2401,7 +2796,8 @@ function AttendanceCheckModal({
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
           <div>
             <h3 className="text-lg font-bold text-slate-850">勤怠実績確認 (対照)</h3>
-            <p className="text-xs text-slate-500">{employeeName} - {month}</p>
+            <p className="text-xs text-slate-500">{employeeName} — 給与 {payrollMonth}（勤怠 {attendanceMonth}）</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">対象期間: {attendancePeriod}</p>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

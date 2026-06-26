@@ -1,6 +1,12 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createEmployeeSchema, employeeQuerySchema } from '@/lib/validations/employee';
+import {
+  createEmployeeSchema,
+  employeeQuerySchema,
+  mapCertificationForCreate,
+  mapDependentForCreate,
+  mapEducationForCreate,
+} from '@/lib/validations/employee';
 import { successResponse, createdResponse, errorResponse, handleApiError, parsePagination, buildMeta } from '@/lib/api-utils';
 import { syncEmployeeSalaries } from '@/lib/payroll-calculator';
 import { logDatabaseChange } from '@/lib/audit-logger';
@@ -166,20 +172,13 @@ export async function POST(request: NextRequest) {
         contractEndDate: employeeData.contractEndDate ? new Date(employeeData.contractEndDate) : null,
         benefits: employeeData.benefits ?? undefined,
         dependents: {
-          create: dependents.map(d => ({
-            ...d,
-            birthDate: d.birthDate ? new Date(d.birthDate) : null,
-          })),
+          create: dependents.map(mapDependentForCreate),
         },
         education: {
-          create: education,
+          create: education.map(mapEducationForCreate),
         },
         certifications: {
-          create: certifications.map(c => ({
-            ...c,
-            acquiredDate: c.acquiredDate ? new Date(c.acquiredDate) : null,
-            expiryDate: c.expiryDate ? new Date(c.expiryDate) : null,
-          })),
+          create: certifications.map(mapCertificationForCreate),
         },
         employeeContracts: {
           create: {

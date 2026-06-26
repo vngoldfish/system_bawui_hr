@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
 import BulkSalaryUpdate from './BulkSalaryUpdate';
@@ -47,7 +47,7 @@ interface TaxBracket {
 
 const defaultHealth: HealthInsuranceSettings = {
   baseRate: 9.98,
-  careInsuranceRate: 1.58,
+  careInsuranceRate: 1.59,
   prefecture: '東京都',
   standardMonthlyMin: 58000,
   standardMonthlyMax: 1390000,
@@ -72,7 +72,7 @@ const defaultTaxBrackets: TaxBracket[] = [
 ];
 
 const defaultRates: RateItem[] = [
-  { id: 'employment', name: '雇用保険', nameKana: 'こようほけん', companyRate: 0.6, employeeRate: 0.3, companyFixed: 0, employeeFixed: 0, type: 'rate', category: 'insurance', description: '一般の事業' },
+  { id: 'employment', name: '雇用保険', nameKana: 'こようほけん', companyRate: 0.9, employeeRate: 0.55, companyFixed: 0, employeeFixed: 0, type: 'rate', category: 'insurance', description: '一般の事業（令和7年4月〜）' },
   { id: 'workers', name: '労災保険', nameKana: 'ろうさいほけん', companyRate: 0.3, employeeRate: 0, companyFixed: 0, employeeFixed: 0, type: 'rate', category: 'insurance', description: '一般の事業（従業員負担なし）' },
   { id: 'resident_tax', name: '住民税', nameKana: 'じゅうみんぜい', companyRate: 0, employeeRate: 0, companyFixed: 0, employeeFixed: 0, type: 'fixed', category: 'tax', description: '特別徴収（前年度所得に基づく）' },
   { id: 'transport', name: '通勤手当', nameKana: 'つうきんてあて', companyRate: 0, employeeRate: 0, companyFixed: 15000, employeeFixed: 0, type: 'fixed', category: 'allowance', description: '定期代相当（非課税限度額15万円/月）' },
@@ -148,7 +148,7 @@ function logChange(
 // ─── Health Insurance Section ─────────────────────────────────────
 function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }: {
   settings: HealthInsuranceSettings;
-  onChange: (s: HealthInsuranceSettings) => void;
+  onChange: (s: HealthInsuranceSettings) => void | Promise<void>;
   changeLog: ChangeLog[];
   setChangeLog: React.Dispatch<React.SetStateAction<ChangeLog[]>>;
 }) {
@@ -284,7 +284,7 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
 // ─── Pension Section ──────────────────────────────────────────────
 function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
   settings: PensionSettings;
-  onChange: (s: PensionSettings) => void;
+  onChange: (s: PensionSettings) => void | Promise<void>;
   changeLog: ChangeLog[];
   setChangeLog: React.Dispatch<React.SetStateAction<ChangeLog[]>>;
 }) {
@@ -412,7 +412,7 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
 // ─── Income Tax Section ───────────────────────────────────────────
 function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
   brackets: TaxBracket[];
-  onChange: (b: TaxBracket[]) => void;
+  onChange: (b: TaxBracket[]) => void | Promise<void>;
   changeLog: ChangeLog[];
   setChangeLog: React.Dispatch<React.SetStateAction<ChangeLog[]>>;
 }) {
@@ -606,6 +606,14 @@ function EditModal({ item, onSave, onClose }: {
   );
 }
 
+interface AiCheckResult {
+  status: string;
+  summary: string;
+  differences: Array<{ field: string; current: number | string; suggested: number | string }>;
+  suggestedRates: Record<string, unknown> | null;
+  checkType: string;
+}
+
 // ─── Main Component ───────────────────────────────────────────────
 export default function SalaryTableClient() {
   const { t, locale } = useI18n();
@@ -620,8 +628,165 @@ export default function SalaryTableClient() {
 
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isStale, setIsStale] = useState(false);
+  const [staleMessage, setStaleMessage] = useState('');
+  const [aiChecking, setAiChecking] = useState(false);
+  const [aiResult, setAiResult] = useState<AiCheckResult | null>(null);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [fiscalYear, setFiscalYear] = useState(2026);
 
-  const handleSaveRate = (updated: RateItem, reason: string) => {
+  const buildPayload = useCallback(() => ({
+    healthInsuranceRate: health.baseRate,
+    nursingCareRate: health.careInsuranceRate,
+    prefecture: health.prefecture,
+    pensionRate: pension.totalRate,
+    employmentInsuranceEmployee: rates.find(r => r.id === 'employment')?.employeeRate ?? 0.55,
+    employmentInsuranceCompany: rates.find(r => r.id === 'employment')?.companyRate ?? 0.9,
+    workersCompRate: rates.find(r => r.id === 'workers')?.companyRate ?? 0.3,
+    otherRates: rates,
+    incomeTaxYear: fiscalYear,
+  }), [health, pension, rates, fiscalYear]);
+
+  const saveConfig = useCallback(async (extra?: Record<string, unknown>) => {
+    try {
+      const res = await fetch('/api/payroll-rates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...buildPayload(), ...extra }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      const data = await res.json();
+      const cfg = data.data ?? data;
+      setIsStale(!!cfg.isStale);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      console.error('Failed to save rate config', e);
+    }
+  }, [buildPayload]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [ratesRes, statusRes] = await Promise.all([
+          fetch('/api/payroll-rates'),
+          fetch('/api/payroll-rates/status'),
+        ]);
+        if (cancelled) return;
+        if (ratesRes.ok) {
+          const payload = await ratesRes.json();
+          const cfg = payload.data ?? payload;
+          setFiscalYear(cfg.fiscalYear ?? new Date().getFullYear());
+          setHealth({
+            baseRate: cfg.healthInsuranceRate ?? defaultHealth.baseRate,
+            careInsuranceRate: cfg.nursingCareRate ?? defaultHealth.careInsuranceRate,
+            prefecture: cfg.prefecture ?? defaultHealth.prefecture,
+            standardMonthlyMin: defaultHealth.standardMonthlyMin,
+            standardMonthlyMax: defaultHealth.standardMonthlyMax,
+          });
+          setPension({
+            totalRate: cfg.pensionRate ?? defaultPension.totalRate,
+            companyRate: (cfg.pensionRate ?? defaultPension.totalRate) / 2,
+            employeeRate: (cfg.pensionRate ?? defaultPension.totalRate) / 2,
+            standardMonthlyMin: defaultPension.standardMonthlyMin,
+            standardMonthlyMax: defaultPension.standardMonthlyMax,
+          });
+          if (Array.isArray(cfg.otherRates) && cfg.otherRates.length > 0) {
+            setRates(cfg.otherRates as RateItem[]);
+          }
+          if (Array.isArray(cfg.changeLog)) {
+            setChangeLog(cfg.changeLog as ChangeLog[]);
+          }
+        }
+        if (statusRes.ok) {
+          const statusPayload = await statusRes.json();
+          const status = statusPayload.data ?? statusPayload;
+          setIsStale(!!status.isStale);
+          setStaleMessage(status.message ?? '');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleAiCheck = async () => {
+    setAiChecking(true);
+    try {
+      const res = await fetch('/api/payroll-rates/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (!res.ok) throw new Error('AI check failed');
+      const payload = await res.json();
+      const result = payload.data ?? payload;
+      setAiResult(result);
+      setShowAiModal(true);
+      if (result.status === 'OK') {
+        setIsStale(false);
+      }
+    } catch (e) {
+      alert('税率チェックに失敗しました');
+      console.error(e);
+    } finally {
+      setAiChecking(false);
+    }
+  };
+
+  const applyAiSuggestions = async () => {
+    if (!aiResult?.suggestedRates) return;
+    const s = aiResult.suggestedRates;
+    const newHealth = {
+      ...health,
+      baseRate: Number(s.healthInsuranceRate ?? health.baseRate),
+      careInsuranceRate: Number(s.nursingCareRate ?? health.careInsuranceRate),
+      prefecture: String(s.prefecture ?? health.prefecture),
+    };
+    const newPension = {
+      ...pension,
+      totalRate: Number(s.pensionRate ?? pension.totalRate),
+      companyRate: Number(s.pensionRate ?? pension.totalRate) / 2,
+      employeeRate: Number(s.pensionRate ?? pension.totalRate) / 2,
+    };
+    const newRates = rates.map(r => {
+      if (r.id === 'employment') {
+        return {
+          ...r,
+          employeeRate: Number(s.employmentInsuranceEmployee ?? r.employeeRate),
+          companyRate: Number(s.employmentInsuranceCompany ?? r.companyRate),
+        };
+      }
+      if (r.id === 'workers') {
+        return { ...r, companyRate: Number(s.workersCompRate ?? r.companyRate) };
+      }
+      return r;
+    });
+    setHealth(newHealth);
+    setPension(newPension);
+    setRates(newRates);
+    await saveConfig({
+      healthInsuranceRate: newHealth.baseRate,
+      nursingCareRate: newHealth.careInsuranceRate,
+      prefecture: newHealth.prefecture,
+      pensionRate: newPension.totalRate,
+      employmentInsuranceEmployee: newRates.find(r => r.id === 'employment')?.employeeRate,
+      employmentInsuranceCompany: newRates.find(r => r.id === 'employment')?.companyRate,
+      workersCompRate: newRates.find(r => r.id === 'workers')?.companyRate,
+      otherRates: newRates,
+      changeEntry: {
+        itemId: 'ai',
+        itemName: 'AI税率更新',
+        field: '一括適用',
+        oldValue: '-',
+        newValue: aiResult.summary,
+        reason: 'AIチェック結果を適用',
+      },
+    });
+    setIsStale(false);
+    setShowAiModal(false);
+  };
+
+  const handleSaveRate = async (updated: RateItem, reason: string) => {
     const original = rates.find(r => r.id === updated.id);
     if (!original) return;
     const trans = getItemTranslation(updated.id, updated.name, updated.description, t);
@@ -630,10 +795,39 @@ export default function SalaryTableClient() {
     if (original.employeeRate !== updated.employeeRate) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.employeeRate'), `${original.employeeRate}%`, `${updated.employeeRate}%`, reason, adminLabel);
     if (original.companyFixed !== updated.companyFixed) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.companyFixed'), `¥${original.companyFixed.toLocaleString()}`, `¥${updated.companyFixed.toLocaleString()}`, reason, adminLabel);
     if (original.employeeFixed !== updated.employeeFixed) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.employeeFixed'), `¥${original.employeeFixed.toLocaleString()}`, `¥${updated.employeeFixed.toLocaleString()}`, reason, adminLabel);
-    setRates(prev => prev.map(r => r.id === updated.id ? updated : r));
+    const newRates = rates.map(r => r.id === updated.id ? updated : r);
+    setRates(newRates);
     setEditingItem(null);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    await saveConfig({
+      otherRates: newRates,
+      changeEntry: {
+        itemId: updated.id,
+        itemName: trans.name,
+        field: t('salaryTable.editBtn'),
+        oldValue: `${original.companyRate}% / ${original.employeeRate}%`,
+        newValue: `${updated.companyRate}% / ${updated.employeeRate}%`,
+        reason,
+      },
+    });
+  };
+
+  const handleHealthChange = async (s: HealthInsuranceSettings) => {
+    setHealth(s);
+    await saveConfig({
+      healthInsuranceRate: s.baseRate,
+      nursingCareRate: s.careInsuranceRate,
+      prefecture: s.prefecture,
+    });
+  };
+
+  const handlePensionChange = async (s: PensionSettings) => {
+    setPension(s);
+    await saveConfig({ pensionRate: s.totalRate });
+  };
+
+  const handleTaxBracketsChange = async (b: TaxBracket[]) => {
+    setTaxBrackets(b);
+    await saveConfig({});
   };
 
   const filtered = activeCategory === 'all' ? rates : rates.filter(r => r.category === activeCategory);
@@ -689,6 +883,26 @@ export default function SalaryTableClient() {
 
       {activeTab === 'regulations' ? (
         <>
+          {loading && (
+            <div className="text-center py-4 text-sm text-slate-500">読み込み中...</div>
+          )}
+
+          {isStale && (
+            <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-amber-900">⚠️ 税率設定が古い可能性があります</p>
+                <p className="text-xs text-amber-800 mt-1">{staleMessage || `${fiscalYear}年度の設定を確認してください。`}</p>
+              </div>
+              <button
+                onClick={handleAiCheck}
+                disabled={aiChecking}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-50"
+              >
+                {aiChecking ? '確認中...' : 'AIで最新税率を確認'}
+              </button>
+            </div>
+          )}
+
           {saved && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
           <span className="text-green-600 text-lg">&#10003;</span>
@@ -713,9 +927,9 @@ export default function SalaryTableClient() {
 
       {/* Three main insurance/tax sections */}
       <div className="space-y-6 mt-6">
-        <HealthInsuranceSection settings={health} onChange={setHealth} changeLog={changeLog} setChangeLog={setChangeLog} />
-        <PensionSection settings={pension} onChange={setPension} changeLog={changeLog} setChangeLog={setChangeLog} />
-        <IncomeTaxSection brackets={taxBrackets} onChange={setTaxBrackets} changeLog={changeLog} setChangeLog={setChangeLog} />
+        <HealthInsuranceSection settings={health} onChange={handleHealthChange} changeLog={changeLog} setChangeLog={setChangeLog} />
+        <PensionSection settings={pension} onChange={handlePensionChange} changeLog={changeLog} setChangeLog={setChangeLog} />
+        <IncomeTaxSection brackets={taxBrackets} onChange={handleTaxBracketsChange} changeLog={changeLog} setChangeLog={setChangeLog} />
       </div>
 
       {/* Category Filter + Change Log toggle */}
@@ -871,6 +1085,36 @@ export default function SalaryTableClient() {
       )}
 
           {editingItem && <EditModal item={editingItem} onSave={handleSaveRate} onClose={() => setEditingItem(null)} />}
+
+          {showAiModal && aiResult && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAiModal(false)}>
+              <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">AI税率チェック結果</h3>
+                <p className="text-sm text-slate-600 mb-4">{aiResult.summary}</p>
+                <p className="text-xs text-slate-400 mb-3">チェック種別: {aiResult.checkType} / ステータス: {aiResult.status}</p>
+                {aiResult.differences.length > 0 ? (
+                  <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                    {aiResult.differences.map((d, i) => (
+                      <div key={i} className="text-sm bg-slate-50 rounded-lg p-2 flex justify-between">
+                        <span className="font-medium">{d.field}</span>
+                        <span><span className="text-red-500 line-through">{d.current}</span> → <span className="text-green-600">{d.suggested}</span></span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-green-700 mb-4">差異はありません。現在の設定は最新です。</p>
+                )}
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setShowAiModal(false)} className="px-4 py-2 bg-slate-200 rounded-lg text-sm">閉じる</button>
+                  {aiResult.suggestedRates && aiResult.differences.length > 0 && (
+                    <button onClick={applyAiSuggestions} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+                      提案を適用
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <BulkSalaryUpdate />

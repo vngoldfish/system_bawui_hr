@@ -139,6 +139,12 @@ model Employee {
   workRestriction        String?
   residenceCardImage     String?
 
+  // Work hour / income caps (留学生・家族滞在 週28h / 被扶養者維持 月8万円等)
+  workLimitVisa28h       Boolean @default(false)
+  workLimitIncomeCap80k  Boolean @default(false)
+  workLimitWeeklyHours   Float?
+  workLimitMonthlyIncome Float?
+
   // Contract
   contractTypeId      String
   contractType        ContractType @relation(fields: [contractTypeId], references: [id])
@@ -491,9 +497,61 @@ model Company {
   salaryCutoffDay     String
   payday              String
   healthInsuranceRate Float?
+  attendanceAutoScheduleEnabled Boolean @default(true)
+  attendanceGrossEstimateEnabled Boolean @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   @@map("companies")
+}
+
+// Cấu hình tỷ lệ bảo hiểm/thuế theo năm tài chính
+model PayrollRateConfig {
+  id                          String   @id @default(cuid())
+  fiscalYear                  Int
+  effectiveFrom               String
+  status                      String   @default("ACTIVE")
+  prefecture                  String   @default("東京都")
+  healthInsuranceRate         Float    @default(9.98)
+  nursingCareRate             Float    @default(1.59)
+  pensionRate                 Float    @default(18.3)
+  employmentInsuranceEmployee Float    @default(0.55)
+  employmentInsuranceCompany  Float    @default(0.9)
+  workersCompRate             Float    @default(0.3)
+  incomeTaxYear               Int      @default(2026)
+  otherRates                  Json?
+  incomeTaxTable              Json?
+  changeLog                   Json?
+  lastVerifiedAt              DateTime?
+  lastAiCheckAt               DateTime?
+  aiCheckSummary              String?
+  sourceNotes                 String?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  checkLogs PayrollRateCheckLog[]
+
+  @@unique([fiscalYear, status])
+  @@index([status])
+  @@map("payroll_rate_configs")
+}
+
+model PayrollRateCheckLog {
+  id              String   @id @default(cuid())
+  configId        String?
+  config          PayrollRateConfig? @relation(fields: [configId], references: [id])
+  checkType       String
+  fiscalYear      Int
+  status          String
+  currentRates    Json?
+  suggestedRates  Json?
+  differences     Json?
+  aiModel         String?
+  aiRawResponse   String?
+  checkedBy       String?
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("payroll_rate_check_logs")
 }
 

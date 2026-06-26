@@ -4,12 +4,12 @@ import { createdResponse, errorResponse, handleApiError, successResponse } from 
 import { hasPermission } from '@/lib/auth-mock';
 import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
-import { getEffectiveSalary, calculatePayrollDetails, syncEmployeeSalaries } from '@/lib/payroll-calculator';
+import { batchGetEffectiveSalaries, calculatePayrollDetails, getEffectiveSalary, syncEmployeeSalaries } from '@/lib/payroll-calculator';
+import { getActiveRateConfig, toPayrollRateSettings } from '@/services/payrollRateService';
 
 // GET payroll records
 export async function GET(request: NextRequest) {
   try {
-    await syncEmployeeSalaries(prisma);
     const user = getSessionUser(request);
     if (!user) {
       return errorResponse('Unauthorized', 401);
@@ -60,6 +60,8 @@ export async function GET(request: NextRequest) {
           lte: nowMonthStr,
         };
       }
+
+      where.status = { in: ['APPROVED', 'PAID'] };
     }
 
     const records = await prisma.payrollRecord.findMany({
@@ -92,8 +94,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const syncMonth = !Array.isArray(body) && body?.syncMonth ? String(body.syncMonth) : null;
     const isArray = Array.isArray(body);
-    const recordsData = isArray ? body : [body];
+    const recordsData = isArray
+      ? body
+      : Array.isArray(body?.records)
+        ? body.records
+        : [body];
 
     // Verify operator role in database
     const dbOperator = await prisma.employee.findUnique({
@@ -129,28 +136,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fetch effective salary from SalaryAdjustment if applicable
-    for (const data of recordsData) {
-      if (data.employeeId && data.month) {
-        const effective = await getEffectiveSalary(data.employeeId, data.month, prisma);
-        if (effective) {
-          data.baseSalary = effective.baseSalary;
-          data.hourlyRate = effective.hourlyRate;
-          data.dailyRate = effective.dailyRate;
-        }
-      }
+    const uniqueEmployeeIds = [...new Set(recordsData.map((data: { employeeId?: string }) => data.employeeId).filter(Boolean))] as string[];
+    const uniqueMonths = [...new Set(recordsData.map((data: { month?: string }) => data.month).filter(Boolean))] as string[];
+    const effectiveSalariesByMonth: Record<string, Awaited<ReturnType<typeof batchGetEffectiveSalaries>>> = {};
+    for (const month of uniqueMonths) {
+      effectiveSalariesByMonth[month] = await batchGetEffectiveSalaries(month, prisma);
     }
 
-    // Fetch company-wide health insurance rate
-    const company = await prisma.company.findFirst({ select: { healthInsuranceRate: true } });
-    const companyRate = company?.healthInsuranceRate;
-
-    // Calculate detailed payroll breakdown for each record
-    for (const data of recordsData) {
-      if (data.employeeId) {
-        const employee = await prisma.employee.findUnique({
-          where: { id: data.employeeId },
+    const employees = uniqueEmployeeIds.length > 0
+      ? await prisma.employee.findMany({
+          where: { id: { in: uniqueEmployeeIds } },
           select: {
+            id: true,
             salary: true,
             salaryType: true,
             hourlyRate: true,
@@ -162,10 +159,37 @@ export async function POST(request: NextRequest) {
             position: {
               select: {
                 allowance: true,
-              }
-            }
+              },
+            },
           },
-        });
+        })
+      : [];
+    const employeeMap = new Map(employees.map(employee => [employee.id, employee]));
+
+    for (const data of recordsData) {
+      if (data.employeeId && data.month) {
+        const employee = employeeMap.get(data.employeeId);
+        const effective = effectiveSalariesByMonth[data.month]?.[data.employeeId];
+        if (effective && employee) {
+          // Chỉ ghi đè lương cơ bản tháng cho nhân viên lương tháng; 時給/日給 dùng hourly/daily rate
+          if ((employee.salaryType || '月給') === '月給') {
+            data.baseSalary = effective.baseSalary;
+          }
+          data.hourlyRate = effective.hourlyRate;
+          data.dailyRate = effective.dailyRate;
+        }
+      }
+    }
+
+    const rateConfig = await getActiveRateConfig(prisma);
+    const rateSettings = toPayrollRateSettings(rateConfig);
+    const company = await prisma.company.findFirst({ select: { healthInsuranceRate: true } });
+    const companyRate = company?.healthInsuranceRate;
+
+    // Calculate detailed payroll breakdown for each record
+    for (const data of recordsData) {
+      if (data.employeeId) {
+        const employee = employeeMap.get(data.employeeId);
         if (employee) {
           const details = calculatePayrollDetails({
             baseSalary: parseFloat(data.baseSalary) || employee.salary || 0,
@@ -181,6 +205,7 @@ export async function POST(request: NextRequest) {
             dependents: employee.dependents,
             insuranceSalary: employee.insuranceSalary,
             companyRate,
+            rateSettings,
             customAllowances: (data.allowances !== undefined && data.allowances !== null && data.allowances !== '')
               ? parseFloat(data.allowances)
               : (data.bonus !== undefined && data.bonus !== null && data.bonus !== '')
@@ -203,31 +228,20 @@ export async function POST(request: NextRequest) {
           data.nursingCareInsurance = details.nursingCareInsurance;
           data.totalCompanyCost = details.totalCompanyCost;
 
-          // Populate missing fields in data from details before saving
-          if (data.baseSalary === undefined || data.baseSalary === null || data.baseSalary === '') {
-            data.baseSalary = details.baseSalary;
-          }
-          if (data.overtimePay === undefined || data.overtimePay === null || data.overtimePay === '') {
-            data.overtimePay = details.overtimePay;
-          }
-          if (data.allowances === undefined || data.allowances === null || data.allowances === '') {
-            data.allowances = details.allowances;
-          }
-          if (data.tax === undefined || data.tax === null || data.tax === '') {
-            data.tax = details.incomeTax + details.residentTax;
-          }
-          if (data.insurance === undefined || data.insurance === null || data.insurance === '') {
-            data.insurance = details.healthInsurance + details.pension + details.employmentInsurance;
-          }
-          if (data.netSalary === undefined || data.netSalary === null || data.netSalary === '') {
-            data.netSalary = details.netSalary;
-          }
+          // Luôn dùng kết quả tính toán server làm giá trị lưu DB
+          data.baseSalary = details.baseSalary;
+          data.overtimePay = details.overtimePay;
+          data.allowances = details.allowances;
+          data.tax = details.incomeTax + details.residentTax;
+          data.insurance = details.healthInsurance + details.pension + details.employmentInsurance;
+          data.netSalary = details.netSalary;
+          data.workHours = details.workHours;
         }
       }
     }
 
-    const results = await prisma.$transaction(
-      recordsData.map((data: any) => {
+    const results = await prisma.$transaction([
+      ...recordsData.map((data: any) => {
         const baseSalary = (data.baseSalary !== undefined && data.baseSalary !== null && data.baseSalary !== '') ? parseFloat(data.baseSalary) : 0;
         const overtimePay = (data.overtimePay !== undefined && data.overtimePay !== null && data.overtimePay !== '') ? parseFloat(data.overtimePay) : 0;
         const allowances = (data.allowances !== undefined && data.allowances !== null && data.allowances !== '') 
@@ -306,21 +320,38 @@ export async function POST(request: NextRequest) {
             totalCompanyCost: data.totalCompanyCost || 0,
           },
         });
-      })
-    );
+      }),
+      ...(syncMonth
+        ? [
+            prisma.payrollRecord.deleteMany({
+              where: {
+                month: syncMonth,
+                employeeId: {
+                  notIn: recordsData
+                    .filter((r: { employeeId?: string; month?: string }) => r.month === syncMonth && r.employeeId)
+                    .map((r: { employeeId: string }) => r.employeeId),
+                },
+                status: { in: ['CALCULATED', 'PENDING'] },
+              },
+            }),
+          ]
+        : []),
+    ]);
+
+    const upserted = results.filter((r: unknown) => r && typeof r === 'object' && 'id' in (r as object));
 
     logDatabaseChange({
       request,
       action: 'CREATE',
       model: 'PayrollRecord',
-      recordId: isArray ? 'BATCH' : results[0].id,
+      recordId: recordsData.length > 1 ? 'BATCH' : upserted[0]?.id,
       details: {
         count: results.length,
         month: recordsData[0]?.month,
       },
     });
 
-    return createdResponse(isArray ? results : results[0]);
+    return createdResponse(recordsData.length > 1 || syncMonth ? upserted : upserted[0]);
   } catch (error) {
     return handleApiError(error);
   }
@@ -457,6 +488,8 @@ export async function PUT(request: NextRequest) {
     let nursingCareInsurance = existing.nursingCareInsurance;
     let totalCompanyCost = existing.totalCompanyCost;
 
+    const rateConfig = await getActiveRateConfig(prisma);
+    const rateSettings = toPayrollRateSettings(rateConfig);
     const company = await prisma.company.findFirst({ select: { healthInsuranceRate: true } });
     const companyRate = company?.healthInsuranceRate;
 
@@ -476,6 +509,7 @@ export async function PUT(request: NextRequest) {
         dependents: employee.dependents,
         insuranceSalary: employee.insuranceSalary,
         companyRate,
+        rateSettings,
         customAllowances: allowances,
         customBonus: undefined,
         positionAllowance: employee.position?.allowance || 0,
