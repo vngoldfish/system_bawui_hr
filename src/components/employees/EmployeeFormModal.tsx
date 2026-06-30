@@ -137,7 +137,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
   const [autoGenerateCode, setAutoGenerateCode] = useState(true);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [contractTypes, setContractTypes] = useState<ContractType[]>([]);
+  const [contractTypes, setContractTypes] = useState<(ContractType & { payrollMode?: string; category?: string })[]>([]);
   const [shitens, setShitens] = useState<Shiten[]>([]);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingCard, setIsUploadingCard] = useState(false);
@@ -146,6 +146,8 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
   const [manageContractOpen, setManageContractOpen] = useState(false);
 
   const isForeign = formData.nationality !== '日本';
+  const selectedContractType = contractTypes.find(c => c.id === formData.contractTypeId);
+  const isHoursOnlyContract = selectedContractType?.payrollMode === 'HOURS_ONLY';
 
   const fetchDepartments = useCallback(async () => {
     const res = await fetch('/api/departments');
@@ -646,6 +648,15 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
                     </select>
                     <button type="button" onClick={() => setManageContractOpen(true)} className="px-3 py-2 text-xs bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200 whitespace-nowrap">{t('form.manage')}</button>
                   </div>
+                  {isHoursOnlyContract && (
+                    <p className="mt-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                      {locale === 'ja'
+                        ? 'この雇用形態は派遣勤務時間レポート対象です。給与計算には含まれません。'
+                        : locale === 'vi'
+                          ? 'Loại hợp đồng này dùng báo cáo giờ làm việc điều phối, không tính vào bảng lương.'
+                          : 'This contract type uses the dispatch hours report and is excluded from payroll calculation.'}
+                    </p>
+                  )}
                 </div>
                 <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.contractStart')}</label><input type="date" name="contractStartDate" value={formData.contractStartDate} onChange={handleChange} className={inputCls} required /></div>
                 <div>

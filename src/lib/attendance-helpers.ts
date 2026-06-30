@@ -48,7 +48,11 @@ export function calculateRecordWorkHours(
     const rBreakStart = applyRounding(breakStart, policy, true);
     const rBreakEnd = applyRounding(breakEnd, policy, false);
     if (rBreakStart && rBreakEnd) {
-      durationMins -= (rBreakEnd.getTime() - rBreakStart.getTime()) / (1000 * 60);
+      const overlapStart = Math.max(rCheckIn.getTime(), rBreakStart.getTime());
+      const overlapEnd = Math.min(rCheckOut.getTime(), rBreakEnd.getTime());
+      if (overlapEnd > overlapStart) {
+        durationMins -= (overlapEnd - overlapStart) / (1000 * 60);
+      }
     }
   }
 

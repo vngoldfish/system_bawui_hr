@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n";
+import LocaleShell from "@/components/layout/LocaleShell";
 
 const geistSans = { variable: "font-sans" };
 const geistMono = { variable: "font-mono" };
@@ -29,11 +31,12 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="h-full overflow-hidden" suppressHydrationWarning>
-        <I18nProvider initialLocale="ja">
-          {children}
-        </I18nProvider>
+        <Suspense
+          fallback={<I18nProvider initialLocale="ja">{children}</I18nProvider>}
+        >
+          <LocaleShell>{children}</LocaleShell>
+        </Suspense>
       </body>
     </html>
   );
 }
-

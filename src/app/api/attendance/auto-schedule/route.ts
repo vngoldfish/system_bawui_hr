@@ -1,12 +1,84 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { buildAutoScheduleForMonth } from '@/lib/attendance-estimate';
+import {
+  buildAutoScheduleForMonth,
+  parseShiftPattern,
+  type ExistingAttendanceDay,
+  type ShiftPattern,
+} from '@/lib/attendance-estimate';
 import { createdResponse, errorResponse, handleApiError, successResponse } from '@/lib/api-utils';
 // successResponse used by GET preview
 import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
-import { getPayrollMonthForAttendanceDate } from '@/lib/payroll-helpers';
+import { computeServerOvertimeHours } from '@/lib/attendance-overtime';
+import { getAttendanceMonthDateRangeJst, getPayrollMonthForAttendanceDate } from '@/lib/payroll-helpers';
+import { dateOnlyJst } from '@/lib/utils';
 import { isAttendanceAutoScheduleEnabled } from '@/lib/system-settings';
+
+const SHIFT_PATTERN_REQUIRED_MSG =
+  '勤怠画面の「今月のデフォルト勤務パターン」を設定してください。 (Hãy cấu hình mẫu ca tháng trên màn chấm công.)';
+
+function shiftPatternFromQuery(searchParams: URLSearchParams): ShiftPattern | undefined {
+  return parseShiftPattern({
+    checkIn: searchParams.get('shiftCheckIn'),
+    checkOut: searchParams.get('shiftCheckOut'),
+    breakStart: searchParams.get('shiftBreakStart'),
+    breakEnd: searchParams.get('shiftBreakEnd'),
+    hasBreak: searchParams.get('shiftHasBreak'),
+  });
+}
+
+function formatRecordDate(date: Date): string {
+  return dateOnlyJst(date);
+}
+
+function mapExistingAttendance(
+  records: Array<{
+    date: Date;
+    checkIn: Date | null;
+    checkOut: Date | null;
+    breakStart: Date | null;
+    breakEnd: Date | null;
+    status: string;
+  }>
+): { existingAttendance: ExistingAttendanceDay[]; occupiedDates: Set<string> } {
+  const existingAttendance: ExistingAttendanceDay[] = [];
+  const occupiedDates = new Set<string>();
+  for (const r of records) {
+    if (r.status !== 'PRESENT' && r.status !== 'LATE' && r.status !== 'EARLY_LEAVE') continue;
+    const dateStr = formatRecordDate(new Date(r.date));
+    occupiedDates.add(dateStr);
+    existingAttendance.push({
+      date: dateStr,
+      checkIn: r.checkIn?.toISOString() ?? null,
+      checkOut: r.checkOut?.toISOString() ?? null,
+      breakStart: r.breakStart?.toISOString() ?? null,
+      breakEnd: r.breakEnd?.toISOString() ?? null,
+      status: r.status,
+    });
+  }
+  return { existingAttendance, occupiedDates };
+}
+
+function shiftPatternFromBody(body: Record<string, unknown>): ShiftPattern | undefined {
+  if (body.shiftPattern && typeof body.shiftPattern === 'object') {
+    const p = body.shiftPattern as Record<string, unknown>;
+    return parseShiftPattern({
+      checkIn: typeof p.checkIn === 'string' ? p.checkIn : null,
+      checkOut: typeof p.checkOut === 'string' ? p.checkOut : null,
+      breakStart: typeof p.breakStart === 'string' ? p.breakStart : null,
+      breakEnd: typeof p.breakEnd === 'string' ? p.breakEnd : null,
+      hasBreak: typeof p.hasBreak === 'boolean' ? p.hasBreak : null,
+    });
+  }
+  return parseShiftPattern({
+    checkIn: typeof body.shiftCheckIn === 'string' ? body.shiftCheckIn : null,
+    checkOut: typeof body.shiftCheckOut === 'string' ? body.shiftCheckOut : null,
+    breakStart: typeof body.shiftBreakStart === 'string' ? body.shiftBreakStart : null,
+    breakEnd: typeof body.shiftBreakEnd === 'string' ? body.shiftBreakEnd : null,
+    hasBreak: typeof body.shiftHasBreak === 'boolean' ? body.shiftHasBreak : null,
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,10 +98,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { employeeId, year, month, replaceExisting = true } = body;
+    const { employeeId, year, month, replaceExisting = false } = body;
+    const shiftPattern = shiftPatternFromBody(body as Record<string, unknown>);
 
     if (!employeeId || !year || !month) {
       return errorResponse('employeeId, year, month are required', 400);
+    }
+
+    if (!shiftPattern) {
+      return errorResponse(SHIFT_PATTERN_REQUIRED_MSG, 400);
     }
 
     const employee = await prisma.employee.findUnique({
@@ -40,8 +117,8 @@ export async function POST(request: NextRequest) {
     });
     if (!employee) return errorResponse('従業員が見つかりません', 404);
 
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
+    const calendarMonth = `${year}-${String(month).padStart(2, '0')}`;
+    const { startUtc: monthStart, endUtc: monthEnd } = getAttendanceMonthDateRangeJst(calendarMonth);
     const payrollMonth = getPayrollMonthForAttendanceDate(monthStart);
 
     const payrollRecord = await prisma.payrollRecord.findFirst({
@@ -65,15 +142,22 @@ export async function POST(request: NextRequest) {
       },
     });
     const holidayDates = new Set(
-      holidays.filter(h => h.isPaidHoliday).map(h => {
-        const d = new Date(h.date);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      })
+      holidays.filter(h => h.isPaidHoliday).map(h => dateOnlyJst(h.date))
     );
+
+    const monthRecords = await prisma.attendanceRecord.findMany({
+      where: {
+        employeeId,
+        date: { gte: monthStart, lte: monthEnd },
+        status: { in: ['PRESENT', 'LATE', 'EARLY_LEAVE'] },
+      },
+    });
+    const { existingAttendance, occupiedDates } = mapExistingAttendance(monthRecords);
 
     const schedule = buildAutoScheduleForMonth({
       employee: {
         salaryType: employee.salaryType,
+        salary: employee.salary,
         hourlyRate: employee.hourlyRate,
         dailyRate: employee.dailyRate,
         workLimitVisa28h: employee.workLimitVisa28h,
@@ -95,6 +179,9 @@ export async function POST(request: NextRequest) {
       year: Number(year),
       month: Number(month),
       holidayDates,
+      shiftPattern,
+      occupiedDates: replaceExisting ? new Set<string>() : occupiedDates,
+      existingAttendance: replaceExisting ? [] : existingAttendance,
     });
 
     if (!schedule) {
@@ -105,7 +192,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (schedule.days.length === 0) {
-      return errorResponse('配置可能な勤務日がありません。', 400);
+      const baseMsg = occupiedDates.size > 0 && !replaceExisting
+        ? '上限に達しているか、空き勤務日がありません。 (Đã đủ giới hạn hoặc không còn ngày trống để xếp.)'
+        : '配置可能な勤務日がありません。今月のデフォルト勤務パターン（出勤・退勤・休憩）を確認してください。 (Không xếp được ca — kiểm tra mẫu ca tháng trên màn chấm công.)';
+      return errorResponse(schedule.warning ? `${schedule.warning} ${baseMsg}` : baseMsg, 400);
     }
 
     const created = await prisma.$transaction(async tx => {
@@ -125,15 +215,29 @@ export async function POST(request: NextRequest) {
         });
         if (existing && !replaceExisting) continue;
 
+        const recordDate = new Date(`${day.date}T00:00:00+09:00`);
+        const checkIn = new Date(day.checkIn + '+09:00');
+        const checkOut = new Date(day.checkOut + '+09:00');
+        const breakStart = day.breakStart ? new Date(day.breakStart + '+09:00') : null;
+        const breakEnd = day.breakEnd ? new Date(day.breakEnd + '+09:00') : null;
+        const overtimeHours = await computeServerOvertimeHours(tx, employeeId, {
+          status: 'PRESENT',
+          checkIn,
+          checkOut,
+          breakStart,
+          breakEnd,
+          date: recordDate,
+        });
+
         const record = await tx.attendanceRecord.create({
           data: {
             employeeId,
-            date: new Date(`${day.date}T00:00:00+09:00`),
-            checkIn: new Date(day.checkIn + '+09:00'),
-            checkOut: new Date(day.checkOut + '+09:00'),
-            breakStart: day.breakStart ? new Date(day.breakStart + '+09:00') : null,
-            breakEnd: day.breakEnd ? new Date(day.breakEnd + '+09:00') : null,
-            overtimeHours: 0,
+            date: recordDate,
+            checkIn,
+            checkOut,
+            breakStart,
+            breakEnd,
+            overtimeHours,
             status: 'PRESENT',
             notes: '自動配置 (auto-schedule)',
           },
@@ -191,21 +295,33 @@ export async function GET(request: NextRequest) {
     });
     if (!employee) return errorResponse('従業員が見つかりません', 404);
 
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
+    const calendarMonth = `${year}-${String(month).padStart(2, '0')}`;
+    const { startUtc: monthStart, endUtc: monthEnd } = getAttendanceMonthDateRangeJst(calendarMonth);
     const holidays = await prisma.holiday.findMany({
       where: { isActive: true, date: { gte: monthStart, lte: monthEnd } },
     });
     const holidayDates = new Set(
-      holidays.filter(h => h.isPaidHoliday).map(h => {
-        const d = new Date(h.date);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      })
+      holidays.filter(h => h.isPaidHoliday).map(h => dateOnlyJst(h.date))
     );
 
+    const replaceExisting = searchParams.get('replaceExisting') === 'true';
+    const monthRecords = await prisma.attendanceRecord.findMany({
+      where: {
+        employeeId,
+        date: { gte: monthStart, lte: monthEnd },
+        status: { in: ['PRESENT', 'LATE', 'EARLY_LEAVE'] },
+      },
+    });
+    const { existingAttendance, occupiedDates } = mapExistingAttendance(monthRecords);
+
+    const shiftPattern = shiftPatternFromQuery(searchParams);
+    if (!shiftPattern) {
+      return errorResponse(SHIFT_PATTERN_REQUIRED_MSG, 400);
+    }
     const schedule = buildAutoScheduleForMonth({
       employee: {
         salaryType: employee.salaryType,
+        salary: employee.salary,
         hourlyRate: employee.hourlyRate,
         dailyRate: employee.dailyRate,
         workLimitVisa28h: employee.workLimitVisa28h,
@@ -227,6 +343,9 @@ export async function GET(request: NextRequest) {
       year,
       month,
       holidayDates,
+      shiftPattern,
+      occupiedDates: replaceExisting ? new Set<string>() : occupiedDates,
+      existingAttendance: replaceExisting ? [] : existingAttendance,
     });
 
     if (!schedule) {

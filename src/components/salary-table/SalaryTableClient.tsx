@@ -164,8 +164,8 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
     if (draft.baseRate !== settings.baseRate) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.baseRate'), `${settings.baseRate}%`, `${draft.baseRate}%`, reason, adminLabel);
     if (draft.careInsuranceRate !== settings.careInsuranceRate) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.careTotal'), `${settings.careInsuranceRate}%`, `${draft.careInsuranceRate}%`, reason, adminLabel);
     if (draft.prefecture !== settings.prefecture) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.prefecture'), settings.prefecture, draft.prefecture, reason, adminLabel);
-    if (draft.standardMonthlyMin !== settings.standardMonthlyMin) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.standardMin'), `¥${settings.standardMonthlyMin.toLocaleString()}`, `¥${draft.standardMonthlyMin.toLocaleString()}`, reason, adminLabel);
-    if (draft.standardMonthlyMax !== settings.standardMonthlyMax) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.standardMax'), `¥${settings.standardMonthlyMax.toLocaleString()}`, `¥${draft.standardMonthlyMax.toLocaleString()}`, reason, adminLabel);
+    if (draft.standardMonthlyMin !== settings.standardMonthlyMin) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.standardMin'), `¥${settings.standardMonthlyMin.toLocaleString('ja-JP')}`, `¥${draft.standardMonthlyMin.toLocaleString('ja-JP')}`, reason, adminLabel);
+    if (draft.standardMonthlyMax !== settings.standardMonthlyMax) logChange(setChangeLog, 'health', healthLabel, t('salaryTable.standardMax'), `¥${settings.standardMonthlyMax.toLocaleString('ja-JP')}`, `¥${draft.standardMonthlyMax.toLocaleString('ja-JP')}`, reason, adminLabel);
     onChange(draft);
     setEditing(false);
     setReason('');
@@ -237,7 +237,7 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
                   onChange={e => setDraft(p => ({ ...p, standardMonthlyMin: Number(e.target.value) }))}
                   className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
               ) : (
-                <p className="text-sm text-slate-800 mt-1">¥{settings.standardMonthlyMin.toLocaleString()}</p>
+                <p className="text-sm text-slate-800 mt-1">¥{settings.standardMonthlyMin.toLocaleString('ja-JP')}</p>
               )}
             </div>
             <div>
@@ -247,7 +247,7 @@ function HealthInsuranceSection({ settings, onChange, changeLog, setChangeLog }:
                   onChange={e => setDraft(p => ({ ...p, standardMonthlyMax: Number(e.target.value) }))}
                   className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
               ) : (
-                <p className="text-sm text-slate-800 mt-1">¥{settings.standardMonthlyMax.toLocaleString()}</p>
+                <p className="text-sm text-slate-800 mt-1">¥{settings.standardMonthlyMax.toLocaleString('ja-JP')}</p>
               )}
             </div>
           </div>
@@ -300,8 +300,8 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
     if (draft.totalRate !== settings.totalRate) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.totalRate'), `${settings.totalRate}%`, `${draft.totalRate}%`, reason, adminLabel);
     if (draft.companyRate !== settings.companyRate) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.pensionCompany'), `${settings.companyRate}%`, `${draft.companyRate}%`, reason, adminLabel);
     if (draft.employeeRate !== settings.employeeRate) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.pensionEmployee'), `${settings.employeeRate}%`, `${draft.employeeRate}%`, reason, adminLabel);
-    if (draft.standardMonthlyMin !== settings.standardMonthlyMin) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.standardMin'), `¥${settings.standardMonthlyMin.toLocaleString()}`, `¥${draft.standardMonthlyMin.toLocaleString()}`, reason, adminLabel);
-    if (draft.standardMonthlyMax !== settings.standardMonthlyMax) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.standardMax'), `¥${settings.standardMonthlyMax.toLocaleString()}`, `¥${draft.standardMonthlyMax.toLocaleString()}`, reason, adminLabel);
+    if (draft.standardMonthlyMin !== settings.standardMonthlyMin) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.standardMin'), `¥${settings.standardMonthlyMin.toLocaleString('ja-JP')}`, `¥${draft.standardMonthlyMin.toLocaleString('ja-JP')}`, reason, adminLabel);
+    if (draft.standardMonthlyMax !== settings.standardMonthlyMax) logChange(setChangeLog, 'pension', pensionLabel, t('salaryTable.standardMax'), `¥${settings.standardMonthlyMax.toLocaleString('ja-JP')}`, `¥${draft.standardMonthlyMax.toLocaleString('ja-JP')}`, reason, adminLabel);
     onChange(draft);
     setEditing(false);
     setReason('');
@@ -369,7 +369,7 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
                   onChange={e => setDraft(p => ({ ...p, standardMonthlyMin: Number(e.target.value) }))}
                   className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
               ) : (
-                <p className="text-sm text-slate-800 mt-1">¥{settings.standardMonthlyMin.toLocaleString()}</p>
+                <p className="text-sm text-slate-800 mt-1">¥{settings.standardMonthlyMin.toLocaleString('ja-JP')}</p>
               )}
             </div>
             <div>
@@ -379,7 +379,7 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
                   onChange={e => setDraft(p => ({ ...p, standardMonthlyMax: Number(e.target.value) }))}
                   className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm" />
               ) : (
-                <p className="text-sm text-slate-800 mt-1">¥{settings.standardMonthlyMax.toLocaleString()}</p>
+                <p className="text-sm text-slate-800 mt-1">¥{settings.standardMonthlyMax.toLocaleString('ja-JP')}</p>
               )}
             </div>
           </div>
@@ -400,8 +400,8 @@ function PensionSection({ settings, onChange, changeLog, setChangeLog }: {
             <div className="flex justify-between pl-4"><span className="text-orange-600">{t('salaryTable.employeeHalf')}</span><span className="font-medium text-orange-600">{settings.employeeRate}%</span></div>
             <div className="border-t border-slate-200 my-2" />
             <p className="text-xs text-slate-500">{t('salaryTable.pensionExample')}</p>
-            <div className="flex justify-between"><span className="text-blue-600">{t('salaryTable.companyBurden')}</span><span>¥{Math.round(300000 * settings.companyRate / 100).toLocaleString()}</span></div>
-            <div className="flex justify-between"><span className="text-orange-600">{t('salaryTable.employeeBurden')}</span><span>¥{Math.round(300000 * settings.employeeRate / 100).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-blue-600">{t('salaryTable.companyBurden')}</span><span>¥{Math.round(300000 * settings.companyRate / 100).toLocaleString('ja-JP')}</span></div>
+            <div className="flex justify-between"><span className="text-orange-600">{t('salaryTable.employeeBurden')}</span><span>¥{Math.round(300000 * settings.employeeRate / 100).toLocaleString('ja-JP')}</span></div>
           </div>
         </div>
       </div>
@@ -432,7 +432,7 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
         logChange(setChangeLog, 'income_tax', taxLabel, `${t('salaryTable.taxRate')}(${orig.min}${t('salaryTable.aboveSuffix')})`, `${orig.rate}%`, `${b.rate}%`, reason, adminLabel);
       }
       if (orig.deduction !== b.deduction) {
-        logChange(setChangeLog, 'income_tax', taxLabel, `${t('salaryTable.taxDeduction')}(${orig.min}${t('salaryTable.aboveSuffix')})`, `¥${orig.deduction.toLocaleString()}`, `¥${b.deduction.toLocaleString()}`, reason, adminLabel);
+        logChange(setChangeLog, 'income_tax', taxLabel, `${t('salaryTable.taxDeduction')}(${orig.min}${t('salaryTable.aboveSuffix')})`, `¥${orig.deduction.toLocaleString('ja-JP')}`, `¥${b.deduction.toLocaleString('ja-JP')}`, reason, adminLabel);
       }
     });
     onChange(draft);
@@ -484,7 +484,7 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
                       }} placeholder={t('salaryTable.noLimit')} className="w-20 px-2 py-1 border border-slate-300 rounded text-sm" />
                     </div>
                   ) : (
-                    <span>{b.min.toLocaleString()}万 〜 {b.max ? `${b.max.toLocaleString()}万` : t('salaryTable.aboveSuffix')}</span>
+                    <span>{b.min.toLocaleString('ja-JP')}万 〜 {b.max ? `${b.max.toLocaleString('ja-JP')}万` : t('salaryTable.aboveSuffix')}</span>
                   )}
                 </td>
                 <td className="px-4 py-2 text-sm text-right">
@@ -504,7 +504,7 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
                       setDraft(p => p.map((x, j) => j === i ? { ...x, deduction: v } : x));
                     }} className="w-24 px-2 py-1 border border-slate-300 rounded text-sm text-right" />
                   ) : (
-                    <span>¥{b.deduction.toLocaleString()}</span>
+                    <span>¥{b.deduction.toLocaleString('ja-JP')}</span>
                   )}
                 </td>
                 <td className="px-4 py-2 text-xs text-slate-500">
@@ -534,8 +534,8 @@ function IncomeTaxSection({ brackets, onChange, changeLog, setChangeLog }: {
             return (
               <div key={salary} className="bg-white rounded-lg p-3 border border-slate-200">
                 <p className="text-xs text-slate-500">{t('payroll.baseSalaryLabel')} {salary}{t('salaryTable.aboveSuffix')}</p>
-                <p className="text-lg font-bold text-red-600">¥{tax.toLocaleString()}</p>
-                <p className="text-xs text-slate-400">{t('salaryTable.taxRate')}{bracket?.rate}% / {t('salaryTable.taxDeduction')} ¥{bracket?.deduction.toLocaleString()}</p>
+                <p className="text-lg font-bold text-red-600">¥{tax.toLocaleString('ja-JP')}</p>
+                <p className="text-xs text-slate-400">{t('salaryTable.taxRate')}{bracket?.rate}% / {t('salaryTable.taxDeduction')} ¥{bracket?.deduction.toLocaleString('ja-JP')}</p>
               </div>
             );
           })}
@@ -793,8 +793,8 @@ export default function SalaryTableClient() {
     const adminLabel = t('salaryTable.historyAdmin');
     if (original.companyRate !== updated.companyRate) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.companyRate'), `${original.companyRate}%`, `${updated.companyRate}%`, reason, adminLabel);
     if (original.employeeRate !== updated.employeeRate) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.employeeRate'), `${original.employeeRate}%`, `${updated.employeeRate}%`, reason, adminLabel);
-    if (original.companyFixed !== updated.companyFixed) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.companyFixed'), `¥${original.companyFixed.toLocaleString()}`, `¥${updated.companyFixed.toLocaleString()}`, reason, adminLabel);
-    if (original.employeeFixed !== updated.employeeFixed) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.employeeFixed'), `¥${original.employeeFixed.toLocaleString()}`, `¥${updated.employeeFixed.toLocaleString()}`, reason, adminLabel);
+    if (original.companyFixed !== updated.companyFixed) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.companyFixed'), `¥${original.companyFixed.toLocaleString('ja-JP')}`, `¥${updated.companyFixed.toLocaleString('ja-JP')}`, reason, adminLabel);
+    if (original.employeeFixed !== updated.employeeFixed) logChange(setChangeLog, updated.id, trans.name, t('salaryTable.employeeFixed'), `¥${original.employeeFixed.toLocaleString('ja-JP')}`, `¥${updated.employeeFixed.toLocaleString('ja-JP')}`, reason, adminLabel);
     const newRates = rates.map(r => r.id === updated.id ? updated : r);
     setRates(newRates);
     setEditingItem(null);
@@ -846,8 +846,8 @@ export default function SalaryTableClient() {
         category: t('salaryTable.' + item.category),
         companyRate: item.companyRate > 0 ? `${item.companyRate}%` : '-',
         employeeRate: item.employeeRate > 0 ? `${item.employeeRate}%` : '-',
-        companyFixed: item.companyFixed > 0 ? `¥${item.companyFixed.toLocaleString()}` : '-',
-        employeeFixed: item.employeeFixed > 0 ? `¥${item.employeeFixed.toLocaleString()}` : '-',
+        companyFixed: item.companyFixed > 0 ? `¥${item.companyFixed.toLocaleString('ja-JP')}` : '-',
+        employeeFixed: item.employeeFixed > 0 ? `¥${item.employeeFixed.toLocaleString('ja-JP')}` : '-',
         description: trans.desc,
       };
     });
@@ -992,8 +992,8 @@ export default function SalaryTableClient() {
                       </td>
                       <td className="px-4 py-3 text-sm text-right font-medium text-blue-600">{item.companyRate > 0 ? `${item.companyRate}%` : '-'}</td>
                       <td className="px-4 py-3 text-sm text-right font-medium text-orange-600">{item.employeeRate > 0 ? `${item.employeeRate}%` : '-'}</td>
-                      <td className="px-4 py-3 text-sm text-right text-blue-600">{item.companyFixed > 0 ? `¥${item.companyFixed.toLocaleString()}` : '-'}</td>
-                      <td className="px-4 py-3 text-sm text-right text-orange-600">{item.employeeFixed > 0 ? `¥${item.employeeFixed.toLocaleString()}` : '-'}</td>
+                      <td className="px-4 py-3 text-sm text-right text-blue-600">{item.companyFixed > 0 ? `¥${item.companyFixed.toLocaleString('ja-JP')}` : '-'}</td>
+                      <td className="px-4 py-3 text-sm text-right text-orange-600">{item.employeeFixed > 0 ? `¥${item.employeeFixed.toLocaleString('ja-JP')}` : '-'}</td>
                       <td className="px-4 py-3 text-xs text-slate-500 max-w-[200px]">{trans.desc}</td>
                       <td className="px-4 py-3 text-center">
                         <button onClick={() => setEditingItem(item)} className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100">{t('salaryTable.editBtn')}</button>
@@ -1025,7 +1025,7 @@ export default function SalaryTableClient() {
                 {rates.filter(r => r.companyFixed > 0).map(r => {
                   const trans = getItemTranslation(r.id, r.name, r.description, t);
                   return (
-                    <div key={r.id} className="flex justify-between"><span>{trans.name}</span><span className="font-medium">¥{r.companyFixed.toLocaleString()}</span></div>
+                    <div key={r.id} className="flex justify-between"><span>{trans.name}</span><span className="font-medium">¥{r.companyFixed.toLocaleString('ja-JP')}</span></div>
                   );
                 })}
               </div>

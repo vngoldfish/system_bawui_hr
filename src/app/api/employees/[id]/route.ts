@@ -161,20 +161,29 @@ export async function PUT(
 
     if (salaryChanged) {
       const currentMonth = new Date().toISOString().slice(0, 7);
-      await prisma.salaryAdjustment.create({
-        data: {
-          employeeId: id,
-          effectiveFrom: currentMonth,
-          oldBaseSalary: existing.salary,
-          newBaseSalary: employeeData.salary !== undefined ? employeeData.salary : existing.salary,
-          oldHourlyRate: existing.hourlyRate,
-          newHourlyRate: employeeData.hourlyRate !== undefined ? employeeData.hourlyRate : existing.hourlyRate,
-          oldDailyRate: existing.dailyRate,
-          newDailyRate: employeeData.dailyRate !== undefined ? employeeData.dailyRate : existing.dailyRate,
-          reason: "従業員情報更新による変更 (Changed via employee profile update)",
-          adjustedBy: user.id,
-        }
+      const adjustmentData = {
+        oldBaseSalary: existing.salary,
+        newBaseSalary: employeeData.salary !== undefined ? employeeData.salary : existing.salary,
+        oldHourlyRate: existing.hourlyRate,
+        newHourlyRate: employeeData.hourlyRate !== undefined ? employeeData.hourlyRate : existing.hourlyRate,
+        oldDailyRate: existing.dailyRate,
+        newDailyRate: employeeData.dailyRate !== undefined ? employeeData.dailyRate : existing.dailyRate,
+        reason: "従業員情報更新による変更 (Changed via employee profile update)",
+        adjustedBy: user.id,
+      };
+      const existingAdjustment = await prisma.salaryAdjustment.findFirst({
+        where: { employeeId: id, effectiveFrom: currentMonth },
       });
+      if (existingAdjustment) {
+        await prisma.salaryAdjustment.update({
+          where: { id: existingAdjustment.id },
+          data: { ...adjustmentData, adjustedAt: new Date() },
+        });
+      } else {
+        await prisma.salaryAdjustment.create({
+          data: { employeeId: id, effectiveFrom: currentMonth, ...adjustmentData },
+        });
+      }
     }
 
     // Track residence card history if residence fields changed

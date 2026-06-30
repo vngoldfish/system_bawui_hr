@@ -1,10 +1,15 @@
 import { prisma } from '@/lib/prisma';
-import { calculatePayrollDetails, type PayrollRateSettings } from '@/lib/payroll-calculator';
+import { batchGetEffectiveSalaries, calculatePayrollDetails, type PayrollRateSettings } from '@/lib/payroll-calculator';
+import { resolveContractPayrollRules } from '@/lib/contract-payroll-rules';
 import { getActiveRateConfig, toPayrollRateSettings } from '@/services/payrollRateService';
+import type { OvertimeContractInfo, OvertimeHolidayInfo } from '@/lib/attendance-overtime';
 import {
   aggregateAttendanceStats,
   buildAttendanceLookupKey,
   countContractWorkDaysInMonth,
+  getActiveContractForDate,
+  getAttendanceMonthForPayroll,
+  getPayrollAttendanceRangeJst,
   getWorkingMonthDateRange,
 } from '@/lib/payroll-helpers';
 
@@ -95,13 +100,43 @@ export function mapEmployeeToClient(emp: {
     gender: string | null;
     cohabitation: string;
   }>;
+  contractType?: {
+    id: string;
+    name: string;
+    category?: string | null;
+    payrollMode?: string | null;
+    defaultSalaryType?: string | null;
+    overtimeMultiplier?: number | null;
+    socialInsuranceDefault?: boolean | null;
+    employmentInsuranceDefault?: boolean | null;
+    workersCompDefault?: boolean | null;
+    maxWeeklyHours?: number | null;
+    defaultStandardHoursPerDay?: number | null;
+    defaultHolidayWorkCountsAsOvertime?: boolean | null;
+    contractTemplateNotes?: string | null;
+  } | null;
   employeeContracts?: Array<{
     workDays: unknown;
     isActive: boolean;
     startDate: Date | string;
     endDate?: Date | string | null;
     standardHoursPerDay?: number | null;
-    contractType?: { name: string } | null;
+    holidayWorkCountsAsOvertime?: boolean | null;
+    contractType?: {
+      id: string;
+      name: string;
+      category?: string | null;
+      payrollMode?: string | null;
+      defaultSalaryType?: string | null;
+      overtimeMultiplier?: number | null;
+      socialInsuranceDefault?: boolean | null;
+      employmentInsuranceDefault?: boolean | null;
+      workersCompDefault?: boolean | null;
+      maxWeeklyHours?: number | null;
+      defaultStandardHoursPerDay?: number | null;
+      defaultHolidayWorkCountsAsOvertime?: boolean | null;
+      contractTemplateNotes?: string | null;
+    } | null;
   }>;
   workLimitVisa28h?: boolean | null;
   workLimitIncomeCap80k?: boolean | null;
@@ -122,7 +157,8 @@ export function mapEmployeeToClient(emp: {
     salaryType: emp.salaryType || '月給',
     hourlyRate: emp.hourlyRate || 0,
     dailyRate: emp.dailyRate || 0,
-    contractType: emp.employeeContracts?.[0]?.contractType?.name || '正社員',
+    contractType: emp.employeeContracts?.[0]?.contractType?.name || emp.contractType?.name || '正社員',
+    payrollContractType: emp.contractType ?? emp.employeeContracts?.[0]?.contractType ?? null,
     benefits: mergeBenefits(emp.benefits),
     birthDate: emp.birthDate ? emp.birthDate.toISOString() : null,
     dependents: mapDependents(emp.dependents),
@@ -132,6 +168,8 @@ export function mapEmployeeToClient(emp: {
       startDate: c.startDate instanceof Date ? c.startDate.toISOString() : c.startDate,
       endDate: c.endDate instanceof Date ? c.endDate.toISOString() : (c.endDate ?? null),
       standardHoursPerDay: c.standardHoursPerDay ?? 8,
+      holidayWorkCountsAsOvertime: c.holidayWorkCountsAsOvertime ?? true,
+      contractType: c.contractType ?? undefined,
     })),
     workLimitVisa28h: !!emp.workLimitVisa28h,
     workLimitIncomeCap80k: !!emp.workLimitIncomeCap80k,
@@ -142,11 +180,11 @@ export function mapEmployeeToClient(emp: {
 
 export async function batchFetchAttendanceForPayrollRecords(
   records: { employeeId: string; month: string }[]
-): Promise<Map<string, Array<{ status: string; overtimeHours?: number | null }>>> {
-  const result = new Map<string, Array<{ status: string; overtimeHours?: number | null }>>();
+): Promise<Map<string, import('@/lib/payroll-helpers').AttendanceRecordForStats[]>> {
+  const result = new Map<string, import('@/lib/payroll-helpers').AttendanceRecordForStats[]>();
   if (records.length === 0) return result;
 
-  const uniqueKeys = new Map<string, { employeeId: string; month: string; start: Date; end: Date }>();
+  const uniqueKeys = new Map<string, { employeeId: string; month: string; startUtc: Date; endUtc: Date }>();
   let minStart = new Date(8640000000000000);
   let maxEnd = new Date(-8640000000000000);
 
@@ -154,10 +192,10 @@ export async function batchFetchAttendanceForPayrollRecords(
     const key = buildAttendanceLookupKey(record.employeeId, record.month);
     if (uniqueKeys.has(key)) continue;
 
-    const range = getWorkingMonthDateRange(record.month);
-    uniqueKeys.set(key, { ...record, ...range });
-    if (range.start < minStart) minStart = range.start;
-    if (range.end > maxEnd) maxEnd = range.end;
+    const range = getPayrollAttendanceRangeJst(record.month);
+    uniqueKeys.set(key, { employeeId: record.employeeId, month: record.month, startUtc: range.startUtc, endUtc: range.endUtc });
+    if (range.startUtc < minStart) minStart = range.startUtc;
+    if (range.endUtc > maxEnd) maxEnd = range.endUtc;
   }
 
   const employeeIds = [...new Set(records.map(r => r.employeeId))];
@@ -174,7 +212,7 @@ export async function batchFetchAttendanceForPayrollRecords(
   for (const [, entry] of uniqueKeys) {
     const key = buildAttendanceLookupKey(entry.employeeId, entry.month);
     const filtered = allAttendance.filter(
-      a => a.employeeId === entry.employeeId && a.date >= entry.start && a.date <= entry.end
+      a => a.employeeId === entry.employeeId && a.date >= entry.startUtc && a.date <= entry.endUtc
     );
     result.set(key, filtered);
   }
@@ -215,6 +253,7 @@ export function transformPayrollRecord(
     salaryType?: string | null;
     hourlyRate?: number | null;
     dailyRate?: number | null;
+    insuranceSalary?: number | null;
     benefits?: unknown;
     birthDate?: Date | null;
     dependents?: Array<{
@@ -226,26 +265,88 @@ export function transformPayrollRecord(
       cohabitation: string;
     }>;
     position?: { allowance?: number | null } | null;
-    employeeContracts?: Array<{ workDays: unknown; isActive: boolean }>;
+    contractType?: {
+      id: string;
+      name: string;
+      category?: string | null;
+      payrollMode?: string | null;
+      defaultSalaryType?: string | null;
+      overtimeMultiplier?: number | null;
+      socialInsuranceDefault?: boolean | null;
+      employmentInsuranceDefault?: boolean | null;
+      workersCompDefault?: boolean | null;
+      maxWeeklyHours?: number | null;
+      defaultStandardHoursPerDay?: number | null;
+      defaultHolidayWorkCountsAsOvertime?: boolean | null;
+      contractTemplateNotes?: string | null;
+    } | null;
+    employeeContracts?: Array<{
+      workDays: unknown;
+      isActive: boolean;
+      startDate: string | Date;
+      endDate?: string | Date | null;
+      standardHoursPerDay?: number | null;
+      holidayWorkCountsAsOvertime?: boolean | null;
+      contractType?: {
+        id: string;
+        name: string;
+        category?: string | null;
+        payrollMode?: string | null;
+        defaultSalaryType?: string | null;
+        overtimeMultiplier?: number | null;
+        socialInsuranceDefault?: boolean | null;
+        employmentInsuranceDefault?: boolean | null;
+        workersCompDefault?: boolean | null;
+        maxWeeklyHours?: number | null;
+        defaultStandardHoursPerDay?: number | null;
+        defaultHolidayWorkCountsAsOvertime?: boolean | null;
+        contractTemplateNotes?: string | null;
+      } | null;
+    }>;
   } | null | undefined,
   company: { healthInsuranceRate?: number | null } | null | undefined,
-  attendanceMap: Map<string, Array<{ status: string; overtimeHours?: number | null }>>,
-  rateSettings?: PayrollRateSettings
+  attendanceMap: Map<string, import('@/lib/payroll-helpers').AttendanceRecordForStats[]>,
+  rateSettings?: PayrollRateSettings,
+  roundingPolicy = 'exact',
+  effectiveSalary?: { baseSalary: number; hourlyRate: number; dailyRate: number },
+  holidays: OvertimeHolidayInfo[] = []
 ) {
   const allowances = r.bonus;
 
   const attendanceKey = buildAttendanceLookupKey(r.employeeId, r.month);
   const attendance = attendanceMap.get(attendanceKey) || [];
-  const stats = aggregateAttendanceStats(attendance);
-  const workingRange = getWorkingMonthDateRange(r.month);
-  const workingYear = workingRange.start.getFullYear();
-  const workingMonth = workingRange.start.getMonth() + 1;
-  const fallbackWorkDays = countContractWorkDaysInMonth(getContractWorkDays(emp), workingYear, workingMonth);
+  const overtimeContext = emp?.employeeContracts?.length
+    ? {
+        contracts: emp.employeeContracts as OvertimeContractInfo[],
+        holidays,
+      }
+    : undefined;
+  const stats = aggregateAttendanceStats(attendance, roundingPolicy, overtimeContext);
+  const [workingYear, workingMonth] = getAttendanceMonthForPayroll(r.month).split('-').map(Number);
+  const midMonthDate = `${workingYear}-${String(workingMonth).padStart(2, '0')}-15`;
+  const activeContract = getActiveContractForDate(
+    emp?.employeeContracts as Parameters<typeof getActiveContractForDate>[0],
+    midMonthDate
+  );
+  const fallbackWorkDays = countContractWorkDaysInMonth(
+    activeContract?.workDays ?? getContractWorkDays(emp),
+    workingYear,
+    workingMonth
+  );
+  const contractWorkDaysInMonth = fallbackWorkDays;
 
-  const workDays = stats.workDays > 0 ? stats.workDays : (r.workDays ?? fallbackWorkDays);
-  const absentDays = r.absentDays ?? stats.absentDays;
-  const overtimeHours = stats.workDays > 0 ? stats.overtimeHours : (r.overtimeHours ?? 0);
-  let workHours = r.workHours ?? stats.workHours;
+  const isLocked = r.status === 'APPROVED' || r.status === 'PAID';
+
+  const resolvedWorkDays =
+    stats.workDays > 0
+      ? stats.workDays
+      : stats.absentDays > 0 || stats.overtimeHours > 0
+        ? 0
+        : fallbackWorkDays;
+  const workDays = isLocked ? (r.workDays ?? resolvedWorkDays) : resolvedWorkDays;
+  const absentDays = isLocked ? (r.absentDays ?? stats.absentDays) : stats.absentDays;
+  const overtimeHours = isLocked ? (r.overtimeHours ?? stats.overtimeHours) : stats.overtimeHours;
+  let workHours = isLocked ? (r.workHours ?? stats.workHours) : stats.workHours;
 
   let baseSalary = r.baseSalary;
   let overtimePay = r.overtimePay;
@@ -262,35 +363,34 @@ export function transformPayrollRecord(
   let totalCompanyCost = r.totalCompanyCost;
   let netSalary = r.netSalary;
 
-  const attendanceStale =
-    stats.workDays > 0 &&
-    r.workDays !== null &&
-    r.workDays !== undefined &&
-    r.workDays !== stats.workDays;
-  const hourlyDisplayBroken =
-    emp &&
-    r.baseSalary === 0 &&
-    (emp.salaryType === '時給' || emp.salaryType === '日給') &&
-    ((emp.hourlyRate || 0) > 0 || (emp.dailyRate || 0) > 0) &&
-    workDays > 0;
+  const payrollRules = emp ? resolveContractPayrollRules(emp, r.month) : null;
 
-  if (emp && (!totalCompanyCost || totalCompanyCost === 0 || hourlyDisplayBroken || attendanceStale)) {
-    const details = calculatePayrollDetails({
+  if (emp && !isLocked && payrollRules?.payrollMode !== 'HOURS_ONLY') {
+    const rates = effectiveSalary ?? {
       baseSalary: emp.salary || 0,
-      salaryType: emp.salaryType || '月給',
-      workDays,
       hourlyRate: emp.hourlyRate || 0,
       dailyRate: emp.dailyRate || 0,
+    };
+    const details = calculatePayrollDetails({
+      baseSalary: rates.baseSalary,
+      salaryType: emp.salaryType || '月給',
+      workDays: resolvedWorkDays,
+      workHours: stats.workHours,
+      hourlyRate: rates.hourlyRate,
+      dailyRate: rates.dailyRate,
       overtimeHours,
+      contractWorkDaysInMonth,
       benefits: mergeBenefits(emp.benefits),
       birthDate: emp.birthDate ? emp.birthDate.toISOString() : null,
       month: r.month,
       dependentsCount: emp.dependents ? emp.dependents.length : 0,
       dependents: mapDependents(emp.dependents),
+      insuranceSalary: emp.insuranceSalary ?? undefined,
       companyRate: company?.healthInsuranceRate,
       rateSettings,
       customAllowances: allowances,
       positionAllowance: emp.position?.allowance || 0,
+      overtimeMultiplier: payrollRules!.overtimeMultiplier,
     });
 
     baseSalary = details.baseSalary;
@@ -363,6 +463,7 @@ export async function loadPayrollRecordsForAdmin(
     salaryType?: string | null;
     hourlyRate?: number | null;
     dailyRate?: number | null;
+    insuranceSalary?: number | null;
     benefits?: unknown;
     birthDate?: Date | null;
     dependents?: Array<{
@@ -373,17 +474,48 @@ export async function loadPayrollRecordsForAdmin(
       gender: string | null;
       cohabitation: string;
     }>;
+    contractType?: {
+      id: string;
+      name: string;
+      category?: string | null;
+      payrollMode?: string | null;
+      defaultSalaryType?: string | null;
+      overtimeMultiplier?: number | null;
+      socialInsuranceDefault?: boolean | null;
+      employmentInsuranceDefault?: boolean | null;
+      workersCompDefault?: boolean | null;
+      maxWeeklyHours?: number | null;
+      defaultStandardHoursPerDay?: number | null;
+      defaultHolidayWorkCountsAsOvertime?: boolean | null;
+      contractTemplateNotes?: string | null;
+    } | null;
     employeeContracts?: Array<{
       workDays: unknown;
       isActive: boolean;
       startDate: Date | string;
       endDate?: Date | string | null;
       standardHoursPerDay?: number | null;
-      contractType?: { name: string } | null;
+      holidayWorkCountsAsOvertime?: boolean | null;
+      contractType?: {
+        id: string;
+        name: string;
+        category?: string | null;
+        payrollMode?: string | null;
+        defaultSalaryType?: string | null;
+        overtimeMultiplier?: number | null;
+        socialInsuranceDefault?: boolean | null;
+        employmentInsuranceDefault?: boolean | null;
+        workersCompDefault?: boolean | null;
+        maxWeeklyHours?: number | null;
+        defaultStandardHoursPerDay?: number | null;
+        defaultHolidayWorkCountsAsOvertime?: boolean | null;
+        contractTemplateNotes?: string | null;
+      } | null;
     }>;
   }>,
-  company: { healthInsuranceRate?: number | null } | null
+  company: { healthInsuranceRate?: number | null; roundingPolicy?: string | null } | null
 ) {
+  const roundingPolicy = company?.roundingPolicy || 'exact';
   const rateConfig = await getActiveRateConfig(prisma);
   const rateSettings = toPayrollRateSettings(rateConfig);
 
@@ -395,10 +527,44 @@ export async function loadPayrollRecordsForAdmin(
     dbRecords.map(r => ({ employeeId: r.employeeId, month: r.month }))
   );
 
+  const uniqueMonths = [...new Set(dbRecords.map(r => r.month))];
+  const effectiveSalariesByMonth: Record<string, Awaited<ReturnType<typeof batchGetEffectiveSalaries>>> = {};
+  for (const month of uniqueMonths) {
+    effectiveSalariesByMonth[month] = await batchGetEffectiveSalaries(month, prisma);
+  }
+
+  let holidayMin = new Date(8640000000000000);
+  let holidayMax = new Date(-8640000000000000);
+  for (const month of uniqueMonths) {
+    const range = getPayrollAttendanceRangeJst(month);
+    if (range.startUtc < holidayMin) holidayMin = range.startUtc;
+    if (range.endUtc > holidayMax) holidayMax = range.endUtc;
+  }
+  const dbHolidays =
+    uniqueMonths.length > 0
+      ? await prisma.holiday.findMany({
+          where: { isActive: true, date: { gte: holidayMin, lte: holidayMax } },
+        })
+      : [];
+  const holidays: OvertimeHolidayInfo[] = dbHolidays.map(h => ({
+    date: h.date,
+    isActive: h.isActive,
+  }));
+
   const employees = dbEmployees.map(mapEmployeeToClient);
   const records = dbRecords.map(r => {
     const emp = dbEmployees.find(e => e.id === r.employeeId);
-    return transformPayrollRecord(r, emp, company, attendanceMap, rateSettings);
+    const effectiveSalary = effectiveSalariesByMonth[r.month]?.[r.employeeId];
+    return transformPayrollRecord(
+      r,
+      emp,
+      company,
+      attendanceMap,
+      rateSettings,
+      roundingPolicy,
+      effectiveSalary,
+      holidays
+    );
   });
 
   return { employees, records };
@@ -419,6 +585,7 @@ export async function loadPayrollRecordsForEmployee(
     salaryType?: string | null;
     hourlyRate?: number | null;
     dailyRate?: number | null;
+    insuranceSalary?: number | null;
     benefits?: unknown;
     birthDate?: Date | null;
     dependents?: Array<{
@@ -429,17 +596,48 @@ export async function loadPayrollRecordsForEmployee(
       gender: string | null;
       cohabitation: string;
     }>;
+    contractType?: {
+      id: string;
+      name: string;
+      category?: string | null;
+      payrollMode?: string | null;
+      defaultSalaryType?: string | null;
+      overtimeMultiplier?: number | null;
+      socialInsuranceDefault?: boolean | null;
+      employmentInsuranceDefault?: boolean | null;
+      workersCompDefault?: boolean | null;
+      maxWeeklyHours?: number | null;
+      defaultStandardHoursPerDay?: number | null;
+      defaultHolidayWorkCountsAsOvertime?: boolean | null;
+      contractTemplateNotes?: string | null;
+    } | null;
     employeeContracts?: Array<{
       workDays: unknown;
       isActive: boolean;
       startDate: Date | string;
       endDate?: Date | string | null;
       standardHoursPerDay?: number | null;
-      contractType?: { name: string } | null;
+      holidayWorkCountsAsOvertime?: boolean | null;
+      contractType?: {
+        id: string;
+        name: string;
+        category?: string | null;
+        payrollMode?: string | null;
+        defaultSalaryType?: string | null;
+        overtimeMultiplier?: number | null;
+        socialInsuranceDefault?: boolean | null;
+        employmentInsuranceDefault?: boolean | null;
+        workersCompDefault?: boolean | null;
+        maxWeeklyHours?: number | null;
+        defaultStandardHoursPerDay?: number | null;
+        defaultHolidayWorkCountsAsOvertime?: boolean | null;
+        contractTemplateNotes?: string | null;
+      } | null;
     }>;
   },
-  company: { healthInsuranceRate?: number | null; salaryCutoffDay?: string | null; payday?: string | null; name?: string; address?: string | null } | null
+  company: { healthInsuranceRate?: number | null; roundingPolicy?: string | null; salaryCutoffDay?: string | null; payday?: string | null; name?: string; address?: string | null } | null
 ) {
+  const roundingPolicy = company?.roundingPolicy || 'exact';
   const hireDate = new Date(dbUser.hireDate);
   const hireYear = hireDate.getFullYear();
   const hireMonth = hireDate.getMonth() + 1;
@@ -471,7 +669,43 @@ export async function loadPayrollRecordsForEmployee(
     dbRecords.map(r => ({ employeeId: r.employeeId, month: r.month }))
   );
 
-  const records = dbRecords.map(r => transformPayrollRecord(r, dbUser, company, attendanceMap, rateSettings));
+  const uniqueMonths = [...new Set(dbRecords.map(r => r.month))];
+  const effectiveSalariesByMonth: Record<string, Awaited<ReturnType<typeof batchGetEffectiveSalaries>>> = {};
+  for (const month of uniqueMonths) {
+    effectiveSalariesByMonth[month] = await batchGetEffectiveSalaries(month, prisma);
+  }
+
+  let holidayMin = new Date(8640000000000000);
+  let holidayMax = new Date(-8640000000000000);
+  for (const month of uniqueMonths) {
+    const range = getPayrollAttendanceRangeJst(month);
+    if (range.startUtc < holidayMin) holidayMin = range.startUtc;
+    if (range.endUtc > holidayMax) holidayMax = range.endUtc;
+  }
+  const dbHolidays =
+    uniqueMonths.length > 0
+      ? await prisma.holiday.findMany({
+          where: { isActive: true, date: { gte: holidayMin, lte: holidayMax } },
+        })
+      : [];
+  const holidays: OvertimeHolidayInfo[] = dbHolidays.map(h => ({
+    date: h.date,
+    isActive: h.isActive,
+  }));
+
+  const records = dbRecords.map(r => {
+    const effectiveSalary = effectiveSalariesByMonth[r.month]?.[r.employeeId];
+    return transformPayrollRecord(
+      r,
+      dbUser,
+      company,
+      attendanceMap,
+      rateSettings,
+      roundingPolicy,
+      effectiveSalary,
+      holidays
+    );
+  });
   const employees = [{
     ...mapEmployeeToClient({ ...dbUser, employeeContracts: dbUser.employeeContracts }),
     position: dbUser.position?.name || '一般社員',

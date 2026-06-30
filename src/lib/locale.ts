@@ -56,10 +56,14 @@ export function readLocaleFromBrowserCookies(): AppLocale | null {
 export function getClientLocaleSnapshot(fallback: AppLocale): AppLocale {
   if (typeof window === 'undefined') return fallback;
 
+  // Prefer cookie (same source as SSR) so hydration matches server HTML.
+  const fromCookie = readLocaleFromBrowserCookies();
+  if (fromCookie) return fromCookie;
+
   const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
   if (stored && isAllowedLocale(stored)) return stored;
 
-  return readLocaleFromBrowserCookies() ?? fallback;
+  return fallback;
 }
 
 export function persistClientLocale(locale: AppLocale) {

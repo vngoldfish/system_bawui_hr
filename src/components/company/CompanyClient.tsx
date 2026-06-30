@@ -3,6 +3,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import Card from '@/components/common/Card';
 import { useI18n } from '@/lib/i18n';
+import {
+  DEFAULT_ENABLED_SHIFT_TYPES,
+  SHIFT_TYPE_OPTIONS,
+  parseEnabledShiftTypes,
+  serializeEnabledShiftTypes,
+} from '@/lib/shift-company-settings';
+import type { ShiftType } from '@/lib/shift-helpers';
 
 interface CompanyInfo {
   name: string;
@@ -28,6 +35,7 @@ interface CompanyInfo {
   payday: string;
   roundingPolicy: string; // 'exact' | '15min' | '30min'
   healthInsuranceRate: string;
+  enabledShiftTypes: string;
 }
 
 const defaultCompany: CompanyInfo = {
@@ -54,6 +62,7 @@ const defaultCompany: CompanyInfo = {
   payday: '25',
   roundingPolicy: 'exact',
   healthInsuranceRate: '9.98',
+  enabledShiftTypes: 'day,early,late,night',
 };
 
 const getAccountTypeLabel = (type: string, t: any) => {
@@ -104,6 +113,7 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
             ...defaultCompany,
             ...data,
             healthInsuranceRate: data.healthInsuranceRate != null ? String(data.healthInsuranceRate) : '9.98',
+            enabledShiftTypes: data.enabledShiftTypes || DEFAULT_ENABLED_SHIFT_TYPES,
             ...initialData,
           };
           setCompany(loaded);
@@ -150,6 +160,7 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
           ...defaultCompany,
           ...data,
           healthInsuranceRate: data.healthInsuranceRate != null ? String(data.healthInsuranceRate) : '9.98',
+          enabledShiftTypes: data.enabledShiftTypes || DEFAULT_ENABLED_SHIFT_TYPES,
         };
         setCompany(updated);
         setDraft(updated);
@@ -175,7 +186,14 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
     setDraft(prev => ({ ...prev, [field]: value }));
   };
 
+  const toggleShiftType = (key: ShiftType) => {
+    const current = parseEnabledShiftTypes(draft.enabledShiftTypes);
+    const next = current.includes(key) ? current.filter(k => k !== key) : [...current, key];
+    handleChange('enabledShiftTypes', serializeEnabledShiftTypes(next));
+  };
+
   const data = editing ? draft : company;
+  const enabledTypes = parseEnabledShiftTypes(data.enabledShiftTypes);
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -314,6 +332,42 @@ export default function CompanyClient({ initialData }: { initialData?: Partial<C
             </div>
           </div>
           <PayrollStatus cutoffDay={data.salaryCutoffDay} payday={data.payday} t={t} />
+        </Card>
+
+        {/* Shift types */}
+        <Card title={t('company.cardShiftTypes')} className="lg:col-span-2">
+          <p className="text-xs text-slate-500 mb-4">{t('company.cardShiftTypesDesc')}</p>
+          <div className="flex flex-wrap gap-2">
+            {SHIFT_TYPE_OPTIONS.map(opt => {
+              const active = enabledTypes.includes(opt.key);
+              return editing ? (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => toggleShiftType(opt.key)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
+                    active
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  {opt.icon} {opt.label}
+                </button>
+              ) : (
+                <span
+                  key={opt.key}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border ${
+                    active
+                      ? 'bg-blue-50 text-blue-800 border-blue-200'
+                      : 'bg-slate-50 text-slate-400 border-slate-200 line-through'
+                  }`}
+                >
+                  {opt.icon} {opt.label}
+                </span>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-3">{t('company.cardShiftTypesHint')}</p>
         </Card>
 
         {/* Preview Card */}

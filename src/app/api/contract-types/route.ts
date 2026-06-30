@@ -18,6 +18,14 @@ const createContractTypeSchema = z.object({
   defaultBreakStart: z.string().default('12:00'),
   defaultBreakEnd: z.string().default('13:00'),
   defaultHolidayWorkCountsAsOvertime: z.boolean().default(true),
+  category: z.enum(['SEISHAIN', 'KEIYAKU', 'PART', 'ARUBAITO', 'HAKKEN', 'CUSTOM']).default('CUSTOM'),
+  payrollMode: z.enum(['FULL', 'HOURS_ONLY']).default('FULL'),
+  overtimeMultiplier: z.coerce.number().min(1).max(3).default(1.25),
+  socialInsuranceDefault: z.boolean().default(true),
+  employmentInsuranceDefault: z.boolean().default(true),
+  workersCompDefault: z.boolean().default(true),
+  maxWeeklyHours: z.coerce.number().min(0).max(168).optional().nullable(),
+  contractTemplateNotes: z.string().default(''),
   isActive: z.boolean().default(true),
 });
 

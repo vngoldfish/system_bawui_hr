@@ -4,6 +4,11 @@ import { successResponse, errorResponse, handleApiError } from '@/lib/api-utils'
 import { z } from 'zod';
 import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
+import {
+  readEnabledShiftTypesRaw,
+  readShiftRegistrationRequiredRaw,
+} from '@/lib/shift-company-settings-server';
+import { DEFAULT_ENABLED_SHIFT_TYPES } from '@/lib/shift-company-settings';
 
 const updateCompanySchema = z.object({
   name: z.string().min(1, '会社名は必須です'),
@@ -29,6 +34,7 @@ const updateCompanySchema = z.object({
   salaryCutoffDay: z.string().default('末日'),
   payday: z.string().default('25'),
   healthInsuranceRate: z.number().optional().nullable(),
+  enabledShiftTypes: z.string().optional(),
 });
 
 // GET company info (Public)
@@ -64,10 +70,25 @@ export async function GET(_request: NextRequest) {
           healthInsuranceRate: 9.98,
           attendanceAutoScheduleEnabled: true,
           attendanceGrossEstimateEnabled: true,
+          autoScheduleTimeFrom: '08:00',
+          autoScheduleTimeTo: '22:00',
+          autoScheduleBreakEnabled: true,
+          autoScheduleBreakFrom: '12:00',
+          autoScheduleBreakTo: '13:00',
+          autoScheduleBreakMinutes: 60,
         },
       });
     }
-    return successResponse(company);
+    const [enabledShiftTypes, shiftRegistrationRequired] = await Promise.all([
+      readEnabledShiftTypesRaw(),
+      readShiftRegistrationRequiredRaw(),
+    ]);
+
+    return successResponse({
+      ...company,
+      enabledShiftTypes: enabledShiftTypes ?? DEFAULT_ENABLED_SHIFT_TYPES,
+      shiftRegistrationRequired,
+    });
   } catch (error) {
     return handleApiError(error);
   }
@@ -87,17 +108,38 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const data = updateCompanySchema.parse(body);
 
+    const { enabledShiftTypes: enabledShiftTypesInput, ...companyData } = data;
+
     let company = await prisma.company.findFirst();
     if (company) {
       company = await prisma.company.update({
         where: { id: company.id },
-        data,
+        data: companyData,
       });
+      if (enabledShiftTypesInput !== undefined) {
+        await prisma.$executeRaw`
+          UPDATE "companies"
+          SET "enabledShiftTypes" = ${enabledShiftTypesInput}
+          WHERE "id" = ${company.id}
+        `;
+      }
     } else {
       company = await prisma.company.create({
-        data,
+        data: companyData,
       });
+      if (enabledShiftTypesInput !== undefined) {
+        await prisma.$executeRaw`
+          UPDATE "companies"
+          SET "enabledShiftTypes" = ${enabledShiftTypesInput}
+          WHERE "id" = ${company.id}
+        `;
+      }
     }
+
+    const [enabledShiftTypes, shiftRegistrationRequired] = await Promise.all([
+      readEnabledShiftTypesRaw(),
+      readShiftRegistrationRequiredRaw(),
+    ]);
 
     logDatabaseChange({
       request,
@@ -109,7 +151,11 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    return successResponse(company);
+    return successResponse({
+      ...company,
+      enabledShiftTypes: enabledShiftTypes ?? DEFAULT_ENABLED_SHIFT_TYPES,
+      shiftRegistrationRequired,
+    });
   } catch (error) {
     return handleApiError(error);
   }

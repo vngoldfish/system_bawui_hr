@@ -553,13 +553,20 @@ export default function ContractsClient({
     const schedule = getActiveEmployeeContract(emp);
     const departmentName = typeof (emp as any).department === 'string' ? (emp as any).department : emp.department?.name || '';
     const positionName = typeof (emp as any).position === 'string' ? (emp as any).position : emp.position?.name || '';
-    const contractTypeName = typeof (emp as any).contractType === 'string' ? (emp as any).contractType : emp.contractType?.name || '';
+    const contractTypeObj = typeof (emp as any).contractType === 'string'
+      ? contractTypes.find(c => c.name === (emp as any).contractType)
+      : emp.contractType;
+    const contractTypeName = typeof (emp as any).contractType === 'string'
+      ? (emp as any).contractType
+      : emp.contractType?.name || '';
     generateContractPDF({
       employeeName: `${emp.lastName || ''} ${emp.firstName || ''}`.trim(),
       employeeNameKana: `${emp.lastNameKana || ''} ${emp.firstNameKana || ''}`.trim(),
       department: departmentName,
       position: positionName,
       contractType: contractTypeName,
+      category: (contractTypeObj as { category?: string } | undefined)?.category,
+      contractTemplateNotes: (contractTypeObj as { contractTemplateNotes?: string } | undefined)?.contractTemplateNotes,
       contractStartDate: emp.contractStartDate || '',
       contractEndDate: emp.contractEndDate || '',
       salary: emp.salary || 0,

@@ -1,8 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils';
+import { useI18n } from '@/lib/i18n';
+import ExportButtons from '@/components/common/ExportButtons';
 
 export default function PayrollSummaryPage() {
+  const { t, locale } = useI18n();
   const [month, setMonth] = useState('');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -28,6 +31,24 @@ export default function PayrollSummaryPage() {
   }, [month]);
 
   if (!data) return <div className="p-8">Loading...</div>;
+
+  const exportData: Record<string, unknown>[] = data.records.map((r: any) => ({
+    name: r.employeeName,
+    healthInsurance: formatCurrency(r.breakdown.healthInsurance),
+    pension: formatCurrency(r.breakdown.pension),
+    employmentInsurance: formatCurrency(r.breakdown.employmentInsurance),
+    workersComp: formatCurrency(r.breakdown.workersComp),
+    total: formatCurrency(r.totalCompanyCost),
+  }));
+
+  const exportColumns = [
+    { header: t('payroll.colName'), key: 'name' },
+    { header: t('payroll.healthInsSubject'), key: 'healthInsurance' },
+    { header: t('payroll.pensionSubject'), key: 'pension' },
+    { header: t('payroll.employmentInsSubject'), key: 'employmentInsurance' },
+    { header: t('payroll.workersCompSubject'), key: 'workersComp' },
+    { header: t('benefits.total'), key: 'total' },
+  ];
 
   const totalInsurance =
     (data.breakdown.healthInsurance || 0) +
@@ -103,6 +124,11 @@ export default function PayrollSummaryPage() {
 
       <div className="mt-6 flex gap-4">
         <button onClick={() => window.print()} className="px-6 py-2 bg-slate-800 text-white rounded">印刷 / PDF保存</button>
+        <ExportButtons
+          data={exportData}
+          columns={exportColumns}
+          fileName={`Bao_cao_chi_phi_cong_ty_${month}`}
+        />
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ShiftClient from '@/components/shift/ShiftClient';
 import { Suspense } from 'react';
+import { getShiftCompanySettings } from '@/lib/shift-company-settings-server';
 
 async function ShiftLoader() {
   const cookieStore = await cookies();
@@ -32,6 +33,7 @@ async function ShiftLoader() {
   const dbEmployees = await prisma.employee.findMany({
     include: {
       department: true,
+      contractType: { select: { name: true, category: true } },
     },
     where: {
       status: 'ACTIVE',
@@ -49,6 +51,8 @@ async function ShiftLoader() {
     firstNameKana: emp.firstNameKana,
     department: emp.department?.name || '未所属',
     position: '',
+    contractCategory: emp.contractType?.category || '',
+    contractTypeName: emp.contractType?.name || '',
   }));
 
   // Get role permissions for user's role
@@ -77,12 +81,22 @@ async function ShiftLoader() {
     mappedEmployees = mappedEmployees.filter(emp => emp.department === userDeptName);
   }
 
-  return <ShiftClient employees={mappedEmployees} isReadOnly={isReadOnly} />;
+  const shiftSettings = await getShiftCompanySettings();
+
+  return (
+    <ShiftClient
+      employees={mappedEmployees}
+      isReadOnly={isReadOnly}
+      shiftRegistrationRequired={shiftSettings.shiftRegistrationRequired}
+      shiftRegistrationPolicy={shiftSettings.shiftRegistrationPolicy}
+      enabledShiftTypes={shiftSettings.enabledShiftTypes}
+    />
+  );
 }
 
 export default function ShiftPage() {
   return (
-    <DashboardLayout title="シフト管理" subtitle="シフト作成・管理・集計">
+    <DashboardLayout title="シフト管理" subtitle="日次割当と月間シフト表で勤務シフトを管理">
       <div className="space-y-6">
         <Suspense fallback={<div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div></div>}>
           <ShiftLoader />

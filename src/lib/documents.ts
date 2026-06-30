@@ -7,6 +7,8 @@ interface ContractData {
   department: string;
   position: string;
   contractType: string;
+  category?: string;
+  contractTemplateNotes?: string;
   contractStartDate: string;
   contractEndDate: string;
   salary: number;
@@ -65,36 +67,49 @@ function addJapaneseText(doc: jsPDF, text: string, x: number, y: number, options
 }
 
 export function generateContractPDF(data: ContractData): void {
+  const isHaken = data.category === 'HAKKEN';
+
   let salaryText = '';
-  if (data.salaryType === '時給') {
-    salaryText = `時給 ${Number(data.hourlyRate || 0).toLocaleString()} 円`;
-  } else if (data.salaryType === '日給') {
-    salaryText = `日給 ${Number(data.dailyRate || 0).toLocaleString()} 円`;
-  } else {
-    salaryText = `月給 ${Number(data.salary || 0).toLocaleString()} 円`;
+  if (!isHaken) {
+    if (data.salaryType === '時給') {
+      salaryText = `時給 ${Number(data.hourlyRate || 0).toLocaleString()} 円`;
+    } else if (data.salaryType === '日給') {
+      salaryText = `日給 ${Number(data.dailyRate || 0).toLocaleString()} 円`;
+    } else {
+      salaryText = `月給 ${Number(data.salary || 0).toLocaleString()} 円`;
+    }
   }
 
   const benefitList: string[] = [];
-  if (data.benefits.healthInsurance) benefitList.push('健康保険');
-  if (data.benefits.pension) benefitList.push('厚生年金');
-  if (data.benefits.employmentInsurance) benefitList.push('雇用保険');
-  if (data.benefits.workersComp) benefitList.push('労災保険');
+  if (!isHaken) {
+    if (data.benefits.healthInsurance) benefitList.push('健康保険');
+    if (data.benefits.pension) benefitList.push('厚生年金');
+    if (data.benefits.employmentInsurance) benefitList.push('雇用保険');
+    if (data.benefits.workersComp) benefitList.push('労災保険');
+  }
 
   const allowanceList: string[] = [];
-  if (data.benefits.transportation > 0) allowanceList.push(`通勤手当: ${data.benefits.transportation.toLocaleString()}円`);
-  if (data.benefits.housing > 0) allowanceList.push(`住宅手当: ${data.benefits.housing.toLocaleString()}円`);
-  if (data.benefits.meal > 0) allowanceList.push(`食事手当: ${data.benefits.meal.toLocaleString()}円`);
+  if (!isHaken) {
+    if (data.benefits.transportation > 0) allowanceList.push(`通勤手当: ${data.benefits.transportation.toLocaleString()}円`);
+    if (data.benefits.housing > 0) allowanceList.push(`住宅手当: ${data.benefits.housing.toLocaleString()}円`);
+    if (data.benefits.meal > 0) allowanceList.push(`食事手当: ${data.benefits.meal.toLocaleString()}円`);
+  }
 
   const rows = [
     ['雇用形態', data.contractType],
-    ['給与形態', data.salaryType],
+    ...(isHaken ? [] : [['給与形態', data.salaryType] as [string, string]]),
     ['契約期間', `${formatDate(data.contractStartDate)} ～ ${data.contractEndDate ? formatDate(data.contractEndDate) : '無期'}`],
     ['所属部署', data.department],
     ['役職', data.position],
     ['就業場所', data.workLocation],
     ['就業時間', data.workingHours],
-    ['賃金', salaryText],
+    ...(isHaken
+      ? [['報告区分', '勤務時間報告対象'] as [string, string]]
+      : [['賃金', salaryText] as [string, string]]),
   ];
+
+  const contractTitle = isHaken ? '派遣就業契約書' : '雇用契約書';
+  const templateNotes = (data.contractTemplateNotes || '').trim();
 
   const printWindow = window.open('', '_blank', 'width=900,height=1200');
   if (!printWindow) {
@@ -106,7 +121,7 @@ export function generateContractPDF(data: ContractData): void {
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>雇用契約書_${escapeHtml(data.employeeName)}</title>
+  <title>${escapeHtml(contractTitle)}_${escapeHtml(data.employeeName)}</title>
   <style>
     @page { size: A4; margin: 18mm; }
     * { box-sizing: border-box; }
@@ -143,11 +158,11 @@ export function generateContractPDF(data: ContractData): void {
 <body>
   <div class="page">
     <div class="no-print">印刷画面で「PDFとして保存」を選択してください。日本語フォント崩れを防ぐためブラウザ印刷を使用しています。</div>
-    <h1>雇用契約書</h1>
+    <h1>${escapeHtml(contractTitle)}</h1>
     <div class="date">${escapeHtml(formatDate(data.contractStartDate))}</div>
     <div class="employee">${escapeHtml(data.employeeName)} 様</div>
     <div class="kana">(${escapeHtml(data.employeeNameKana)})</div>
-    <p class="intro">下記の通り雇用契約を締結します。</p>
+    <p class="intro">${isHaken ? '下記の通り派遣就業契約を締結します。' : '下記の通り雇用契約を締結します。'}</p>
     <table>
       <tbody>
         ${rows.map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join('')}
@@ -157,6 +172,10 @@ export function generateContractPDF(data: ContractData): void {
       <div class="section-title">社会保険・諸手当</div>
       ${benefitList.length ? `<div>社会保険: ${escapeHtml(benefitList.join('、'))}</div>` : ''}
       ${allowanceList.length ? `<div>諸手当: ${escapeHtml(allowanceList.join('、'))}</div>` : ''}
+    ` : ''}
+    ${templateNotes ? `
+      <div class="section-title">特記事項</div>
+      <div class="notes">${escapeHtml(templateNotes).replace(/\n/g, '<br />')}</div>
     ` : ''}
     <div class="notes">
       <div>※ 本契約書は2部作成し、甲乙それぞれ1部ずつ保管するものとします。</div>

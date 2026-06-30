@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getAttendanceMonthDateRangeJst } from '@/lib/payroll-helpers';
 import { serializeEmployee } from './employeeService';
 
 const attendanceEmployeeInclude = {
@@ -13,10 +14,8 @@ const attendanceEmployeeInclude = {
 
 function buildDateFilter(options?: { month?: string; monthsBack?: number }) {
   if (options?.month) {
-    const [year, monthNum] = options.month.split('-').map(Number);
-    const startDate = new Date(year, monthNum - 1, 1);
-    const endDate = new Date(year, monthNum, 0, 23, 59, 59, 999);
-    return { gte: startDate, lte: endDate };
+    const { startUtc, endUtc } = getAttendanceMonthDateRangeJst(options.month);
+    return { gte: startUtc, lte: endUtc };
   }
 
   if (options?.monthsBack) {

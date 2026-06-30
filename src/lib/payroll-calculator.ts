@@ -209,9 +209,11 @@ export function getSmrIncome({
   baseSalary,
   salaryType,
   workDays,
+  workHours: inputWorkHours,
   hourlyRate,
   dailyRate,
   overtimeHours,
+  contractWorkDaysInMonth,
   benefits,
   birthDate,
   month = '2026-05',
@@ -225,13 +227,16 @@ export function getSmrIncome({
   companyRate,
   positionAllowance,
   rateSettings,
+  overtimeMultiplier = 1.25,
 }: {
   baseSalary: number;
   salaryType: string;
   workDays: number;
+  workHours?: number;
   hourlyRate: number;
   dailyRate: number;
   overtimeHours: number;
+  contractWorkDaysInMonth?: number;
   benefits: any;
   birthDate?: string | null;
   month?: string;
@@ -245,6 +250,7 @@ export function getSmrIncome({
   companyRate?: number | null;
   positionAllowance?: number;
   rateSettings?: PayrollRateSettings;
+  overtimeMultiplier?: number;
 }) {
 	  // Override salary from SalaryAdjustment if prisma + employeeId provided
 	  if (prisma && employeeId) {
@@ -281,19 +287,20 @@ export function getSmrIncome({
 	  const dailyHours = 8;
 
 	  if (salaryType === '月給') {
-	    calculatedBase = baseSalary;
-	    workHours = workDays * dailyHours;
+	    const contractDays = contractWorkDaysInMonth && contractWorkDaysInMonth > 0 ? contractWorkDaysInMonth : 22;
+	    calculatedBase = Math.round((baseSalary * workDays) / contractDays);
+	    workHours = inputWorkHours != null && inputWorkHours > 0 ? inputWorkHours : workDays * dailyHours;
 	  } else if (salaryType === '日給') {
 	    calculatedBase = dailyRate * workDays;
-	    workHours = workDays * dailyHours;
+	    workHours = inputWorkHours != null && inputWorkHours > 0 ? inputWorkHours : workDays * dailyHours;
 	  } else if (salaryType === '時給') {
-	    const hoursPerDay = 6;
-	    calculatedBase = hourlyRate * hoursPerDay * workDays;
-	    workHours = hoursPerDay * workDays;
+	    workHours = inputWorkHours != null && inputWorkHours > 0 ? inputWorkHours : 0;
+	    calculatedBase = Math.round(hourlyRate * workHours);
 	  }
 
 	  const hourlyEquiv = salaryType === '時給' ? hourlyRate : (workHours > 0 ? calculatedBase / workHours : 0);
-	  const overtimePay = Math.round(hourlyEquiv * 1.25 * overtimeHours);
+	  const otMultiplier = overtimeMultiplier > 0 ? overtimeMultiplier : 1.25;
+	  const overtimePay = Math.round(hourlyEquiv * otMultiplier * overtimeHours);
 
 	  const baseAllowances = b.transportation + b.housing + b.meal + (positionAllowance || 0);
 	  const allowances = customAllowances !== undefined && customAllowances !== null ? customAllowances : baseAllowances;
@@ -428,28 +435,35 @@ export function getSmrIncome({
 	      employeeId,
 	      effectiveFrom: { lte: month },
 	    },
-	    orderBy: { effectiveFrom: 'desc' },
+	    orderBy: [{ effectiveFrom: 'desc' }, { adjustedAt: 'desc' }],
 	    take: 1,
 	  });
 
-	  if (adjustments.length > 0) {
-	    const adj = adjustments[0];
-	    return {
-	      baseSalary: adj.newBaseSalary,
-	      hourlyRate: adj.newHourlyRate,
-	      dailyRate: adj.newDailyRate,
-	    };
-	  }
-
 	  const employee = await prisma.employee.findUnique({
 	    where: { id: employeeId },
-	    select: { salary: true, hourlyRate: true, dailyRate: true },
+	    select: { salary: true, hourlyRate: true, dailyRate: true, salaryType: true },
 	  });
+
+	  if (adjustments.length > 0 && employee) {
+	    return effectiveSalaryFromAdjustment(employee, adjustments[0]);
+	  }
 
 	  return {
 	    baseSalary: employee?.salary ?? 0,
 	    hourlyRate: employee?.hourlyRate ?? 0,
 	    dailyRate: employee?.dailyRate ?? 0,
+	  };
+	}
+
+	function effectiveSalaryFromAdjustment(
+	  employee: { salary: number | null; hourlyRate: number | null; dailyRate: number | null; salaryType?: string | null },
+	  adjustment: { newBaseSalary: number; newHourlyRate: number; newDailyRate: number }
+	): { baseSalary: number; hourlyRate: number; dailyRate: number } {
+	  const salaryType = employee.salaryType || '月給';
+	  return {
+	    baseSalary: salaryType === '月給' ? adjustment.newBaseSalary : (employee.salary ?? 0),
+	    hourlyRate: salaryType === '時給' ? adjustment.newHourlyRate : (employee.hourlyRate ?? 0),
+	    dailyRate: salaryType === '日給' ? adjustment.newDailyRate : (employee.dailyRate ?? 0),
 	  };
 	}
 
@@ -468,12 +482,13 @@ export function getSmrIncome({
 	      salary: true,
 	      hourlyRate: true,
 	      dailyRate: true,
+	      salaryType: true,
 	    },
 	  });
 
 	  const adjustments = await prisma.salaryAdjustment.findMany({
 	    where: { effectiveFrom: { lte: month } },
-	    orderBy: { effectiveFrom: 'desc' },
+	    orderBy: [{ effectiveFrom: 'desc' }, { adjustedAt: 'desc' }],
 	  });
 
 	  const latestAdjustmentByEmployee = new Map<string, (typeof adjustments)[0]>();
@@ -487,11 +502,7 @@ export function getSmrIncome({
 	  for (const employee of employees) {
 	    const adjustment = latestAdjustmentByEmployee.get(employee.id);
 	    result[employee.id] = adjustment
-	      ? {
-	          baseSalary: adjustment.newBaseSalary,
-	          hourlyRate: adjustment.newHourlyRate,
-	          dailyRate: adjustment.newDailyRate,
-	        }
+	      ? effectiveSalaryFromAdjustment(employee, adjustment)
 	      : {
 	          baseSalary: employee.salary ?? 0,
 	          hourlyRate: employee.hourlyRate ?? 0,
@@ -567,7 +578,8 @@ export async function syncEmployeeSalaries(prisma: any) {
   } catch (e) {
     // Ignore if outside Next.js request context
   }
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const { getJstMonthString } = await import('./utils');
+  const currentMonth = getJstMonthString();
   const employees = await prisma.employee.findMany({
     where: {
       status: {
@@ -578,7 +590,8 @@ export async function syncEmployeeSalaries(prisma: any) {
       id: true,
       salary: true,
       hourlyRate: true,
-      dailyRate: true
+      dailyRate: true,
+      salaryType: true,
     }
   });
 
@@ -590,23 +603,22 @@ export async function syncEmployeeSalaries(prisma: any) {
           lte: currentMonth
         }
       },
-      orderBy: {
-        effectiveFrom: 'desc'
-      }
+      orderBy: [{ effectiveFrom: 'desc' }, { adjustedAt: 'desc' }],
     });
 
     if (latestAdjustment) {
-      const diffBase = latestAdjustment.newBaseSalary !== emp.salary;
-      const diffHourly = latestAdjustment.newHourlyRate !== emp.hourlyRate;
-      const diffDaily = latestAdjustment.newDailyRate !== emp.dailyRate;
+      const effective = effectiveSalaryFromAdjustment(emp, latestAdjustment);
+      const diffBase = effective.baseSalary !== emp.salary;
+      const diffHourly = effective.hourlyRate !== emp.hourlyRate;
+      const diffDaily = effective.dailyRate !== emp.dailyRate;
 
       if (diffBase || diffHourly || diffDaily) {
         await prisma.employee.update({
           where: { id: emp.id },
           data: {
-            salary: latestAdjustment.newBaseSalary,
-            hourlyRate: latestAdjustment.newHourlyRate,
-            dailyRate: latestAdjustment.newDailyRate
+            salary: effective.baseSalary,
+            hourlyRate: effective.hourlyRate,
+            dailyRate: effective.dailyRate,
           }
         });
       }

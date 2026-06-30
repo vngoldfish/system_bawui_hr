@@ -1,0 +1,2 @@
+ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "shiftRegistrationRequired" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "enabledShiftTypes" TEXT NOT NULL DEFAULT 'day,early,late,night';

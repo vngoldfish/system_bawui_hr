@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { createdResponse, errorResponse, handleApiError, successResponse } from '@/lib/api-utils';
 import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
-import { getPayrollMonthForAttendanceDate } from '@/lib/payroll-helpers';
+import { computeServerOvertimeHours } from '@/lib/attendance-overtime';
+import { getAttendanceMonthDateRangeJst, getPayrollMonthForAttendanceDate } from '@/lib/payroll-helpers';
 import {
   checkWeeklyHourLimit,
   getWeekRange,
@@ -36,18 +37,16 @@ export async function GET(request: NextRequest) {
 
     if (date) {
       where.date = {
-        gte: new Date(date),
-        lt: new Date(new Date(date).getTime() + 24 * 60 * 60 * 1000),
+        gte: new Date(`${date}T00:00:00+09:00`),
+        lte: new Date(`${date}T23:59:59.999+09:00`),
       };
     }
 
     if (month) {
-      const [year, monthNum] = month.split('-');
-      const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-      const endDate = new Date(parseInt(year), parseInt(monthNum), 1);
+      const { startUtc, endUtc } = getAttendanceMonthDateRangeJst(month);
       where.date = {
-        gte: startDate,
-        lt: endDate,
+        gte: startUtc,
+        lte: endUtc,
       };
     }
 
@@ -188,17 +187,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const checkIn = parseDateTime(data.date, data.checkIn);
+    const checkOut = parseDateTime(data.date, data.checkOut);
+    const breakStart = parseDateTime(data.date, data.breakStart);
+    const breakEnd = parseDateTime(data.date, data.breakEnd);
+    const status = data.status || 'PRESENT';
+    const overtimeHours = await computeServerOvertimeHours(prisma, data.employeeId, {
+      status,
+      checkIn,
+      checkOut,
+      breakStart,
+      breakEnd,
+      date: recordDate,
+    });
+
     const record = await prisma.attendanceRecord.create({
       data: {
         employeeId: data.employeeId,
         date: new Date(data.date),
-        checkIn: parseDateTime(data.date, data.checkIn),
-        checkOut: parseDateTime(data.date, data.checkOut),
-        breakStart: parseDateTime(data.date, data.breakStart),
-        breakEnd: parseDateTime(data.date, data.breakEnd),
-        overtimeHours: parseFloat(data.overtimeHours) || 0,
+        checkIn,
+        checkOut,
+        breakStart,
+        breakEnd,
+        overtimeHours,
         notes: data.notes || '',
-        status: data.status || 'PRESENT',
+        status,
       },
       include: {
         employee: {
@@ -286,16 +299,30 @@ export async function PUT(request: NextRequest) {
       return errorResponse(msg, 400);
     }
 
+    const checkIn = parseDateTime(data.date, data.checkIn);
+    const checkOut = parseDateTime(data.date, data.checkOut);
+    const breakStart = parseDateTime(data.date, data.breakStart);
+    const breakEnd = parseDateTime(data.date, data.breakEnd);
+    const status = data.status || 'PRESENT';
+    const overtimeHours = await computeServerOvertimeHours(prisma, currentRecord.employeeId, {
+      status,
+      checkIn,
+      checkOut,
+      breakStart,
+      breakEnd,
+      date: recordDate,
+    });
+
     const record = await prisma.attendanceRecord.update({
       where: { id: data.id },
       data: {
-        checkIn: parseDateTime(data.date, data.checkIn),
-        checkOut: parseDateTime(data.date, data.checkOut),
-        breakStart: parseDateTime(data.date, data.breakStart),
-        breakEnd: parseDateTime(data.date, data.breakEnd),
-        overtimeHours: parseFloat(data.overtimeHours) || 0,
+        checkIn,
+        checkOut,
+        breakStart,
+        breakEnd,
+        overtimeHours,
         notes: data.notes || '',
-        status: data.status || 'PRESENT',
+        status,
       },
       include: {
         employee: {

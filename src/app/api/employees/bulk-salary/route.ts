@@ -53,20 +53,29 @@ export async function PUT(request: NextRequest) {
                               (u.dailyRate !== undefined && u.dailyRate !== existing.dailyRate);
 
         if (salaryChanged) {
-          await tx.salaryAdjustment.create({
-            data: {
-              employeeId: u.id,
-              effectiveFrom: currentMonth,
-              oldBaseSalary: existing.salary,
-              newBaseSalary: u.salary,
-              oldHourlyRate: existing.hourlyRate,
-              newHourlyRate: u.hourlyRate !== undefined ? u.hourlyRate : existing.hourlyRate,
-              oldDailyRate: existing.dailyRate,
-              newDailyRate: u.dailyRate !== undefined ? u.dailyRate : existing.dailyRate,
-              reason: "一括給与改定による変更 (Changed via bulk salary update)",
-              adjustedBy: user.id,
-            }
+          const adjustmentData = {
+            oldBaseSalary: existing.salary,
+            newBaseSalary: u.salary,
+            oldHourlyRate: existing.hourlyRate,
+            newHourlyRate: u.hourlyRate !== undefined ? u.hourlyRate : existing.hourlyRate,
+            oldDailyRate: existing.dailyRate,
+            newDailyRate: u.dailyRate !== undefined ? u.dailyRate : existing.dailyRate,
+            reason: "一括給与改定による変更 (Changed via bulk salary update)",
+            adjustedBy: user.id,
+          };
+          const existingAdjustment = await tx.salaryAdjustment.findFirst({
+            where: { employeeId: u.id, effectiveFrom: currentMonth },
           });
+          if (existingAdjustment) {
+            await tx.salaryAdjustment.update({
+              where: { id: existingAdjustment.id },
+              data: { ...adjustmentData, adjustedAt: new Date() },
+            });
+          } else {
+            await tx.salaryAdjustment.create({
+              data: { employeeId: u.id, effectiveFrom: currentMonth, ...adjustmentData },
+            });
+          }
         }
 
         const updateData: any = {

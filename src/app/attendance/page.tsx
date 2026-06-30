@@ -6,6 +6,7 @@ import AttendanceClient from '@/components/attendance/AttendanceClient';
 import { employeeService } from '@/services/employeeService';
 import { attendanceService } from '@/services/attendanceService';
 import { prisma } from '@/lib/prisma';
+import { getJstDateString } from '@/lib/utils';
 
 export const unstable_instant = {
   prefetch: 'static',
@@ -77,7 +78,8 @@ async function AttendanceLoader() {
         initialRecords={records} 
         employees={employees} 
         holidays={holidays} 
-        isEmployeeMode={isEmployee} 
+        isEmployeeMode={isEmployee}
+        todayStr={getJstDateString()}
       />
     </DashboardLayout>
   );

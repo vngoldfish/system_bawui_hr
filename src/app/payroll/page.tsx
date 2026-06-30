@@ -51,7 +51,7 @@ async function PayrollLoader() {
           payday: company?.payday || '25' 
         }} 
         isEmployeeMode={true}
-        companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
+        companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate, roundingPolicy: company.roundingPolicy } : undefined}
       />
     );
   }
@@ -61,6 +61,7 @@ async function PayrollLoader() {
       department: true,
       position: true,
       dependents: true,
+      contractType: true,
       employeeContracts: {
         include: {
           contractType: true,
@@ -80,7 +81,7 @@ async function PayrollLoader() {
         payday: company?.payday || '25' 
       }} 
       isEmployeeMode={false}
-      companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate } : undefined}
+      companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate, roundingPolicy: company.roundingPolicy } : undefined}
     />
   );
 }

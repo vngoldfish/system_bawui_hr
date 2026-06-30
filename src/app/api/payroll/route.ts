@@ -5,6 +5,7 @@ import { hasPermission } from '@/lib/auth-mock';
 import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
 import { batchGetEffectiveSalaries, calculatePayrollDetails, getEffectiveSalary, syncEmployeeSalaries } from '@/lib/payroll-calculator';
+import { resolveContractPayrollRules } from '@/lib/contract-payroll-rules';
 import { getActiveRateConfig, toPayrollRateSettings } from '@/services/payrollRateService';
 
 // GET payroll records
@@ -156,6 +157,11 @@ export async function POST(request: NextRequest) {
             birthDate: true,
             dependents: true,
             insuranceSalary: true,
+            contractType: true,
+            employeeContracts: {
+              where: { isActive: true },
+              include: { contractType: true },
+            },
             position: {
               select: {
                 allowance: true,
@@ -191,13 +197,27 @@ export async function POST(request: NextRequest) {
       if (data.employeeId) {
         const employee = employeeMap.get(data.employeeId);
         if (employee) {
+          const payrollRules = resolveContractPayrollRules(employee, data.month);
+          if (payrollRules.payrollMode === 'HOURS_ONLY') {
+            continue;
+          }
+          const parsedWorkHours =
+            data.workHours !== undefined && data.workHours !== null && data.workHours !== ''
+              ? parseFloat(data.workHours)
+              : undefined;
+          const parsedWorkDays =
+            data.workDays !== undefined && data.workDays !== null && data.workDays !== ''
+              ? parseFloat(data.workDays)
+              : undefined;
           const details = calculatePayrollDetails({
             baseSalary: parseFloat(data.baseSalary) || employee.salary || 0,
             salaryType: employee.salaryType || '月給',
-            workDays: parseFloat(data.workDays) || 20,
+            workDays: parsedWorkDays ?? 20,
+            workHours: parsedWorkHours,
             hourlyRate: parseFloat(data.hourlyRate) || employee.hourlyRate || 0,
             dailyRate: parseFloat(data.dailyRate) || employee.dailyRate || 0,
             overtimeHours: parseFloat(data.overtimeHours) || 0,
+            contractWorkDaysInMonth: parseFloat(data.contractWorkDaysInMonth) || undefined,
             benefits: employee.benefits,
             birthDate: employee.birthDate ? employee.birthDate.toISOString() : null,
             month: data.month,
@@ -208,11 +228,12 @@ export async function POST(request: NextRequest) {
             rateSettings,
             customAllowances: (data.allowances !== undefined && data.allowances !== null && data.allowances !== '')
               ? parseFloat(data.allowances)
-              : (data.bonus !== undefined && data.bonus !== null && data.bonus !== '')
-                ? parseFloat(data.bonus)
-                : undefined,
-            customBonus: (data.bonus !== undefined && data.bonus !== null && data.bonus !== '') ? parseFloat(data.bonus) : undefined,
+              : undefined,
+            customBonus: (data.bonus !== undefined && data.bonus !== null && data.bonus !== '' && (data.allowances === undefined || data.allowances === null || data.allowances === ''))
+              ? parseFloat(data.bonus)
+              : undefined,
             positionAllowance: employee.position?.allowance || 0,
+            overtimeMultiplier: payrollRules.overtimeMultiplier,
           });
 
           // Map all 11 detailed fields
@@ -240,8 +261,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const payrollEligibleRecords = recordsData.filter((data: { employeeId?: string; month?: string }) => {
+      if (!data.employeeId || !data.month) return true;
+      const employee = employeeMap.get(data.employeeId);
+      if (!employee) return true;
+      return resolveContractPayrollRules(employee, data.month).payrollMode !== 'HOURS_ONLY';
+    });
+
     const results = await prisma.$transaction([
-      ...recordsData.map((data: any) => {
+      ...payrollEligibleRecords.map((data: any) => {
         const baseSalary = (data.baseSalary !== undefined && data.baseSalary !== null && data.baseSalary !== '') ? parseFloat(data.baseSalary) : 0;
         const overtimePay = (data.overtimePay !== undefined && data.overtimePay !== null && data.overtimePay !== '') ? parseFloat(data.overtimePay) : 0;
         const allowances = (data.allowances !== undefined && data.allowances !== null && data.allowances !== '') 
@@ -468,6 +496,11 @@ export async function PUT(request: NextRequest) {
         birthDate: true,
         dependents: true,
         insuranceSalary: true,
+        contractType: true,
+        employeeContracts: {
+          where: { isActive: true },
+          include: { contractType: true },
+        },
         position: {
           select: {
             allowance: true,
@@ -494,11 +527,20 @@ export async function PUT(request: NextRequest) {
     const companyRate = company?.healthInsuranceRate;
 
     if (employee) {
+      const payrollRules = resolveContractPayrollRules(employee, existing.month);
+      if (payrollRules.payrollMode === 'HOURS_ONLY') {
+        return errorResponse('Dispatch employees (HOURS_ONLY) are excluded from payroll', 400);
+      }
       const effective = await getEffectiveSalary(existing.employeeId, existing.month, prisma);
+      const resolvedWorkHours =
+        workHours !== null && workHours !== undefined
+          ? workHours
+          : (employee.salaryType === '時給' ? existing.workHours : undefined);
       const details = calculatePayrollDetails({
         baseSalary: body.baseSalary !== undefined ? parseFloat(body.baseSalary) : (effective?.baseSalary ?? employee.salary ?? 0),
         salaryType: employee.salaryType || '月給',
         workDays: workDays !== null ? workDays : 20,
+        workHours: resolvedWorkHours ?? undefined,
         hourlyRate: effective?.hourlyRate ?? employee.hourlyRate ?? 0,
         dailyRate: effective?.dailyRate ?? employee.dailyRate ?? 0,
         overtimeHours: overtimeHours !== null ? overtimeHours : 0,
@@ -513,6 +555,7 @@ export async function PUT(request: NextRequest) {
         customAllowances: allowances,
         customBonus: undefined,
         positionAllowance: employee.position?.allowance || 0,
+        overtimeMultiplier: payrollRules.overtimeMultiplier,
       });
 
       healthInsuranceCompany = body.healthInsuranceCompany !== undefined ? parseFloat(body.healthInsuranceCompany) : details.healthInsuranceCompany;

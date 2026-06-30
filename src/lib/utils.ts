@@ -32,6 +32,11 @@ export function formatCurrency(amount: number | null | undefined): string {
   }).format(amount ?? 0);
 }
 
+/** Fixed ja-JP thousands separator — consistent SSR/client (avoids hydration mismatch). */
+export function formatNumber(amount: number | null | undefined): string {
+  return new Intl.NumberFormat("ja-JP").format(amount ?? 0);
+}
+
 // Calculate overtime hours
 export function calculateOvertimeHours(
   checkIn: string | null,
@@ -71,6 +76,25 @@ export function getCurrentMonth(): string {
 
 // Get current date in YYYY-MM-DD format
 export function getCurrentDate(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return getJstDateString();
+}
+
+/** Calendar date in Asia/Tokyo — consistent between SSR and browser (avoids hydration mismatch). */
+export function getJstDateString(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(date);
+}
+
+/** Calendar month YYYY-MM in Asia/Tokyo. */
+export function getJstMonthString(date: Date = new Date()): string {
+  return getJstDateString(date).slice(0, 7);
+}
+
+/** Extract YYYY-MM-DD in Asia/Tokyo from an ISO timestamp or Date. */
+export function dateOnlyJst(value: string | Date): string {
+  if (!value) return "";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (isNaN(d.getTime())) {
+    return typeof value === "string" ? value.split("T")[0] : "";
+  }
+  return getJstDateString(d);
 }

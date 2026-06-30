@@ -1,9 +1,25 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { ReactNode, useState, useCallback } from 'react';
-import Sidebar from './Sidebar';
-import Header from './Header';
 import { useI18n } from '@/lib/i18n';
+
+const Sidebar = dynamic(() => import('./Sidebar'), {
+  ssr: false,
+  loading: () => (
+    <aside
+      className="relative bg-slate-950 text-white flex-shrink-0 flex flex-col w-64 border-r border-slate-850/50 hidden md:flex"
+      aria-hidden
+    />
+  ),
+});
+
+const Header = dynamic(() => import('./Header'), {
+  ssr: false,
+  loading: () => (
+    <header className="h-[72px] flex-shrink-0 border-b border-slate-200/60 bg-white/80" aria-hidden />
+  ),
+});
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -17,16 +33,22 @@ const titleMap: Record<string, string> = {
   '\u52e4\u6020\u7ba1\u7406': 'nav.attendance',
   '\u4f11\u6687\u7ba1\u7406': 'nav.leave',
   '\u30b7\u30d5\u30c8\u7ba1\u7406': 'nav.shift',
+  '\u2461 \u30b7\u30d5\u30c8\u5272\u5f53\u30fb\u7ba1\u7406': 'nav.shift',
   '\u7d4c\u8cbb\u7ba1\u7406': 'nav.expenses',
   '\u798f\u5229\u539a\u751f': 'nav.benefits',
   '\u4f1a\u793e\u60c5\u5831': 'nav.company',
   '\u5951\u7d04\u7ba1\u7406': 'nav.contracts',
   '\u90e8\u7f72\u7ba1\u7406': 'nav.departments',
+  '\u96c7\u7528\u5f62\u614b\u7ba1\u7406': 'nav.contractTypes',
   '\u66f8\u985e\u7ba1\u7406': 'nav.documents',
   '\u5f93\u696d\u54e1\u7ba1\u7406': 'nav.employees',
   '\u8a55\u4fa1\u7ba1\u7406': 'nav.evaluation',
   '\u5916\u56fd\u4eba\u7ba1\u7406': 'nav.foreigners',
   '\u63a1\u7528\u7ba1\u7406': 'nav.recruitment',
+  '\u4f1a\u793e\u30ab\u30ec\u30f3\u30c0\u30fc': 'nav.companyCalendar',
+  '\u52e4\u52d9\u30ab\u30ec\u30f3\u30c0\u30fc': 'nav.workCalendar',
+  '\u5e0c\u671b\u52e4\u52d9\u65e5\u767b\u9332': 'nav.shiftRegister',
+  '\u52e4\u52d9\u30fb\u4f11\u307f\u5e0c\u671b\u767b\u9332': 'nav.shiftRegister',
   '\u7d66\u4e0e\u8a08\u7b97': 'nav.payroll',
   '\u7d66\u4e0e\u660e\u7d30': 'nav.payslip',
   '\u7d66\u4e0e\u30c6\u30fc\u30d6\u30eb': 'nav.salaryTable',
@@ -49,6 +71,10 @@ const subtitleMap: Record<string, string> = {
   '\u5f93\u696d\u54e1\u306e\u51fa\u9005\u52e4\u30fb\u6b8b\u696d\u7ba1\u7406': 'navSubtitle.attendance',
   '\u4f11\u6687\u7533\u8acb\u306e\u7ba1\u7406\u3068\u627f\u8a8d': 'navSubtitle.leave',
   '\u30b7\u30d5\u30c8\u4f5c\u6210\u30fb\u7ba1\u7406\u30fb\u96c6\u8a08': 'navSubtitle.shift',
+  '\u65e5\u6b21\u5272\u5f53\u3068\u6708\u9593\u30b7\u30d5\u30c8\u8868\u3067\u52e4\u52d9\u30b7\u30d5\u30c8\u3092\u7ba1\u7406': 'navSubtitle.shiftManage',
+  '\u7fcc\u6708\u306e\u52e4\u52d9\u53ef\u80fd\u65e5\u30fb\u4f11\u307f\u5e0c\u671b\u65e5\u3092\u767b\u9332\uff08\u7ba1\u7406\u8005\u306f\u30b7\u30d5\u30c8\u7ba1\u7406\u3067\u5272\u5f53\uff09': 'navSubtitle.shiftRegister',
+  '\u795d\u65e5\u30fb\u4f1a\u793e\u4f11\u696d\u65e5\u306e\u767b\u9332\u3068\u7ba1\u7406': 'navSubtitle.companyCalendar',
+  '\u4f1a\u793e\u4f11\u65e5\u30fb\u5951\u7d04\u30fb\u30b7\u30d5\u30c8\u30fb\u5b9f\u7e3e\u306e\u7d71\u5408\u30d3\u30e5\u30fc': 'navSubtitle.workCalendar',
   '\u5f93\u696d\u54e1\u60c5\u5831\u306e\u7ba1\u7406': 'navSubtitle.employees',
   '\u65b0\u898f\u5f93\u696d\u54e1\u306e\u767b\u9332': 'navSubtitle.employeesNew',
   '\u5f93\u696d\u54e1\u60c5\u5831\u306e\u7de8\u96c6': 'navSubtitle.employeesEdit',
@@ -56,6 +82,7 @@ const subtitleMap: Record<string, string> = {
   '\u5728\u7559\u30ab\u30fc\u30c9\u30fb\u30d3\u30b6\u7ba1\u7406': 'navSubtitle.residenceCards',
   '\u90e8\u7f72\u306e\u60c5\u5831\u306e\u7ba1\u7406': 'navSubtitle.departments',
   '\u90e8\u7f72\u306e\u60c5\u5831\u3068\u4eba\u54e1\u7ba1\u7406': 'navSubtitle.departments',
+  '\u96c7\u7528\u5f62\u614b\u306e\u767b\u9332\u3068\u7d66\u4e0e\u30fb\u52e4\u52d9\u6761\u4ef6\u306e\u7ba1\u7406': 'navSubtitle.contractTypes',
   '\u5f93\u696d\u54e1\u306e\u30ed\u30b0\u30a4\u30f3\u60c5\u5831\u3068\u30b7\u30b9\u30c6\u30e0\u6a29\u9650\u306e\u8a2d\u5b9a': 'navSubtitle.roles',
   '\u7d66\u4e0e\u306e\u81ea\u52d5\u8a08\u7b97\u3068\u660e\u7d30\u7ba1\u7406': 'navSubtitle.payroll',
   '\u793e\u4f1a\u4fdd\u967a\u30fb\u7a0e\u91d1\u30fb\u624b\u5f53\u306e\u8a2d\u5b9a': 'navSubtitle.salaryTable',

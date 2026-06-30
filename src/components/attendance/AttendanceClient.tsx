@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Card from '@/components/common/Card';
 import ExportButtons from '@/components/common/ExportButtons';
-import { formatDate, formatCurrency, cn } from '@/lib/utils';
+import { formatDate, formatCurrency, cn, dateOnlyJst, getJstDateString } from '@/lib/utils';
 import Portal from '@/components/common/Portal';
 import { useI18n } from '@/lib/i18n';
 import { getAttendanceText, weekDayLabelsMap, dayNamesMap } from '@/lib/translations/attendance';
@@ -12,6 +12,8 @@ import { getPayrollMonthForAttendanceDate } from '@/lib/payroll-helpers';
 import { resolveEmployeeWorkLimits, sumWeeklyWorkedHours } from '@/lib/work-limit';
 import { estimateGrossFromAttendance } from '@/lib/attendance-estimate';
 import { countContractWorkDaysInMonth } from '@/lib/payroll-helpers';
+import { resolveContractPayrollRules } from '@/lib/contract-payroll-rules';
+import CurrentPayrollParamsPanel from '@/components/common/CurrentPayrollParamsPanel';
 
 interface EmployeeContract {
   id: string;
@@ -85,6 +87,8 @@ interface AttendanceClientProps {
   employees: Employee[];
   holidays: Holiday[];
   isEmployeeMode?: boolean;
+  /** JST calendar date from server — keeps SSR and client in sync */
+  todayStr?: string;
 }
 
 const statusOptions = [
@@ -115,11 +119,7 @@ export function calculateRecordWorkHours(
   return sharedCalculateRecordWorkHours(checkIn, checkOut, breakStart, breakEnd, policy);
 }
 
-const dateOnly = (value: string | Date) => {
-  const d = typeof value === 'string' ? new Date(value) : value;
-  if (isNaN(d.getTime())) return typeof value === 'string' ? value.split('T')[0] : '';
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
+const dateOnly = dateOnlyJst;
 
 function getActiveContractForDate(employee: Employee | null, dateStr: string): EmployeeContract | null {
   if (!employee?.employeeContracts?.length) return null;
@@ -175,7 +175,13 @@ function getWorkDayLabel(contract: EmployeeContract | null, holiday: Holiday | n
   return getAttendanceText('workDayContractWorkDay', locale);
 }
 
-export default function AttendanceClient({ initialRecords, employees, holidays, isEmployeeMode = false }: AttendanceClientProps) {
+export default function AttendanceClient({
+  initialRecords,
+  employees,
+  holidays,
+  isEmployeeMode = false,
+  todayStr: todayStrProp,
+}: AttendanceClientProps) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -408,11 +414,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     return Array.from(set).sort();
   }, [employees]);
 
-  // Today's Date String format YYYY-MM-DD
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }, []);
+  const todayStr = todayStrProp ?? getJstDateString();
 
   // Today's summary stats for all employees
   const todayStats = useMemo(() => {
@@ -443,10 +445,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     if (!selectedEmployee) return [];
     const empId = selectedEmployee.id;
     const monthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-    return records.filter(r =>
-      r.employeeId === empId &&
-      r.date.startsWith(monthStr)
-    );
+    return records.filter(r => r.employeeId === empId && dateOnly(r.date).slice(0, 7) === monthStr);
   }, [records, selectedEmployee, selectedYear, selectedMonth]);
 
   // Selected Employee Monthly Stats
@@ -457,14 +456,18 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
     const absentDays = monthRecords.filter(r => r.status === 'ABSENT').length;
     const leaveDays = monthRecords.filter(r => r.status === 'HOLIDAY').length;
 
+    const workStatusRecords = monthRecords.filter(
+      r => r.status === 'PRESENT' || r.status === 'LATE' || r.status === 'EARLY_LEAVE'
+    );
+
     // Sum total actual working hours (excluding breaks) using rounding policy
-    const totalWorkHours = monthRecords.reduce((sum, r) => {
+    const totalWorkHours = workStatusRecords.reduce((sum, r) => {
       const hours = calculateRecordWorkHours(r.checkIn, r.checkOut, r.breakStart, r.breakEnd, roundingPolicy);
       return sum + hours;
     }, 0);
 
     // Sum total overtime hours using contract-aware holiday/rest-day policy
-    const totalOT = monthRecords.reduce((sum, r) => {
+    const totalOT = workStatusRecords.reduce((sum, r) => {
       const dateStr = dateOnly(r.date);
       const contract = getActiveContractForDate(selectedEmployee, dateStr);
       const holiday = getHolidayForDate(holidays, dateStr);
@@ -503,6 +506,9 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
       selectedYear,
       selectedMonth
     );
+    const overtimeContext = selectedEmployee.employeeContracts?.length
+      ? { contracts: selectedEmployee.employeeContracts, holidays }
+      : undefined;
     return estimateGrossFromAttendance({
       salaryType: selectedEmployee.salaryType || '時給',
       salary: selectedEmployee.salary || 0,
@@ -513,8 +519,41 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
       contractWorkDaysInMonth: contractDays,
       benefits: selectedEmployee.benefits,
       positionAllowance: selectedEmployee.position?.allowance || 0,
+      overtimeContext,
     });
-  }, [selectedEmployee, monthRecords, roundingPolicy, selectedYear, selectedMonth]);
+  }, [selectedEmployee, monthRecords, roundingPolicy, selectedYear, selectedMonth, holidays]);
+
+  const paramsTargetMonth = useMemo(() => {
+    if (selectedEmployee) {
+      return `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+    }
+    return todayStrProp?.slice(0, 7) || getJstDateString().slice(0, 7);
+  }, [selectedEmployee, selectedYear, selectedMonth, todayStrProp]);
+
+  const attendancePanelEmployee = useMemo(() => {
+    if (!selectedEmployee) return null;
+    const payrollMonth = getPayrollMonthForAttendanceDate(
+      new Date(`${paramsTargetMonth}-01T12:00:00+09:00`)
+    );
+    const rules = resolveContractPayrollRules(
+      {
+        salaryType: selectedEmployee.salaryType,
+        benefits: selectedEmployee.benefits,
+        employeeContracts: selectedEmployee.employeeContracts as Parameters<typeof resolveContractPayrollRules>[0]['employeeContracts'],
+        contractType: selectedEmployee.contractType as Parameters<typeof resolveContractPayrollRules>[0]['contractType'],
+      },
+      payrollMonth
+    );
+    return {
+      salaryType: selectedEmployee.salaryType,
+      salary: selectedEmployee.salary,
+      hourlyRate: selectedEmployee.hourlyRate,
+      dailyRate: selectedEmployee.dailyRate,
+      contractType: rules.contractType.name,
+      overtimeMultiplier: rules.overtimeMultiplier,
+      benefits: selectedEmployee.benefits,
+    };
+  }, [selectedEmployee, paramsTargetMonth]);
 
   const hasWorkLimits = !!(
     selectedEmployee?.workLimitVisa28h || selectedEmployee?.workLimitIncomeCap80k
@@ -835,7 +874,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
 
     let attendanceDate: Date;
     try {
-      attendanceDate = new Date(formDate ? `${formDate}T00:00:00.000Z` : `${selectedDate}T00:00:00.000Z`);
+      attendanceDate = new Date(formDate ? `${formDate}T00:00:00+09:00` : `${selectedDate}T00:00:00+09:00`);
       if (isNaN(attendanceDate.getTime())) throw new Error('Invalid date');
     } catch (e) {
       alert('日付が無効です');
@@ -849,7 +888,7 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
 
     const data = {
       employeeId: selectedEmployee.id,
-      date: formDate ? `${formDate}T00:00:00.000Z` : `${selectedDate}T00:00:00.000Z`,
+      date: formDate ? `${formDate}T00:00:00+09:00` : `${selectedDate}T00:00:00+09:00`,
       checkIn,
       checkOut,
       breakStart,
@@ -903,9 +942,20 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
 
     setAutoScheduling(true);
     try {
-      const previewRes = await fetch(
-        `/api/attendance/auto-schedule?employeeId=${selectedEmployee.id}&year=${selectedYear}&month=${selectedMonth}`
-      );
+      const shiftQuery = new URLSearchParams({
+        employeeId: selectedEmployee.id,
+        year: String(selectedYear),
+        month: String(selectedMonth),
+        replaceExisting: 'false',
+        shiftCheckIn: defaultCheckIn,
+        shiftCheckOut: defaultCheckOut,
+        shiftHasBreak: String(defaultHasBreak),
+      });
+      if (defaultHasBreak) {
+        shiftQuery.set('shiftBreakStart', defaultBreakStart);
+        shiftQuery.set('shiftBreakEnd', defaultBreakEnd);
+      }
+      const previewRes = await fetch(`/api/attendance/auto-schedule?${shiftQuery.toString()}`);
       const previewBody = await previewRes.json();
       if (!previewRes.ok) {
         throw new Error(previewBody.error || getAttendanceText('autoScheduleError', locale));
@@ -915,6 +965,8 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
         ? getAttendanceText('autoSchedulePreview', locale)
             .replace('{days}', String(previewBody.days.length))
             .replace('{hours}', String(previewBody.summary?.totalHours ?? 0))
+            .replace('{from}', String(previewBody.summary?.timeFrom ?? '08:00'))
+            .replace('{to}', String(previewBody.summary?.timeTo ?? '22:00'))
             .replace('{gross}', String(previewBody.summary?.estimatedGross ?? 0))
         : '';
 
@@ -931,7 +983,14 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           employeeId: selectedEmployee.id,
           year: selectedYear,
           month: selectedMonth,
-          replaceExisting: true,
+          replaceExisting: false,
+          shiftPattern: {
+            checkIn: defaultCheckIn,
+            checkOut: defaultCheckOut,
+            breakStart: defaultHasBreak ? defaultBreakStart : null,
+            breakEnd: defaultHasBreak ? defaultBreakEnd : null,
+            hasBreak: defaultHasBreak,
+          },
         }),
       });
       const body = await res.json();
@@ -1061,6 +1120,12 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
   if (!selectedEmployee) {
     return (
       <div className="space-y-6 animate-fadeIn">
+        <CurrentPayrollParamsPanel
+          targetMonth={paramsTargetMonth}
+          mode="attendance"
+          prefetched={{ roundingPolicy }}
+        />
+
         {/* Header KPI Overview */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           {[
@@ -1073,7 +1138,9 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
           ].map((s, idx) => (
             <div key={idx} className={`${s.bg} rounded-2xl p-4 border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md cursor-default`}>
               <p className="text-[10px] text-slate-500 font-semibold mb-1 uppercase tracking-wider">{s.label}</p>
-              <p className={`text-xl font-black mt-1 tracking-tight ${s.color}`}>{s.value} <span className="text-xs font-normal text-slate-400">{getAttendanceText('staffUnit', locale)}</span></p>
+              <p className={`text-xl font-black mt-1 tracking-tight ${s.color}`} suppressHydrationWarning>
+                {s.value} <span className="text-xs font-normal text-slate-400">{getAttendanceText('staffUnit', locale)}</span>
+              </p>
             </div>
           ))}
         </div>
@@ -1165,6 +1232,13 @@ export default function AttendanceClient({ initialRecords, employees, holidays, 
   return (
     <>
       <div className="space-y-6 animate-fadeIn">
+      <CurrentPayrollParamsPanel
+        targetMonth={paramsTargetMonth}
+        mode="attendance"
+        employee={attendancePanelEmployee}
+        prefetched={{ roundingPolicy }}
+      />
+
       {/* Top Banner Navigation */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md p-5 rounded-2xl border border-slate-200/50 shadow-sm">
         <div className="flex items-center gap-4">

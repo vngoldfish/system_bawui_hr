@@ -52,6 +52,14 @@ model ContractType {
   defaultBreakStart                  String   @default("12:00")
   defaultBreakEnd                    String   @default("13:00")
   defaultHolidayWorkCountsAsOvertime Boolean  @default(true)
+  category                           String   @default("CUSTOM")
+  payrollMode                        String   @default("FULL")
+  overtimeMultiplier                 Float    @default(1.25)
+  socialInsuranceDefault             Boolean  @default(true)
+  employmentInsuranceDefault         Boolean  @default(true)
+  workersCompDefault                 Boolean  @default(true)
+  maxWeeklyHours                     Float?
+  contractTemplateNotes              String   @default("")
   isActive                           Boolean  @default(true)
   createdAt                          DateTime @default(now())
   updatedAt                          DateTime @updatedAt
@@ -178,6 +186,8 @@ model Employee {
   sentAnnouncements    Announcement[]         @relation("SentAnnouncements")
   shitens              Shiten[]               @relation("EmployeeShitens")
   salaryAdjustments    SalaryAdjustment[]
+  shiftAssignments     ShiftAssignment[]
+  shiftAvailabilities  ShiftAvailability[]
 
   @@index([departmentId])
   @@index([positionId])
@@ -248,6 +258,44 @@ model ResidenceCardHistory {
   updatedAt              DateTime  @default(now())
 
   @@map("residence_card_history")
+}
+
+// Planned shift assignment per employee per day
+model ShiftAssignment {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime
+  shiftType  String   @default("day")
+  startTime  String   @default("09:00")
+  endTime    String   @default("18:00")
+  notes      String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([employeeId])
+  @@index([date])
+  @@map("shift_assignments")
+}
+
+// Part-time / arubaito monthly work-day registration (希望勤務日)
+model ShiftAvailability {
+  id              String   @id @default(cuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  targetMonth     String
+  date            DateTime
+  shiftPreference String   @default("any")
+  notes           String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([targetMonth])
+  @@index([date])
+  @@index([employeeId, targetMonth])
+  @@map("shift_availabilities")
 }
 
 // Attendance Record model
@@ -499,6 +547,16 @@ model Company {
   healthInsuranceRate Float?
   attendanceAutoScheduleEnabled Boolean @default(true)
   attendanceGrossEstimateEnabled Boolean @default(true)
+  autoScheduleTimeFrom          String  @default("08:00")
+  autoScheduleTimeTo            String  @default("22:00")
+  autoScheduleBreakEnabled      Boolean @default(true)
+  autoScheduleBreakFrom         String  @default("12:00")
+  autoScheduleBreakTo           String  @default("13:00")
+  autoScheduleBreakMinutes      Int     @default(60)
+  shiftRegistrationRequired     Boolean @default(true)
+  shiftRegistrationDeadlineDay  Int     @default(25)
+  shiftRegistrationPolicyRules  Json?
+  enabledShiftTypes             String  @default("day,early,late,night")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

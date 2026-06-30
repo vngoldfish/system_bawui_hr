@@ -40,6 +40,7 @@ const menuSections: MenuSection[] = [
       { href: '/employees', label: 'nav.employees', icon: '👤' },
       { href: '/departments', label: 'nav.departments', icon: '🏬' },
       { href: '/positions', label: 'nav.positions', icon: '👔' },
+      { href: '/contract-types', label: 'nav.contractTypes', icon: '📑' },
       { href: '/shitens', label: 'nav.shitens', icon: '🏪' },
       { href: '/contracts', label: 'nav.contracts', icon: '📋' },
       { href: '/residence-cards', label: 'nav.foreigners', icon: '🛂' },
@@ -53,7 +54,10 @@ const menuSections: MenuSection[] = [
     items: [
       { href: '/attendance', label: 'nav.attendance', icon: '⏰' },
       { href: '/leave', label: 'nav.leave', icon: '🏖️' },
+      { href: '/shift-register', label: 'nav.shiftRegister', icon: '✋' },
       { href: '/shift', label: 'nav.shift', icon: '📅' },
+      { href: '/work-calendar', label: 'nav.workCalendar', icon: '🗓️' },
+      { href: '/company-calendar', label: 'nav.companyCalendar', icon: '🏢' },
     ],
   },
   {
@@ -61,6 +65,7 @@ const menuSections: MenuSection[] = [
     icon: '💰',
     items: [
       { href: '/payroll', label: 'nav.payroll', icon: '💵' },
+      { href: '/dispatch-report', label: 'nav.dispatchReport', icon: '📋' },
       { href: '/salary-table', label: 'nav.salaryTable', icon: '📑' },
       { href: '/payment-methods', label: 'nav.paymentMethods', icon: '💳' },
       { href: '/expenses', label: 'nav.expenses', icon: '🧾' },
@@ -86,6 +91,7 @@ const permissionMap: Record<string, string> = {
   '/employees': 'employees:view',
   '/departments': 'employees:view',
   '/positions': 'employees:view',
+  '/contract-types': 'employees:view',
   '/shitens': 'employees:view',
   '/contracts': 'employees:view',
   '/residence-cards': 'residence_card:view',
@@ -93,7 +99,11 @@ const permissionMap: Record<string, string> = {
   '/attendance': 'attendance:view',
   '/leave': 'leave:view',
   '/shift': 'attendance:view',
+  '/shift-register': 'attendance:view',
+  '/work-calendar': 'attendance:view',
+  '/company-calendar': 'settings:view',
   '/payroll': 'payroll:view',
+  '/dispatch-report': 'payroll:view',
   '/salary-table': 'payroll:view',
   '/payment-methods': 'payroll:view',
   '/benefits': 'payroll:view',
@@ -114,11 +124,14 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
   }, [pathname, onCloseMobile]);
 
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const [openSections, setOpenSections] = useState<string[]>([]);
+  const [openSections, setOpenSections] = useState<string[]>(() =>
+    menuSections
+      .filter(s => s.items.some(i => pathname.startsWith(i.href)))
+      .map(s => s.label)
+  );
   const [user, setUser] = useState<LoggedUser | null>(null);
-  const [filteredSections, setFilteredSections] = useState<MenuSection[]>([]);
-  const [companyName, setCompanyName] = useState('');
+  const [filteredSections, setFilteredSections] = useState<MenuSection[]>(menuSections);
+  const [companyName, setCompanyName] = useState(() => t('common.companyName'));
 
   // Fetch latest company info from database API on mount
   useEffect(() => {
@@ -139,29 +152,24 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
     loadCompany();
   }, []);
 
-  // Load collapse state and user permissions on mount
+  // Load collapse state and user permissions on mount (after hydration)
   useEffect(() => {
-    setIsMounted(true);
-    let initialName = '';
-    if (typeof window !== 'undefined') {
-      const savedCollapsed = localStorage.getItem('sidebar_collapsed');
-      if (savedCollapsed) {
-        setIsCollapsed(savedCollapsed === 'true');
-      }
-      const savedInfo = localStorage.getItem('company_info');
-      if (savedInfo) {
-        try {
-          const parsed = JSON.parse(savedInfo);
-          if (parsed.name) {
-            initialName = parsed.name;
-          }
-        } catch (e) {
-          console.error('Failed to parse company_info', e);
+    const savedCollapsed = localStorage.getItem('sidebar_collapsed');
+    if (savedCollapsed) {
+      setIsCollapsed(savedCollapsed === 'true');
+    }
+    const savedInfo = localStorage.getItem('company_info');
+    if (savedInfo) {
+      try {
+        const parsed = JSON.parse(savedInfo);
+        if (parsed.name) {
+          setCompanyName(parsed.name);
         }
+      } catch (e) {
+        console.error('Failed to parse company_info', e);
       }
     }
-    setCompanyName(initialName || t('common.companyName'));
-    
+
     const loggedUser = getLoggedUser();
     setUser(loggedUser);
 
@@ -182,7 +190,7 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
         }
 
         if (effectiveRole === 'EMPLOYEE') {
-          return ['/dashboard', '/profile', '/attendance', '/leave', '/payroll'].includes(item.href);
+          return ['/dashboard', '/profile', '/attendance', '/leave', '/payroll', '/shift-register'].includes(item.href);
         }
 
         const requiredPermission = permissionMap[item.href] || (item.href === '/evaluation' ? 'employees:view' : null);
@@ -221,11 +229,11 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
     );
   };
 
-  // Prevent hydration flash by keeping empty layout structure or simple state
-  const sideWidthClass = isMounted && isCollapsed ? "w-16" : "w-64";
+  const sideWidthClass = isCollapsed ? 'w-16' : 'w-64';
 
   return (
-    <aside className={cn(
+    <aside
+      className={cn(
       "relative bg-slate-950 text-white flex-shrink-0 flex flex-col overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out border-r border-slate-850/50",
       sideWidthClass,
       className
@@ -246,12 +254,12 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
               </button>
             )}
 
-            {isMounted && isCollapsed ? (
-              <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-blue-600 rounded-2xl flex items-center justify-center text-white text-[11px] font-black font-sans shadow-lg border border-indigo-400/20 animate-fadeIn" title={companyName}>
+            {isCollapsed ? (
+              <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-blue-600 rounded-2xl flex items-center justify-center text-white text-[11px] font-black font-sans shadow-lg border border-indigo-400/20" title={companyName}>
                 {companyName ? companyName.replace(/\u682a\u5f0f\u4f1a\u793a|\u6709\u9650\u4f1a\u793a/g, '').slice(0, 2) : 'HR'}
               </div>
             ) : (
-              <div className="animate-fadeIn w-full text-center px-1">
+              <div className="w-full text-center px-1">
                 <h1 className="text-sm font-black tracking-wider whitespace-nowrap overflow-hidden text-ellipsis pr-6 text-slate-100" title={companyName}>
                   {companyName}
                 </h1>
@@ -261,34 +269,24 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
           </div>
 
           <nav className="space-y-1.5">
-            {!isMounted ? (
-              <div className="space-y-3 animate-pulse px-2 py-4">
-                <div className="h-4 bg-slate-850 rounded-md w-3/4"></div>
-                <div className="h-8 bg-slate-850 rounded-xl w-full"></div>
-                <div className="h-8 bg-slate-850 rounded-xl w-full"></div>
-                <div className="h-4 bg-slate-850 rounded-md w-1/2 mt-6"></div>
-                <div className="h-8 bg-slate-850 rounded-xl w-full"></div>
-                <div className="h-8 bg-slate-850 rounded-xl w-full"></div>
-              </div>
-            ) : (
-              filteredSections.map((section) => {
+            {filteredSections.map((section) => {
                 const isOpen = openSections.includes(section.label);
                 const hasActive = section.items.some(i => pathname.startsWith(i.href));
                 
                 return (
                   <div key={section.label} className="relative group">
                     <button
-                      onClick={() => !(isMounted && isCollapsed) && toggleSection(section.label)}
+                      onClick={() => !isCollapsed && toggleSection(section.label)}
                       className={cn(
                         "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-xs font-bold outline-none cursor-pointer",
                         hasActive 
                           ? "bg-slate-900 text-white border-l-4 border-indigo-500 pl-2.5 font-extrabold shadow-inner" 
                           : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
                       )}
-                      title={isMounted && isCollapsed ? t(section.label) : undefined}
+                      title={isCollapsed ? t(section.label) : undefined}
                     >
                       <span className="text-sm flex-shrink-0">{section.icon}</span>
-                      {!(isMounted && isCollapsed) && (
+                      {!isCollapsed && (
                         <>
                           <span className="flex-1 text-left whitespace-nowrap animate-fadeIn">{t(section.label)}</span>
                           <svg
@@ -302,7 +300,7 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
                     </button>
 
                     {/* Collapsed Hover Tooltip Dropdown */}
-                    {isMounted && isCollapsed && (
+                    {isCollapsed && (
                       <div className="absolute left-14 top-0 hidden group-hover:block z-50 bg-slate-950/95 backdrop-blur-md border border-slate-850 text-white rounded-2xl shadow-2xl p-3.5 min-w-[190px] animate-fadeIn transition-all">
                         <div className="font-black text-xs border-b border-slate-900 pb-2 mb-2 text-slate-500 uppercase tracking-wider">
                           {t(section.label)}
@@ -331,7 +329,7 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
                     )}
 
                     {/* Expanded submenu */}
-                    {isOpen && !(isMounted && isCollapsed) && (
+                    {isOpen && !isCollapsed && (
                       <div className="ml-3.5 mt-1.5 space-y-1.5 border-l border-slate-850 pl-4 animate-fadeIn">
                         {section.items.map((item) => {
                           const isActive = pathname === item.href;
@@ -355,8 +353,7 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
                     )}
                   </div>
                 );
-              })
-            )}
+              })}
           </nav>
         </div>
 
@@ -368,11 +365,11 @@ export default function Sidebar({ className, onCloseMobile }: SidebarProps) {
             title={isCollapsed ? t('common.expandMenu') : t('common.collapseMenu')}
           >
             <span className="text-xs font-bold leading-none">
-              {isMounted && isCollapsed ? '▶' : '◀'}
+              {isCollapsed ? '▶' : '◀'}
             </span>
           </button>
-          {!(isMounted && isCollapsed) ? (
-            <div className="text-[9px] text-slate-500 text-center font-bold uppercase tracking-wider animate-fadeIn">
+          {!isCollapsed ? (
+            <div className="text-[9px] text-slate-500 text-center font-bold uppercase tracking-wider">
               © 2026 HR System
               <span className="block mt-0.5 text-slate-650 font-medium">Developed by Team Bawui Dev</span>
             </div>
