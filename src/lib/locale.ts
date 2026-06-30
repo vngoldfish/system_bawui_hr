@@ -12,6 +12,7 @@ type CookieReader = {
 };
 
 export function resolveInitialLocale(cookieStore: CookieReader): AppLocale {
+  if (process.env.NEXT_BUILD === 'true') return 'ja';
   const appLang = cookieStore.get('app_lang')?.value;
   if (appLang && isAllowedLocale(appLang)) return appLang;
 

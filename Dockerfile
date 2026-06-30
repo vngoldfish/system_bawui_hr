@@ -12,6 +12,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV NODE_ENV production
+ENV NEXT_BUILD true
+ENV DATABASE_URL "postgresql://postgres:postgres_password@db:5432/hr_db?schema=public"
 RUN npm run build
 
 # --- Stage 3: Runner ---
