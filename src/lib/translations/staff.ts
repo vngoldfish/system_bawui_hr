@@ -105,6 +105,7 @@ export const staffTranslations = {
     },
     client: {
       rehireTitle: '再雇用処理の実行',
+      salaryChangeMonth: '昇給改定月',
       tabSalary: '給与改定履歴',
       salaryHistoryTitle: '給与改定履歴',
       currentSalaryLabel: '現在の給与',
@@ -407,6 +408,7 @@ export const staffTranslations = {
     },
     client: {
       rehireTitle: 'Perform Re-hire Process',
+      salaryChangeMonth: 'Salary Change Month',
       tabSalary: 'Salary History',
       salaryHistoryTitle: 'Salary Adjustment History',
       currentSalaryLabel: 'Current Salary',
@@ -716,6 +718,7 @@ export const staffTranslations = {
     },
     client: {
       rehireTitle: 'Thực hiện tái tuyển dụng',
+      salaryChangeMonth: 'Tháng thay đổi lương',
       tabSalary: 'Lịch sử lương',
       salaryHistoryTitle: 'Lịch sử thay đổi lương',
       currentSalaryLabel: 'Lương hiện tại',
@@ -1014,6 +1017,7 @@ export const staffTranslations = {
     },
     client: {
       rehireTitle: '执行重新雇用处理',
+      salaryChangeMonth: '薪资调整月份',
       tabSalary: '薪资历史',
       salaryHistoryTitle: '薪资调整历史',
       currentSalaryLabel: '当前薪资',
@@ -1307,6 +1311,7 @@ export const staffTranslations = {
     },
     client: {
       rehireTitle: 'ดำเนินการกระบวนการจ้างงานใหม่',
+      salaryChangeMonth: 'เดือนที่ปรับเงินเดือน',
       tabSalary: 'ประวัติเงินเดือน',
       salaryHistoryTitle: 'ประวัติการปรับเงินเดือน',
       currentSalaryLabel: 'เงินเดือนปัจจุบัน',
