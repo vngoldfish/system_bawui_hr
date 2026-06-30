@@ -557,6 +557,7 @@ model Company {
   shiftRegistrationDeadlineDay  Int     @default(25)
   shiftRegistrationPolicyRules  Json?
   enabledShiftTypes             String  @default("day,early,late,night")
+  payslipDisplayConfig          Json?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

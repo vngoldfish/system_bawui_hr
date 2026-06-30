@@ -12,6 +12,9 @@ import { useI18n } from '@/lib/i18n';
 import { calculatePayrollDetails, type PayrollRateSettings } from '@/lib/payroll-calculator';
 import { aggregateAttendanceStats, countContractWorkDaysInMonth, getActiveContractForDate, getAttendanceMonthForPayroll, getWorkingMonthDateRange } from '@/lib/payroll-helpers';
 import { checkMonthlyIncomeCap, resolveEmployeeWorkLimits } from '@/lib/work-limit';
+import type { PayslipDisplayConfig } from '@/lib/payslip-display-config';
+import { DEFAULT_PAYSLIP_DISPLAY_CONFIG } from '@/lib/payslip-display-config';
+import PayslipDisplayConfigPanel from './PayslipDisplayConfigPanel';
 
 interface Employee {
   id: string; employeeCode: string; firstName: string; lastName: string; firstNameKana: string; lastNameKana: string;
@@ -289,6 +292,7 @@ interface PayslipPrintContentProps {
   t: (key: string) => string;
   isAdmin?: boolean;
   id?: string;
+  displayConfig?: PayslipDisplayConfig;
 }
 
 function PayslipPrintContent({
@@ -301,7 +305,8 @@ function PayslipPrintContent({
   locale,
   t,
   isAdmin = false,
-  id
+  id,
+  displayConfig
 }: PayslipPrintContentProps) {
   const transAllow = employee.benefits?.transportation || 0;
   const houseAllow = employee.benefits?.housing || 0;
@@ -369,26 +374,36 @@ function PayslipPrintContent({
       {/* Employee & Company Info Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 border border-slate-300 p-4 rounded-xl print:rounded-none print:border-black print:gap-1.5 print:p-1.5 print:mb-1 print:text-[10px]">
         <div className="space-y-2 print:space-y-0 text-sm text-slate-700 print:text-black">
-          <div className="flex"><span className="w-28 print:w-16 font-medium text-slate-500 print:text-black">{t('payroll.employeeCode')}:</span><span className="font-bold">{employee.employeeCode}</span></div>
+          {displayConfig?.showEmployeeCode !== false && (
+            <div className="flex"><span className="w-28 print:w-16 font-medium text-slate-500 print:text-black">{t('payroll.employeeCode')}:</span><span className="font-bold">{employee.employeeCode}</span></div>
+          )}
           <div className="flex"><span className="w-28 print:w-16 font-medium text-slate-500 print:text-black">{t('payroll.colName')}:</span><span className="text-base print:text-[10px] font-bold">{locale === 'vi' || locale === 'en' ? t('payroll.recipientSuffix') + ' ' : ''}{employee.lastName} {employee.firstName}{locale === 'ja' || locale === 'zh' ? ' ' + t('payroll.recipientSuffix') : ''}</span></div>
-          <div className="flex"><span className="w-28 print:w-16 font-medium text-slate-500 print:text-black">{t('payroll.deptPos')}:</span><span>{employee.department} / {employee.position}</span></div>
+          {displayConfig?.showDeptPosition !== false && (
+            <div className="flex"><span className="w-28 print:w-16 font-medium text-slate-500 print:text-black">{t('payroll.deptPos')}:</span><span>{employee.department} / {employee.position}</span></div>
+          )}
         </div>
         <div className="space-y-2 print:space-y-0 text-sm text-slate-700 print:text-black md:text-right md:border-l md:border-slate-200 md:pl-6 print:border-black print:pl-2">
-          <div className="font-bold text-base print:text-[10px]">{companyInfo?.name || t('payroll.companyName')}</div>
-          <div className="print:text-[9px]">{companyInfo?.address || t('payroll.companyAddress')}</div>
-          <div className="flex md:justify-end items-center">
-            <span className="w-28 print:w-20 font-medium text-slate-500 print:text-black text-left md:text-right mr-2">{t('payroll.payDate')}:</span>
-            {isEditing && editFields && setEditFields ? (
-              <input 
-                type="date" 
-                value={editFields.paymentDate}
-                onChange={e => setEditFields(prev => ({ ...prev, paymentDate: e.target.value }))}
-                className="px-2 py-1 border border-slate-300 rounded text-sm bg-white text-slate-800"
-              />
-            ) : (
-              <span className="font-semibold">{record.paymentDate ? formatPayday(record.paymentDate) : '2026/05/25'}</span>
-            )}
-          </div>
+          {displayConfig?.showCompanyInfo !== false && (
+            <>
+              <div className="font-bold text-base print:text-[10px]">{companyInfo?.name || t('payroll.companyName')}</div>
+              <div className="print:text-[9px]">{companyInfo?.address || t('payroll.companyAddress')}</div>
+            </>
+          )}
+          {displayConfig?.showPayDate !== false && (
+            <div className="flex md:justify-end items-center">
+              <span className="w-28 print:w-20 font-medium text-slate-500 print:text-black text-left md:text-right mr-2">{t('payroll.payDate')}:</span>
+              {isEditing && editFields && setEditFields ? (
+                <input 
+                  type="date" 
+                  value={editFields.paymentDate}
+                  onChange={e => setEditFields(prev => ({ ...prev, paymentDate: e.target.value }))}
+                  className="px-2 py-1 border border-slate-300 rounded text-sm bg-white text-slate-800"
+                />
+              ) : (
+                <span className="font-semibold">{record.paymentDate ? formatPayday(record.paymentDate) : '2026/05/25'}</span>
+              )}
+            </div>
+          )}
           {isEditing && editFields && setEditFields && (
             <div className="flex md:justify-end items-center mt-2">
               <span className="w-28 font-medium text-slate-500 mr-2 text-left md:text-right">ステータス:</span>
@@ -408,77 +423,91 @@ function PayslipPrintContent({
       </div>
 
       {/* Attendance Section (勤怠) */}
-      <div className="mb-6 print:mb-1">
-        <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 print:mb-0.5 print:py-0.5 print:px-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【{t('payroll.attendanceHeader')}】</h3>
-        <div className="overflow-x-auto print:overflow-x-visible">
-          <table className="w-full text-xs print:text-[9px] border-collapse border border-slate-300 print:border-black">
-            <thead>
-              <tr className="bg-slate-50 print:bg-slate-100">
-                <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.workDays')}</th>
-                <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.absentDays')}</th>
-                <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.paidLeaveDays')}</th>
-                <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.prescribedHours')}</th>
-                <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.actualHours')}</th>
-                <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.overtimeHours')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center print:border-black font-semibold">
-                  {isEditing && editFields && setEditFields ? (
-                    <input 
-                      type="number" 
-                      step="0.5"
-                      value={editFields.workDays}
-                      onChange={e => setEditFields(prev => ({ ...prev, workDays: parseFloat(e.target.value) || 0 }))}
-                      className="w-20 px-1 py-0.5 text-center border border-slate-300 rounded bg-white text-slate-800 font-bold"
-                    />
-                  ) : (
-                    `${record.workDays || 0} ${t('payroll.daysUnit')}`
+      {displayConfig?.showAttendance !== false && (
+        <div className="mb-6 print:mb-1">
+          <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 print:mb-0.5 print:py-0.5 print:px-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【{t('payroll.attendanceHeader')}】</h3>
+          <div className="overflow-x-auto print:overflow-x-visible">
+            <table className="w-full text-xs print:text-[9px] border-collapse border border-slate-300 print:border-black">
+              <thead>
+                <tr className="bg-slate-50 print:bg-slate-100">
+                  {displayConfig?.showWorkDays !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.workDays')}</th>}
+                  {displayConfig?.showAbsentDays !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.absentDays')}</th>}
+                  {displayConfig?.showPaidLeaveDays !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.paidLeaveDays')}</th>}
+                  {displayConfig?.showPrescribedHours !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.prescribedHours')}</th>}
+                  {displayConfig?.showActualHours !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.actualHours')}</th>}
+                  {displayConfig?.showOvertimeHours !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.overtimeHours')}</th>}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {displayConfig?.showWorkDays !== false && (
+                    <td className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center print:border-black font-semibold">
+                      {isEditing && editFields && setEditFields ? (
+                        <input 
+                          type="number" 
+                          step="0.5"
+                          value={editFields.workDays}
+                          onChange={e => setEditFields(prev => ({ ...prev, workDays: parseFloat(e.target.value) || 0 }))}
+                          className="w-20 px-1 py-0.5 text-center border border-slate-300 rounded bg-white text-slate-800 font-bold"
+                        />
+                      ) : (
+                        `${record.workDays || 0} ${t('payroll.daysUnit')}`
+                      )}
+                    </td>
                   )}
-                </td>
-                <td className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center text-red-650 print:text-black print:border-black font-semibold">
-                  {isEditing && editFields && setEditFields ? (
-                    <input 
-                      type="number" 
-                      step="0.5"
-                      value={editFields.absentDays}
-                      onChange={e => setEditFields(prev => ({ ...prev, absentDays: parseFloat(e.target.value) || 0 }))}
-                      className="w-20 px-1 py-0.5 text-center border border-slate-300 rounded bg-white text-red-650 font-bold"
-                    />
-                  ) : (
-                    `${record.absentDays || 0} ${t('payroll.daysUnit')}`
+                  {displayConfig?.showAbsentDays !== false && (
+                    <td className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center text-red-650 print:text-black print:border-black font-semibold">
+                      {isEditing && editFields && setEditFields ? (
+                        <input 
+                          type="number" 
+                          step="0.5"
+                          value={editFields.absentDays}
+                          onChange={e => setEditFields(prev => ({ ...prev, absentDays: parseFloat(e.target.value) || 0 }))}
+                          className="w-20 px-1 py-0.5 text-center border border-slate-300 rounded bg-white text-red-655 font-bold"
+                        />
+                      ) : (
+                        `${record.absentDays || 0} ${t('payroll.daysUnit')}`
+                      )}
+                    </td>
                   )}
-                </td>
-                <td className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center print:border-black font-semibold">
-                  {22 - (isEditing && editFields ? editFields.workDays : record.workDays) - (isEditing && editFields ? editFields.absentDays : (record.absentDays || 0)) > 0 
-                    ? 22 - (isEditing && editFields ? editFields.workDays : record.workDays) - (isEditing && editFields ? editFields.absentDays : (record.absentDays || 0)) 
-                    : 0} {t('payroll.daysUnit')}
-                </td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-center font-bold text-sm print:text-[9px] print:border-black">
-                  {isEditing && editFields ? editFields.workDays * 8 : record.workHours} {t('payroll.hoursUnit')}
-                </td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-center print:border-black">
-                  {isEditing && editFields ? editFields.workDays * 8 : record.workDays * 8} {t('payroll.hoursUnit')}
-                </td>
-                <td className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center text-orange-600 print:text-black print:border-black font-semibold">
-                  {isEditing && editFields && setEditFields ? (
-                    <input 
-                      type="number" 
-                      step="0.1"
-                      value={editFields.overtimeHours}
-                      onChange={e => setEditFields(prev => ({ ...prev, overtimeHours: parseFloat(e.target.value) || 0 }))}
-                      className="w-20 px-1 py-0.5 text-center border border-slate-300 rounded bg-white text-orange-655 font-bold"
-                    />
-                  ) : (
-                    `${Math.round((record.overtimeHours || 0) * 10) / 10} ${t('payroll.hoursUnit')}`
+                  {displayConfig?.showPaidLeaveDays !== false && (
+                    <td className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center print:border-black font-semibold">
+                      {22 - (isEditing && editFields ? editFields.workDays : record.workDays) - (isEditing && editFields ? editFields.absentDays : (record.absentDays || 0)) > 0 
+                        ? 22 - (isEditing && editFields ? editFields.workDays : record.workDays) - (isEditing && editFields ? editFields.absentDays : (record.absentDays || 0)) 
+                        : 0} {t('payroll.daysUnit')}
+                    </td>
                   )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                  {displayConfig?.showPrescribedHours !== false && (
+                    <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-center font-bold text-sm print:text-[9px] print:border-black">
+                      {isEditing && editFields ? editFields.workDays * 8 : record.workHours} {t('payroll.hoursUnit')}
+                    </td>
+                  )}
+                  {displayConfig?.showActualHours !== false && (
+                    <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-center print:border-black">
+                      {isEditing && editFields ? editFields.workDays * 8 : record.workDays * 8} {t('payroll.hoursUnit')}
+                    </td>
+                  )}
+                  {displayConfig?.showOvertimeHours !== false && (
+                    <td className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center text-orange-600 print:text-black print:border-black font-semibold">
+                      {isEditing && editFields && setEditFields ? (
+                        <input 
+                          type="number" 
+                          step="0.1"
+                          value={editFields.overtimeHours}
+                          onChange={e => setEditFields(prev => ({ ...prev, overtimeHours: parseFloat(e.target.value) || 0 }))}
+                          className="w-20 px-1 py-0.5 text-center border border-slate-300 rounded bg-white text-orange-655 font-bold"
+                        />
+                      ) : (
+                        `${Math.round((record.overtimeHours || 0) * 10) / 10} ${t('payroll.hoursUnit')}`
+                      )}
+                    </td>
+                  )}
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Earnings & Deductions Tables Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 print:grid-cols-2 gap-6 mb-6 print:gap-2 print:mb-1">
@@ -525,97 +554,109 @@ function PayslipPrintContent({
                   )}
                 </td>
               </tr>
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.overtimeSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-green-650 print:text-black print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input 
-                      type="number" 
-                      value={editFields.overtimePay}
-                      onChange={e => setEditFields(prev => ({ ...prev, overtimePay: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    `+${formatCurrency(record.overtimePay)}`
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.transportSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input
-                      type="number"
-                      value={editFields.transportation}
-                      onChange={e => setEditFields(prev => ({ ...prev, transportation: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    `+${formatCurrency(transAllow)}`
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.housingSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input
-                      type="number"
-                      value={editFields.housing}
-                      onChange={e => setEditFields(prev => ({ ...prev, housing: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    `+${formatCurrency(houseAllow)}`
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.mealSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input
-                      type="number"
-                      value={editFields.meal}
-                      onChange={e => setEditFields(prev => ({ ...prev, meal: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    `+${formatCurrency(mealAllow)}`
-                  )}
-                </td>
-              </tr>
+              {displayConfig?.showOvertimePay !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.overtimeSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-green-650 print:text-black print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input 
+                        type="number" 
+                        value={editFields.overtimePay}
+                        onChange={e => setEditFields(prev => ({ ...prev, overtimePay: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `+${formatCurrency(record.overtimePay)}`
+                    )}
+                  </td>
+                </tr>
+              )}
+              {displayConfig?.showTransportation !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.transportSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input
+                        type="number"
+                        value={editFields.transportation}
+                        onChange={e => setEditFields(prev => ({ ...prev, transportation: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `+${formatCurrency(transAllow)}`
+                    )}
+                  </td>
+                </tr>
+              )}
+              {displayConfig?.showHousing !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.housingSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input
+                        type="number"
+                        value={editFields.housing}
+                        onChange={e => setEditFields(prev => ({ ...prev, housing: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `+${formatCurrency(houseAllow)}`
+                    )}
+                  </td>
+                </tr>
+              )}
+              {displayConfig?.showMeal !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.mealSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input
+                        type="number"
+                        value={editFields.meal}
+                        onChange={e => setEditFields(prev => ({ ...prev, meal: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `+${formatCurrency(mealAllow)}`
+                    )}
+                  </td>
+                </tr>
+              )}
               
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.otherAllowancesAndAdjustments')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input 
-                      type="number" 
-                      value={editFields.allowances}
-                      onChange={e => setEditFields(prev => ({ ...prev, allowances: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    currentOtherAllow > 0 ? `+${formatCurrency(currentOtherAllow)}` : '-'
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.bonusSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input 
-                      type="number" 
-                      value={editFields.bonus}
-                      onChange={e => setEditFields(prev => ({ ...prev, bonus: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    currentBonus > 0 ? `+${formatCurrency(currentBonus)}` : '-'
-                  )}
-                </td>
-              </tr>
+              {displayConfig?.showOtherAllowances !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.otherAllowancesAndAdjustments')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input 
+                        type="number" 
+                        value={editFields.allowances}
+                        onChange={e => setEditFields(prev => ({ ...prev, allowances: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      currentOtherAllow > 0 ? `+${formatCurrency(currentOtherAllow)}` : '-'
+                    )}
+                  </td>
+                </tr>
+              )}
+              {displayConfig?.showBonus !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.bonusSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input 
+                        type="number" 
+                        value={editFields.bonus}
+                        onChange={e => setEditFields(prev => ({ ...prev, bonus: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      currentBonus > 0 ? `+${formatCurrency(currentBonus)}` : '-'
+                    )}
+                  </td>
+                </tr>
+              )}
 
               <tr className="bg-blue-50/50 font-bold print:bg-slate-100">
                 <td className="border border-slate-300 p-3 print:py-1 print:px-1.5 text-slate-800 print:text-black print:border-black">{t('payroll.totalEarnings')}</td>
@@ -636,22 +677,24 @@ function PayslipPrintContent({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 print:divide-black">
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.healthInsSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-500 print:text-black print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input
-                      type="number"
-                      value={editFields.healthInsuranceEmployee}
-                      onChange={e => setEditFields(prev => ({ ...prev, healthInsuranceEmployee: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    `-${formatCurrency(record.healthInsuranceEmployee || 0)}`
-                  )}
-                </td>
-              </tr>
-              {((record.nursingCareInsurance ?? 0) > 0 || isEditing) && (
+              {displayConfig?.showHealthInsurance !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.healthInsSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-500 print:text-black print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input
+                        type="number"
+                        value={editFields.healthInsuranceEmployee}
+                        onChange={e => setEditFields(prev => ({ ...prev, healthInsuranceEmployee: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `-${formatCurrency(record.healthInsuranceEmployee || 0)}`
+                    )}
+                  </td>
+                </tr>
+              )}
+              {displayConfig?.showNursingCare !== false && ((record.nursingCareInsurance ?? 0) > 0 || isEditing) && (
                 <tr>
                   <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.nursingCareInsuranceEmployee')}</td>
                   <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-505 print:text-black print:border-black">
@@ -668,88 +711,99 @@ function PayslipPrintContent({
                   </td>
                 </tr>
               )}
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.pensionSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-500 print:text-black print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input
-                      type="number"
-                      value={editFields.pensionEmployee}
-                      onChange={e => setEditFields(prev => ({ ...prev, pensionEmployee: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    `-${formatCurrency(record.pensionEmployee || 0)}`
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.employmentInsSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-500 print:text-black print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input
-                      type="number"
-                      value={editFields.employmentInsuranceEmployee}
-                      onChange={e => setEditFields(prev => ({ ...prev, employmentInsuranceEmployee: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    `-${formatCurrency(record.employmentInsuranceEmployee || 0)}`
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.workersCompSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-505 print:text-black print:border-black">
-                  -{formatCurrency(0)}
-                </td>
-              </tr>
-
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.absentAndOtherDeductions')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-505 print:text-black print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input 
-                      type="number" 
-                      value={editFields.deductions}
-                      onChange={e => setEditFields(prev => ({ ...prev, deductions: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    `-${formatCurrency(currentDeductions)}`
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.incomeTaxSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-505 print:text-black print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input 
-                      type="number" 
-                      value={editFields.incomeTax}
-                      onChange={e => setEditFields(prev => ({ ...prev, incomeTax: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    `-${formatCurrency(record.incomeTax || 0)}`
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.residentTaxSubject')}</td>
-                <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-550 print:text-black print:border-black">
-                  {isEditing && editFields && setEditFields ? (
-                    <input
-                      type="number"
-                      value={editFields.residentTax}
-                      onChange={e => setEditFields(prev => ({ ...prev, residentTax: parseFloat(e.target.value) || 0 }))}
-                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
-                    />
-                  ) : (
-                    `-${formatCurrency(record.residentTax || 0)}`
-                  )}
-                </td>
-              </tr>
+              {displayConfig?.showPension !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.pensionSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-500 print:text-black print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input
+                        type="number"
+                        value={editFields.pensionEmployee}
+                        onChange={e => setEditFields(prev => ({ ...prev, pensionEmployee: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `-${formatCurrency(record.pensionEmployee || 0)}`
+                    )}
+                  </td>
+                </tr>
+              )}
+              {displayConfig?.showEmploymentIns !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.employmentInsSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-500 print:text-black print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input
+                        type="number"
+                        value={editFields.employmentInsuranceEmployee}
+                        onChange={e => setEditFields(prev => ({ ...prev, employmentInsuranceEmployee: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `-${formatCurrency(record.employmentInsuranceEmployee || 0)}`
+                    )}
+                  </td>
+                </tr>
+              )}
+              {displayConfig?.showWorkersComp !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.workersCompSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-505 print:text-black print:border-black">
+                    -{formatCurrency(0)}
+                  </td>
+                </tr>
+              )}
+              {displayConfig?.showAbsentDeductions !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.absentAndOtherDeductions')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-505 print:text-black print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input 
+                        type="number" 
+                        value={editFields.deductions}
+                        onChange={e => setEditFields(prev => ({ ...prev, deductions: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `-${formatCurrency(currentDeductions)}`
+                    )}
+                  </td>
+                </tr>
+              )}
+              {displayConfig?.showIncomeTax !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.incomeTaxSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-505 print:text-black print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input 
+                        type="number" 
+                        value={editFields.incomeTax}
+                        onChange={e => setEditFields(prev => ({ ...prev, incomeTax: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `-${formatCurrency(record.incomeTax || 0)}`
+                    )}
+                  </td>
+                </tr>
+              )}
+              {displayConfig?.showResidentTax !== false && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.residentTaxSubject')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-550 print:text-black print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input
+                        type="number"
+                        value={editFields.residentTax}
+                        onChange={e => setEditFields(prev => ({ ...prev, residentTax: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `-${formatCurrency(record.residentTax || 0)}`
+                    )}
+                  </td>
+                </tr>
+              )}
               <tr className="bg-red-50/50 font-bold print:bg-slate-100">
                 <td className="border border-slate-300 p-3 print:py-1 print:px-1.5 text-slate-800 print:text-black print:border-black">{t('payroll.totalDeductions')}</td>
                 <td className="border border-slate-300 p-3 print:py-1 print:px-1.5 text-right text-red-700 print:text-black print:border-black">-{formatCurrency(currentTotalDeductions)}</td>
@@ -918,6 +972,39 @@ function BulkPrintContainer({
   onClose: () => void;
 }) {
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [displayConfig, setDisplayConfig] = useState<PayslipDisplayConfig>(DEFAULT_PAYSLIP_DISPLAY_CONFIG);
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/settings/payslip-display')
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && res.data) {
+          setDisplayConfig(res.data);
+        }
+      })
+      .catch(err => console.error('Failed to load payslip display settings:', err));
+  }, []);
+
+  const handleSaveConfig = async (newConfig?: PayslipDisplayConfig) => {
+    const configToSave = newConfig || displayConfig;
+    setSavingConfig(true);
+    try {
+      const res = await fetch('/api/settings/payslip-display', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configToSave),
+      });
+      if (!res.ok) {
+        alert('Không thể lưu cài đặt hiển thị!');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Đã xảy ra lỗi khi lưu cài đặt hiển thị!');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
 
   // Group records into pairs
   const pairs: PayrollRecord[][] = [];
@@ -1303,6 +1390,7 @@ ${pairsHTML}
                         locale={locale}
                         t={t}
                         isAdmin={false}
+                        displayConfig={displayConfig}
                       />
                     </div>
                   </div>
@@ -1326,7 +1414,14 @@ ${pairsHTML}
                 {t('payroll.printAllBtn')} — {filtered.length} {locale === 'ja' ? '人' : locale === 'vi' ? 'người' : 'persons'} / {pairs.length} {locale === 'ja' ? 'ページ' : locale === 'vi' ? 'trang' : 'pages'}
               </span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <PayslipDisplayConfigPanel
+                config={displayConfig}
+                onChange={setDisplayConfig}
+                onSave={handleSaveConfig}
+                saving={savingConfig}
+                t={t}
+              />
               <button
                 onClick={handleDownloadBulkPDF}
                 disabled={generatingPDF}
@@ -1410,6 +1505,39 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
   const [emailStatus, setEmailStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [displayConfig, setDisplayConfig] = useState<PayslipDisplayConfig>(DEFAULT_PAYSLIP_DISPLAY_CONFIG);
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/settings/payslip-display')
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && res.data) {
+          setDisplayConfig(res.data);
+        }
+      })
+      .catch(err => console.error('Failed to load payslip display settings:', err));
+  }, []);
+
+  const handleSaveConfig = async (newConfig?: PayslipDisplayConfig) => {
+    const configToSave = newConfig || displayConfig;
+    setSavingConfig(true);
+    try {
+      const res = await fetch('/api/settings/payslip-display', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configToSave),
+      });
+      if (!res.ok) {
+        alert('Không thể lưu cài đặt hiển thị!');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Đã xảy ra lỗi khi lưu cài đặt hiển thị!');
+    } finally {
+      setSavingConfig(false);
+    }
+  };
   
   const transAllow = employee.benefits?.transportation || 0;
   const houseAllow = employee.benefits?.housing || 0;
@@ -1727,6 +1855,13 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
         {/* Action Toolbar */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between print:hidden bg-slate-50 rounded-t-2xl">
           <div className="flex gap-2 flex-wrap items-center">
+            <PayslipDisplayConfigPanel
+              config={displayConfig}
+              onChange={setDisplayConfig}
+              onSave={handleSaveConfig}
+              saving={savingConfig}
+              t={t}
+            />
             <button onClick={handlePrint} className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer">
               <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
               {t('payroll.printBtn')}
@@ -1861,6 +1996,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
           locale={locale}
           t={t}
           isAdmin={isAdmin}
+          displayConfig={displayConfig}
         />
 
       </div>
