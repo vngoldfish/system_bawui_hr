@@ -39,7 +39,7 @@ export const DEFAULT_PAYSLIP_DISPLAY_CONFIG: PayslipDisplayConfig = {
   showWorkDays: true,
   showAbsentDays: true,
   showPaidLeaveDays: true,
-  showPrescribedHours: true,
+  showPrescribedHours: false,
   showActualHours: true,
   showOvertimeHours: true,
   showOvertimePay: true,

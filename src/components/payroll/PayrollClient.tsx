@@ -434,7 +434,7 @@ function PayslipPrintContent({
                   {displayConfig?.showWorkDays !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.workDays')}</th>}
                   {displayConfig?.showAbsentDays !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.absentDays')}</th>}
                   {displayConfig?.showPaidLeaveDays !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.paidLeaveDays')}</th>}
-                  {displayConfig?.showPrescribedHours !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.prescribedHours')}</th>}
+                  {displayConfig?.showPrescribedHours !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black print:hidden">{t('payroll.prescribedHours')}</th>}
                   {displayConfig?.showActualHours !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.actualHours')}</th>}
                   {displayConfig?.showOvertimeHours !== false && <th className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center font-medium print:border-black">{t('payroll.overtimeHours')}</th>}
                 </tr>
@@ -479,7 +479,7 @@ function PayslipPrintContent({
                     </td>
                   )}
                   {displayConfig?.showPrescribedHours !== false && (
-                    <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-center font-bold text-sm print:text-[9px] print:border-black">
+                    <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-center font-bold text-sm print:text-[9px] print:border-black print:hidden">
                       {isEditing && editFields ? editFields.workDays * 8 : (record.workDays * 8)} {t('payroll.hoursUnit')}
                     </td>
                   )}
