@@ -1643,14 +1643,6 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
   }, [record, employee]);
 
   const handleRecalculate = () => {
-    alert("Recalculate Inputs: " + JSON.stringify({
-      salaryType: employee.salaryType,
-      hourlyRate: employee.hourlyRate,
-      salary: employee.salary,
-      editFieldsBaseSalary: editFields.baseSalary,
-      editFieldsWorkHours: editFields.workHours,
-      editFieldsWorkDays: editFields.workDays
-    }, null, 2));
     const calc = calculatePayrollDetails({
       baseSalary: editFields.baseSalary,
       salaryType: employee.salaryType || '月給',
