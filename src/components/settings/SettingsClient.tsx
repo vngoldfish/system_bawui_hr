@@ -39,6 +39,24 @@ export default function SettingsClient() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const match = document.cookie.match(/session_user=([^;]+)/);
+      if (match) {
+        try {
+          const user = JSON.parse(decodeURIComponent(match[1]));
+          setIsSuperAdmin(user.role === 'SUPER_ADMIN');
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -167,6 +185,76 @@ export default function SettingsClient() {
     setDraft(settings);
     setDirty(false);
     setError(null);
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/settings/backup');
+      if (!res.ok) {
+        throw new Error('Export failed');
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bawui_hr_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to export backup');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const confirmText = t('settings.importConfirm') || 'Bạn có chắc chắn muốn phục hồi dữ liệu từ file JSON này?';
+    if (!window.confirm(confirmText)) {
+      e.target.value = '';
+      return;
+    }
+
+    setImporting(true);
+    setError(null);
+    try {
+      const text = await file.text();
+      let backupObj;
+      try {
+        backupObj = JSON.parse(text);
+      } catch (err) {
+        throw new Error('File is not a valid JSON');
+      }
+
+      if (!backupObj || typeof backupObj !== 'object') {
+        throw new Error('Invalid JSON structure');
+      }
+
+      const res = await fetch('/api/settings/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(backupObj),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || t('settings.importError') || 'Phục hồi dữ liệu thất bại');
+      }
+
+      alert(t('settings.importSuccess') || 'Đã phục hồi dữ liệu thành công! Hệ thống đang tải lại...');
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('settings.importError') || 'Phục hồi dữ liệu thất bại');
+      e.target.value = '';
+    } finally {
+      setImporting(false);
+    }
   };
 
   const categoryLabel = (cat: string) => t(`settings.contractCategory.${cat}`) || cat;
@@ -394,6 +482,50 @@ export default function SettingsClient() {
           </p>
         </div>
       </Card>
+
+      {isSuperAdmin && (
+        <Card title={t('settings.cardBackup') || 'データ＆バックアップ'} className="bg-white dark:bg-slate-900 border border-slate-200/50 rounded-2xl shadow-sm">
+          <p className="text-sm text-slate-500 mb-5">{t('settings.cardBackupDesc') || '全データベースのエクスポートおよびインポートによるデータ復旧。'}</p>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            {/* Export block */}
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50"
+            >
+              {exporting ? (
+                <div className="animate-spin rounded-full h-4.5 w-4.5 border-2 border-white border-t-transparent" />
+              ) : (
+                <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              )}
+              {t('settings.exportBtn') || 'Xuất dữ liệu (Export JSON)'}
+            </button>
+
+            {/* Import block */}
+            <label className="flex items-center justify-center gap-2 px-5 py-3 bg-violet-600 hover:bg-violet-750 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50 border border-transparent">
+              {importing ? (
+                <div className="animate-spin rounded-full h-4.5 w-4.5 border-2 border-white border-t-transparent" />
+              ) : (
+                <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+              )}
+              <span>{t('settings.importBtn') || 'Nhập dữ liệu (Import JSON)'}</span>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                disabled={importing}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold leading-relaxed flex gap-2 shadow-sm">
+            <span className="shrink-0 text-sm">⚠</span>
+            <span>{t('settings.backupWarning') || 'WARNING: Importing data will completely erase all current system data and replace it with the file contents!'}</span>
+          </div>
+        </Card>
+      )}
 
       <div className="flex justify-end gap-3">
         {dirty && (
