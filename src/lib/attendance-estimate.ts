@@ -515,7 +515,34 @@ export function buildAutoScheduleForMonth(params: {
       dayHours = patternHours;
       if (!useDayBasedScheduling) {
         const remainingMonth = maxMonthHours - monthHoursUsed;
-        if (dayHours > remainingMonth) return null;
+        if (remainingMonth <= 0) return null;
+        if (dayHours > remainingMonth) {
+          // Create a shorter shift to cover exactly the remaining hours needed
+          dayHours = remainingMonth;
+          const breakHours =
+            shiftPattern.hasBreak !== false && shiftPattern.breakStart && shiftPattern.breakEnd
+              ? (timeToMinutes(shiftPattern.breakEnd) - timeToMinutes(shiftPattern.breakStart)) / 60
+              : 0;
+          const checkOutTime = addHoursToTime(shiftPattern.checkIn, dayHours + breakHours);
+          checkInIso = `${dateStr}T${shiftPattern.checkIn}:00`;
+          checkOutIso = `${dateStr}T${checkOutTime}:00`;
+          if (shiftPattern.hasBreak !== false && shiftPattern.breakStart && shiftPattern.breakEnd) {
+            // Only include break if there's enough time
+            const shiftSpan = (timeToMinutes(checkOutTime) - timeToMinutes(shiftPattern.checkIn)) / 60;
+            if (shiftSpan > breakHours + 0.5) {
+              breakStartIso = `${dateStr}T${shiftPattern.breakStart}:00`;
+              breakEndIso = `${dateStr}T${shiftPattern.breakEnd}:00`;
+            }
+          }
+          return {
+            date: dateStr,
+            checkIn: checkInIso,
+            checkOut: checkOutIso,
+            breakStart: breakStartIso,
+            breakEnd: breakEndIso,
+            hours: dayHours,
+          };
+        }
       }
       if (dayHours > remainingWeek) return null;
 
