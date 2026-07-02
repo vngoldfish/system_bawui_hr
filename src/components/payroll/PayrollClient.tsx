@@ -267,6 +267,7 @@ interface EditFieldsType {
   paymentDate: string;
   status: string;
   workDays: number;
+  workHours: number;
   absentDays: number;
   overtimeHours: number;
   healthInsuranceEmployee: number;
@@ -479,12 +480,22 @@ function PayslipPrintContent({
                   )}
                   {displayConfig?.showPrescribedHours !== false && (
                     <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-center font-bold text-sm print:text-[9px] print:border-black">
-                      {isEditing && editFields ? editFields.workDays * 8 : record.workHours} {t('payroll.hoursUnit')}
+                      {isEditing && editFields ? editFields.workDays * 8 : (record.workDays * 8)} {t('payroll.hoursUnit')}
                     </td>
                   )}
                   {displayConfig?.showActualHours !== false && (
-                    <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-center print:border-black">
-                      {isEditing && editFields ? editFields.workDays * 8 : record.workDays * 8} {t('payroll.hoursUnit')}
+                    <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-center print:border-black font-semibold">
+                      {isEditing && editFields && setEditFields ? (
+                        <input 
+                          type="number" 
+                          step="0.5"
+                          value={editFields.workHours}
+                          onChange={e => setEditFields(prev => ({ ...prev, workHours: parseFloat(e.target.value) || 0 }))}
+                          className="w-20 px-1 py-0.5 text-center border border-slate-300 rounded bg-white text-slate-800 font-bold"
+                        />
+                      ) : (
+                        `${record.workHours || 0} ${t('payroll.hoursUnit')}`
+                      )}
                     </td>
                   )}
                   {displayConfig?.showOvertimeHours !== false && (
@@ -1562,7 +1573,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
   const resTax = record.residentTax || 0;
   const incTax = record.incomeTax || record.tax || 0;
 
-  const [editFields, setEditFields] = useState({
+  const [editFields, setEditFields] = useState<EditFieldsType>({
     baseSalary: record.baseSalary,
     overtimePay: record.overtimePay,
     transportation: transAllow,
@@ -1576,6 +1587,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
     paymentDate: record.paymentDate ? new Date(record.paymentDate).toISOString().split('T')[0] : record.month + '-25',
     status: record.status,
     workDays: record.workDays || 22,
+    workHours: record.workHours ?? (record.workDays ? record.workDays * 8 : 176),
     absentDays: record.absentDays || 0,
     overtimeHours: record.overtimeHours || 0,
     healthInsuranceEmployee: record.healthInsuranceEmployee ?? 0,
@@ -1614,6 +1626,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
       paymentDate: record.paymentDate ? new Date(record.paymentDate).toISOString().split('T')[0] : record.month + '-25',
       status: record.status,
       workDays: record.workDays || 22,
+      workHours: record.workHours ?? (record.workDays ? record.workDays * 8 : 176),
       absentDays: record.absentDays || 0,
       overtimeHours: record.overtimeHours || 0,
       healthInsuranceEmployee: record.healthInsuranceEmployee ?? 0,
@@ -1634,6 +1647,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
       baseSalary: editFields.baseSalary,
       salaryType: employee.salaryType || '月給',
       workDays: editFields.workDays,
+      workHours: editFields.workHours,
       hourlyRate: employee.hourlyRate || 0,
       dailyRate: employee.dailyRate || 0,
       overtimeHours: editFields.overtimeHours,
@@ -1656,6 +1670,8 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
 
     setEditFields(prev => ({
       ...prev,
+      baseSalary: calc.baseSalary,
+      workHours: calc.workHours,
       overtimePay: calc.overtimePay,
       tax: calc.incomeTax + calc.residentTax,
       insurance: calc.healthInsuranceEmployee + calc.nursingCareInsurance + calc.pensionEmployee + calc.employmentInsuranceEmployee,
@@ -1736,7 +1752,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
         paymentDate: editFields.paymentDate,
         status: editFields.status,
         workDays: editFields.workDays,
-        workHours: editFields.workDays * 8,
+        workHours: editFields.workHours,
         overtimeHours: editFields.overtimeHours,
         absentDays: editFields.absentDays,
         // Detailed fields
