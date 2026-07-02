@@ -346,11 +346,13 @@ export default function AttendanceClient({
         console.error(e);
       }
     } else {
-      // Fallback: Default shift is 08:00 - 17:00, 1h break
-      setDefaultCheckIn('08:00');
-      setDefaultCheckOut('17:00');
-      setDefaultBreakStart('12:00');
-      setDefaultBreakEnd('13:00');
+      // Fallback: use the employee's active contract defaults
+      const midMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-15`;
+      const activeContract = getActiveContractForDate(selectedEmployee, midMonthStr);
+      setDefaultCheckIn(activeContract?.defaultCheckIn || '09:00');
+      setDefaultCheckOut(activeContract?.defaultCheckOut || '17:00');
+      setDefaultBreakStart(activeContract?.defaultBreakStart || '12:00');
+      setDefaultBreakEnd(activeContract?.defaultBreakEnd || '13:00');
       setDefaultHasBreak(true);
     }
   }, [selectedEmployee, selectedYear, selectedMonth]);
@@ -1591,6 +1593,38 @@ export default function AttendanceClient({
                 )}
 
                 <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200/60 dark:border-slate-800">
+                  {/* Preview: hours and OT info */}
+                  {(() => {
+                    const midMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-15`;
+                    const activeContract = getActiveContractForDate(selectedEmployee, midMonthStr);
+                    const standardHours = activeContract?.standardHoursPerDay ?? 8;
+                    // Calculate shift hours
+                    const checkInMins = tempCheckIn ? (parseInt(tempCheckIn.split(':')[0]) * 60 + parseInt(tempCheckIn.split(':')[1])) : 0;
+                    const checkOutMins = tempCheckOut ? (parseInt(tempCheckOut.split(':')[0]) * 60 + parseInt(tempCheckOut.split(':')[1])) : 0;
+                    let breakMins = 0;
+                    if (tempHasBreak && tempBreakStart && tempBreakEnd) {
+                      const bsMins = parseInt(tempBreakStart.split(':')[0]) * 60 + parseInt(tempBreakStart.split(':')[1]);
+                      const beMins = parseInt(tempBreakEnd.split(':')[0]) * 60 + parseInt(tempBreakEnd.split(':')[1]);
+                      if (beMins > bsMins) breakMins = beMins - bsMins;
+                    }
+                    const workMins = checkOutMins > checkInMins ? (checkOutMins - checkInMins - breakMins) : 0;
+                    const workHrs = workMins / 60;
+                    const otHrs = Math.max(0, workHrs - standardHours);
+                    const hasOT = otHrs > 0;
+                    if (workMins <= 0) return null;
+                    return (
+                      <div className={`flex-1 flex items-center gap-3 px-3 py-2 rounded-xl text-[11px] font-bold border ${hasOT ? 'bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/50 text-orange-700 dark:text-orange-400' : 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400'}`}>
+                        <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span>
+                          {locale === 'vi'
+                            ? `Ca này: ${Math.round(workHrs * 10) / 10}h làm việc${hasOT ? ` (${Math.round(otHrs * 10) / 10}h tăng ca)` : ' — không tăng ca'}`
+                            : `このシフト: ${Math.round(workHrs * 10) / 10}h勤務${hasOT ? `（残業${Math.round(otHrs * 10) / 10}h）` : '（残業なし）'}`
+                          }
+                        </span>
+                        {hasOT && <span className="ml-auto text-[10px] bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 rounded-full">{locale === 'vi' ? `Chuẩn: ${standardHours}h/ngày` : `所定: ${standardHours}h/日`}</span>}
+                      </div>
+                    );
+                  })()}
                   <button 
                     type="button" 
                     onClick={() => setShowSettingsDrawer(false)} 
