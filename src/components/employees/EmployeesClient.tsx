@@ -846,38 +846,20 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [searchField, setSearchField] = useState<string>('all');
   const [showColumnSettings, setShowColumnSettings] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('employee_visible_columns_v2');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (parsed && typeof parsed === 'object') {
-            return {
-              status: true,
-              ...parsed
-            };
-          }
-        } catch (e) {}
-      }
-    }
-    // Clean default view: Hide long ID, BirthDate, Visa Card Number, and Expiry by default.
-    // They can be easily toggled on using the Column Settings button.
-    return {
-      no: true,
-      id: false,
-      code: true,
-      name: true,
-      department: true,
-      position: true,
-      birthDate: false,
-      nationality: true,
-      visa: true,
-      hireDate: true,
-      card: false,
-      expiry: false,
-      status: true,
-    };
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+    no: true,
+    id: false,
+    code: true,
+    name: true,
+    department: true,
+    position: true,
+    birthDate: false,
+    nationality: true,
+    visa: true,
+    hireDate: true,
+    card: false,
+    expiry: false,
+    status: true,
   });
 
   const allColumns = [
@@ -906,38 +888,53 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
 
   const activeColumns = allColumns.filter(c => visibleColumns[c.key]);
 
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    no: 50,
+    id: 95,
+    code: 80,
+    name: 140,
+    department: 110,
+    position: 100,
+    birthDate: 95,
+    nationality: 85,
+    visa: 115,
+    hireDate: 95,
+    card: 110,
+    expiry: 95,
+    status: 100,
+  });
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('employee_column_widths_v2');
-      if (saved) {
+      const savedCols = localStorage.getItem('employee_visible_columns_v2');
+      if (savedCols) {
         try {
-          const parsed = JSON.parse(saved);
+          const parsed = JSON.parse(savedCols);
           if (parsed && typeof parsed === 'object') {
-            return {
-              status: 100,
-              ...parsed
-            };
+            setVisibleColumns(prev => ({
+              ...prev,
+              ...parsed,
+              status: true // always show status
+            }));
+          }
+        } catch (e) {}
+      }
+
+      const savedWidths = localStorage.getItem('employee_column_widths_v2');
+      if (savedWidths) {
+        try {
+          const parsed = JSON.parse(savedWidths);
+          if (parsed && typeof parsed === 'object') {
+            setColumnWidths(prev => ({
+              ...prev,
+              ...parsed,
+              status: 100 // always set status width
+            }));
           }
         } catch (e) {}
       }
     }
-    // Optimized default column widths for tighter, cleaner table rendering without unnecessary scrolls
-    return {
-      no: 50,
-      id: 95,
-      code: 80,
-      name: 140,
-      department: 110,
-      position: 100,
-      birthDate: 95,
-      nationality: 85,
-      visa: 115,
-      hireDate: 95,
-      card: 110,
-      expiry: 95,
-      status: 100,
-    };
-  });
+  }, []);
 
   const handleResizeMouseDown = (e: React.MouseEvent, colKey: string) => {
     e.preventDefault();
