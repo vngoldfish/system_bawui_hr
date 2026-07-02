@@ -2393,6 +2393,7 @@ export default function PayrollClient({
             baseSalary: effective.baseSalary || 0,
             salaryType: emp.salaryType || '月給',
             workDays,
+            workHours: attendanceStats.workHours,
             hourlyRate: effective.hourlyRate || 0,
             dailyRate: effective.dailyRate || 0,
             overtimeHours,
