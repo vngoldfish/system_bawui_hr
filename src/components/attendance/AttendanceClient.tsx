@@ -330,14 +330,18 @@ export default function AttendanceClient({
   const [tempHasBreak, setTempHasBreak] = useState(true);
 
   // Sync temp states and load defaults from localStorage when employee/year/month changes
+  // Priority: (1) per-month key → (2) per-employee key → (3) contract defaults
   useEffect(() => {
     if (!selectedEmployee) return;
-    const key = `shift-default-${selectedEmployee.id}-${selectedYear}-${selectedMonth}`;
-    const saved = localStorage.getItem(key);
+    const monthKey = `shift-default-${selectedEmployee.id}-${selectedYear}-${selectedMonth}`;
+    const empKey = `shift-default-emp-${selectedEmployee.id}`;
+    const savedMonth = localStorage.getItem(monthKey);
+    const savedEmp = localStorage.getItem(empKey);
+    const saved = savedMonth || savedEmp;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setDefaultCheckIn(parsed.checkIn || '08:00');
+        setDefaultCheckIn(parsed.checkIn || '09:00');
         setDefaultCheckOut(parsed.checkOut || '17:00');
         setDefaultBreakStart(parsed.breakStart || '12:00');
         setDefaultBreakEnd(parsed.breakEnd || '13:00');
@@ -392,9 +396,13 @@ export default function AttendanceClient({
 
   const saveMonthlyDefaults = (checkIn: string, checkOut: string, breakStart: string, breakEnd: string, hasBreak: boolean) => {
     if (!selectedEmployee) return;
-    const key = `shift-default-${selectedEmployee.id}-${selectedYear}-${selectedMonth}`;
     const value = { checkIn, checkOut, breakStart, breakEnd, hasBreak };
-    localStorage.setItem(key, JSON.stringify(value));
+    // Save per-employee key (persists across months) — month-specific key is removed to avoid stale overrides
+    const empKey = `shift-default-emp-${selectedEmployee.id}`;
+    localStorage.setItem(empKey, JSON.stringify(value));
+    // Also clear the old per-month key if exists so per-employee key takes priority next time
+    const monthKey = `shift-default-${selectedEmployee.id}-${selectedYear}-${selectedMonth}`;
+    localStorage.removeItem(monthKey);
     
     setDefaultCheckIn(checkIn);
     setDefaultCheckOut(checkOut);
