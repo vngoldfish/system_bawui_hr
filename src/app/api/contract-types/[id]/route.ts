@@ -52,6 +52,26 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data,
     });
 
+    // Automatically sync active employee contracts to match the updated contract type defaults
+    const syncData: any = {};
+    if (data.defaultWorkDays !== undefined) syncData.workDays = data.defaultWorkDays;
+    if (data.defaultStandardHoursPerDay !== undefined) syncData.standardHoursPerDay = data.defaultStandardHoursPerDay;
+    if (data.defaultCheckIn !== undefined) syncData.defaultCheckIn = data.defaultCheckIn;
+    if (data.defaultCheckOut !== undefined) syncData.defaultCheckOut = data.defaultCheckOut;
+    if (data.defaultBreakStart !== undefined) syncData.defaultBreakStart = data.defaultBreakStart;
+    if (data.defaultBreakEnd !== undefined) syncData.defaultBreakEnd = data.defaultBreakEnd;
+    if (data.defaultHolidayWorkCountsAsOvertime !== undefined) syncData.holidayWorkCountsAsOvertime = data.defaultHolidayWorkCountsAsOvertime;
+
+    if (Object.keys(syncData).length > 0) {
+      await prisma.employeeContract.updateMany({
+        where: {
+          contractTypeId: id,
+          isActive: true,
+        },
+        data: syncData,
+      });
+    }
+
     logDatabaseChange({
       request,
       action: 'UPDATE',
