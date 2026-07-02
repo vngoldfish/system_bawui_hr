@@ -139,6 +139,19 @@ export async function POST(request: NextRequest) {
 
     const uniqueEmployeeIds = [...new Set(recordsData.map((data: { employeeId?: string }) => data.employeeId).filter(Boolean))] as string[];
     const uniqueMonths = [...new Set(recordsData.map((data: { month?: string }) => data.month).filter(Boolean))] as string[];
+
+    // Query existing approved/paid records to skip recalculation/overwriting
+    const skippedRecords = await prisma.payrollRecord.findMany({
+      where: {
+        employeeId: { in: uniqueEmployeeIds },
+        month: { in: uniqueMonths },
+        status: { in: ['APPROVED', 'PAID'] }
+      }
+    });
+
+    const approvedOrPaidSet = new Set(
+      skippedRecords.map(r => `${r.employeeId}_${r.month}`)
+    );
     const effectiveSalariesByMonth: Record<string, Awaited<ReturnType<typeof batchGetEffectiveSalaries>>> = {};
     for (const month of uniqueMonths) {
       effectiveSalariesByMonth[month] = await batchGetEffectiveSalaries(month, prisma);
@@ -174,6 +187,9 @@ export async function POST(request: NextRequest) {
 
     for (const data of recordsData) {
       if (data.employeeId && data.month) {
+        if (approvedOrPaidSet.has(`${data.employeeId}_${data.month}`)) {
+          continue;
+        }
         const employee = employeeMap.get(data.employeeId);
         const effective = effectiveSalariesByMonth[data.month]?.[data.employeeId];
         if (effective && employee) {
@@ -195,7 +211,10 @@ export async function POST(request: NextRequest) {
 
     // Calculate detailed payroll breakdown for each record
     for (const data of recordsData) {
-      if (data.employeeId) {
+      if (data.employeeId && data.month) {
+        if (approvedOrPaidSet.has(`${data.employeeId}_${data.month}`)) {
+          continue;
+        }
         const employee = employeeMap.get(data.employeeId);
         if (employee) {
           const payrollRules = resolveContractPayrollRules(employee, data.month);
@@ -264,7 +283,10 @@ export async function POST(request: NextRequest) {
     }
 
     const payrollEligibleRecords = recordsData.filter((data: { employeeId?: string; month?: string }) => {
-      if (!data.employeeId || !data.month) return true;
+      if (!data.employeeId || !data.month) return false;
+      if (approvedOrPaidSet.has(`${data.employeeId}_${data.month}`)) {
+        return false;
+      }
       const employee = employeeMap.get(data.employeeId);
       if (!employee) return true;
       return resolveContractPayrollRules(employee, data.month).payrollMode !== 'HOURS_ONLY';
@@ -368,20 +390,21 @@ export async function POST(request: NextRequest) {
         : []),
     ]);
 
-    const upserted = results.filter((r: unknown) => r && typeof r === 'object' && 'id' in (r as object));
+    const upserted = results.filter((r: unknown) => r && typeof r === 'object' && 'id' in (r as object)) as any[];
+    const allReturned = [...upserted, ...skippedRecords];
 
     logDatabaseChange({
       request,
       action: 'CREATE',
       model: 'PayrollRecord',
-      recordId: recordsData.length > 1 ? 'BATCH' : upserted[0]?.id,
+      recordId: recordsData.length > 1 ? 'BATCH' : (allReturned[0]?.id || 'BATCH'),
       details: {
         count: results.length,
         month: recordsData[0]?.month,
       },
     });
 
-    return createdResponse(recordsData.length > 1 || syncMonth ? upserted : upserted[0]);
+    return createdResponse(recordsData.length > 1 || syncMonth ? allReturned : allReturned[0]);
   } catch (error) {
     return handleApiError(error);
   }

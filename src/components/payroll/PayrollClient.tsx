@@ -2354,7 +2354,22 @@ export default function PayrollClient({
 
       const [workingYear, workingMonth] = workingMonthStr.split('-').map(Number);
 
-      const newRecordsData = employees
+      const recalculableEmployees = employees.filter(emp => {
+        const existing = records.find(r => r.employeeId === emp.id && r.month === endMonth);
+        return !existing || (existing.status !== 'APPROVED' && existing.status !== 'PAID');
+      });
+
+      if (recalculableEmployees.length === 0) {
+        alert(
+          locale === 'vi'
+            ? `Tất cả nhân viên trong tháng này đã được duyệt hoặc chi trả lương.`
+            : `今月の全従業員の給与はすでに承認済みまたは支払い済みです。`
+        );
+        setCalculating(false);
+        return;
+      }
+
+      const newRecordsData = recalculableEmployees
         .filter(emp => {
           const empAttendance = Array.isArray(attendanceList)
             ? attendanceList.filter((a: { employeeId: string }) => a.employeeId === emp.id)
@@ -2472,8 +2487,9 @@ export default function PayrollClient({
       });
 
       setRecords(prev => {
-        const filtered = prev.filter(r => r.month !== endMonth);
-        return [...finalRecords, ...filtered];
+        const keptMonthRecords = prev.filter(r => r.month === endMonth && (r.status === 'APPROVED' || r.status === 'PAID'));
+        const otherMonths = prev.filter(r => r.month !== endMonth);
+        return [...finalRecords, ...keptMonthRecords, ...otherMonths];
       });
     } catch (err: any) {
       console.error(err);
