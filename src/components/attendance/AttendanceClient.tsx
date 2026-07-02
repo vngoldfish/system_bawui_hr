@@ -253,6 +253,11 @@ export default function AttendanceClient({
   const [isPayrollLocked, setIsPayrollLocked] = useState(false);
   const [lockedPayrollMonth, setLockedPayrollMonth] = useState<string | null>(null);
   const [autoScheduling, setAutoScheduling] = useState(false);
+  const [showAutoScheduleModal, setShowAutoScheduleModal] = useState(false);
+  const [autoScheduleMode, setAutoScheduleMode] = useState<'limits' | 'salary' | 'days'>('limits');
+  const [autoScheduleTargetSalary, setAutoScheduleTargetSalary] = useState<string>('');
+  const [autoScheduleTargetDays, setAutoScheduleTargetDays] = useState<string>('');
+  const [autoScheduleReplace, setAutoScheduleReplace] = useState<boolean>(false);
   const [autoScheduleFeatureEnabled, setAutoScheduleFeatureEnabled] = useState(true);
   const [grossEstimateFeatureEnabled, setGrossEstimateFeatureEnabled] = useState(true);
 
@@ -933,10 +938,36 @@ export default function AttendanceClient({
     }
   };
 
-  const handleAutoSchedule = async () => {
+  const handleAutoScheduleClick = () => {
     if (!selectedEmployee || isEmployeeMode || isPayrollLocked) return;
-    if (!hasWorkLimits) {
+    if (hasWorkLimits) {
+      setAutoScheduleMode('limits');
+    } else {
+      setAutoScheduleMode('salary');
+    }
+    setAutoScheduleTargetSalary('');
+    setAutoScheduleTargetDays('');
+    setAutoScheduleReplace(false);
+    setShowAutoScheduleModal(true);
+  };
+
+  const handleAutoScheduleRun = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEmployee || isEmployeeMode || isPayrollLocked) return;
+
+    const targetSalary = autoScheduleMode === 'salary' ? parseFloat(autoScheduleTargetSalary) || 0 : undefined;
+    const targetDays = autoScheduleMode === 'days' ? parseInt(autoScheduleTargetDays, 10) || 0 : undefined;
+
+    if (autoScheduleMode === 'limits' && !hasWorkLimits) {
       alert(getAttendanceText('autoScheduleNoLimits', locale));
+      return;
+    }
+    if (autoScheduleMode === 'salary' && (!targetSalary || targetSalary <= 0)) {
+      alert(locale === 'vi' ? 'Vui lòng nhập mức lương mục tiêu hợp lệ!' : '有効な目標給与を入力してください。');
+      return;
+    }
+    if (autoScheduleMode === 'days' && (!targetDays || targetDays <= 0)) {
+      alert(locale === 'vi' ? 'Vui lòng nhập số ngày làm mục tiêu hợp lệ!' : '有効な目標勤務日数を入力してください。');
       return;
     }
 
@@ -946,7 +977,7 @@ export default function AttendanceClient({
         employeeId: selectedEmployee.id,
         year: String(selectedYear),
         month: String(selectedMonth),
-        replaceExisting: 'false',
+        replaceExisting: String(autoScheduleReplace),
         shiftCheckIn: defaultCheckIn,
         shiftCheckOut: defaultCheckOut,
         shiftHasBreak: String(defaultHasBreak),
@@ -955,6 +986,13 @@ export default function AttendanceClient({
         shiftQuery.set('shiftBreakStart', defaultBreakStart);
         shiftQuery.set('shiftBreakEnd', defaultBreakEnd);
       }
+      if (targetSalary) {
+        shiftQuery.set('targetSalary', String(targetSalary));
+      }
+      if (targetDays) {
+        shiftQuery.set('targetDays', String(targetDays));
+      }
+
       const previewRes = await fetch(`/api/attendance/auto-schedule?${shiftQuery.toString()}`);
       const previewBody = await previewRes.json();
       if (!previewRes.ok) {
@@ -973,6 +1011,7 @@ export default function AttendanceClient({
       if (!window.confirm(
         getAttendanceText('autoScheduleConfirm', locale).replace('{preview}', preview)
       )) {
+        setAutoScheduling(false);
         return;
       }
 
@@ -983,7 +1022,9 @@ export default function AttendanceClient({
           employeeId: selectedEmployee.id,
           year: selectedYear,
           month: selectedMonth,
-          replaceExisting: false,
+          replaceExisting: autoScheduleReplace,
+          targetSalary,
+          targetDays,
           shiftPattern: {
             checkIn: defaultCheckIn,
             checkOut: defaultCheckOut,
@@ -1012,6 +1053,7 @@ export default function AttendanceClient({
         const others = prev.filter(r => r.employeeId !== selectedEmployee.id);
         return [...others, ...updatedRecords];
       });
+      setShowAutoScheduleModal(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : getAttendanceText('autoScheduleError', locale);
       alert(msg);
@@ -1365,10 +1407,10 @@ export default function AttendanceClient({
               </div>
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {!isEmployeeMode && autoScheduleFeatureEnabled && hasWorkLimits && (
+                {!isEmployeeMode && autoScheduleFeatureEnabled && (
                   <button
                     type="button"
-                    onClick={handleAutoSchedule}
+                    onClick={handleAutoScheduleClick}
                     disabled={isPayrollLocked || autoScheduling}
                     className={`px-3.5 py-2 border rounded-xl text-xs font-bold outline-none transition-all cursor-pointer flex items-center gap-1.5 ${
                       isPayrollLocked || autoScheduling
@@ -2135,6 +2177,138 @@ export default function AttendanceClient({
             </form>
           </div>
         </div>
+        </Portal>
+      )}
+
+      {showAutoScheduleModal && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn" onClick={() => setShowAutoScheduleModal(false)} />
+            <div className="relative bg-white rounded-3xl border border-slate-100 shadow-2xl w-full max-w-md mx-auto p-6 animate-fadeIn">
+              <h2 className="text-base font-black text-slate-800 mb-4 pb-3 border-b border-slate-100 uppercase tracking-wide">
+                {locale === 'vi' ? 'TỰ ĐỘNG XẾP CA CHẤM CÔNG' : '勤務の自動配置 (Auto-Schedule)'}
+              </h2>
+
+              <form onSubmit={handleAutoScheduleRun} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">
+                    {locale === 'vi' ? 'Phương thức tự động' : '配置方法 (Method)'}
+                  </label>
+                  <div className="space-y-2">
+                    {hasWorkLimits && (
+                      <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="autoScheduleMode"
+                          value="limits"
+                          checked={autoScheduleMode === 'limits'}
+                          onChange={() => setAutoScheduleMode('limits')}
+                          className="text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <span>{locale === 'vi' ? 'Tối đa theo giới hạn luật' : '就労制限の上限まで配置 (Work limits)'}</span>
+                      </label>
+                    )}
+                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="autoScheduleMode"
+                        value="salary"
+                        checked={autoScheduleMode === 'salary'}
+                        onChange={() => setAutoScheduleMode('salary')}
+                        className="text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <span>{locale === 'vi' ? 'Theo mức lương mong muốn' : '目標給与に合わせる (Target salary)'}</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="autoScheduleMode"
+                        value="days"
+                        checked={autoScheduleMode === 'days'}
+                        onChange={() => setAutoScheduleMode('days')}
+                        className="text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <span>{locale === 'vi' ? 'Theo số ngày làm mong muốn' : '目標勤務日数に合わせる (Target days)'}</span>
+                    </label>
+                  </div>
+                </div>
+
+                {autoScheduleMode === 'salary' && (
+                  <div className="animate-fadeIn">
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">
+                      {locale === 'vi' ? 'Lương mong muốn trong tháng' : '月目標給与 (Target Salary)'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder="Ví dụ: 80000"
+                        value={autoScheduleTargetSalary}
+                        onChange={e => setAutoScheduleTargetSalary(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-850 bg-white"
+                        required
+                        min="1"
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">JPY</span>
+                    </div>
+                  </div>
+                )}
+
+                {autoScheduleMode === 'days' && (
+                  <div className="animate-fadeIn">
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">
+                      {locale === 'vi' ? 'Số ngày làm mong muốn' : '目標勤務日数 (Target Days)'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder="Ví dụ: 15"
+                        value={autoScheduleTargetDays}
+                        onChange={e => setAutoScheduleTargetDays(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-850 bg-white"
+                        required
+                        min="1"
+                        max="31"
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        {locale === 'vi' ? 'ngày' : '日'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-slate-100">
+                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoScheduleReplace}
+                      onChange={e => setAutoScheduleReplace(e.target.checked)}
+                      className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span className="text-xs font-semibold text-slate-550">
+                      {locale === 'vi' ? 'Xóa chấm công hiện tại trong tháng trước khi xếp' : '既存の当月勤怠を削除して上書きする (Replace existing)'}
+                    </span>
+                  </label>
+                </div>
+
+                <div className="flex gap-2.5 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAutoScheduleModal(false)}
+                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer bg-white"
+                  >
+                    {getAttendanceText('modalCancel', locale)}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isPayrollLocked || autoScheduling}
+                    className="flex-1 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-350 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    {autoScheduling ? '...' : (locale === 'vi' ? 'Tạo tự động' : '自動配置する')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </Portal>
       )}
     </>

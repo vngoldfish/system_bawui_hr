@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { employeeId, year, month, replaceExisting = false } = body;
+    const { employeeId, year, month, replaceExisting = false, targetSalary, targetDays } = body;
     const shiftPattern = shiftPatternFromBody(body as Record<string, unknown>);
 
     if (!employeeId || !year || !month) {
@@ -182,11 +182,13 @@ export async function POST(request: NextRequest) {
       shiftPattern,
       occupiedDates: replaceExisting ? new Set<string>() : occupiedDates,
       existingAttendance: replaceExisting ? [] : existingAttendance,
+      targetSalary: targetSalary ? Number(targetSalary) : null,
+      targetDays: targetDays ? Number(targetDays) : null,
     });
 
     if (!schedule) {
       return errorResponse(
-        'この従業員には就労時間・収入上限が設定されていません。 (Nhân viên chưa bật giới hạn 28h/tuần hoặc trần thu nhập.)',
+        '就労制限、目標給与、または目標勤務日数が指定されていません。 (Nhân viên chưa cấu hình giới hạn giờ làm, mục tiêu lương, hoặc số ngày làm.)',
         400
       );
     }
@@ -284,6 +286,8 @@ export async function GET(request: NextRequest) {
     const employeeId = searchParams.get('employeeId');
     const year = parseInt(searchParams.get('year') || '0', 10);
     const month = parseInt(searchParams.get('month') || '0', 10);
+    const targetSalary = searchParams.get('targetSalary') ? parseFloat(searchParams.get('targetSalary')!) : null;
+    const targetDays = searchParams.get('targetDays') ? parseInt(searchParams.get('targetDays')!, 10) : null;
 
     if (!employeeId || !year || !month) {
       return errorResponse('employeeId, year, month are required', 400);
@@ -346,10 +350,12 @@ export async function GET(request: NextRequest) {
       shiftPattern,
       occupiedDates: replaceExisting ? new Set<string>() : occupiedDates,
       existingAttendance: replaceExisting ? [] : existingAttendance,
+      targetSalary,
+      targetDays,
     });
 
     if (!schedule) {
-      return errorResponse('就労制限が未設定です', 400);
+      return errorResponse('就労制限、目標給与、または目標勤務日数が指定されていません。', 400);
     }
 
     return successResponse(schedule);

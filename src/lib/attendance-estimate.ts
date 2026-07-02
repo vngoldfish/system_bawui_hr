@@ -327,6 +327,8 @@ export function buildAutoScheduleForMonth(params: {
   occupiedDates?: Set<string>;
   /** Existing records this month — their hours/days count toward limits. */
   existingAttendance?: ExistingAttendanceDay[];
+  targetSalary?: number | null;
+  targetDays?: number | null;
 }): {
   days: ProposedAttendanceDay[];
   summary: {
@@ -341,7 +343,9 @@ export function buildAutoScheduleForMonth(params: {
   warning?: string;
 } | null {
   const limits = resolveEmployeeWorkLimits(params.employee);
-  if (!limits.visa28h && !limits.incomeCap80k) return null;
+  const hasTargetSalary = params.targetSalary != null && params.targetSalary > 0;
+  const hasTargetDays = params.targetDays != null && params.targetDays > 0;
+  if (!limits.visa28h && !limits.incomeCap80k && !hasTargetSalary && !hasTargetDays) return null;
 
   const salaryType = params.employee.salaryType || '時給';
   const salary = params.employee.salary || 0;
@@ -358,7 +362,7 @@ export function buildAutoScheduleForMonth(params: {
       totalHours: 0,
       estimatedGross: 0,
       weeklyLimit: limits.weeklyHours,
-      monthlyCap: limits.monthlyIncome,
+      monthlyCap: (hasTargetSalary ? params.targetSalary : limits.monthlyIncome) ?? null,
       timeFrom,
       timeTo,
       ...(warning ? { warning } : {}),
@@ -419,20 +423,23 @@ export function buildAutoScheduleForMonth(params: {
     return makeEmptyResult();
   }
 
+  const hasIncomeCap = limits.incomeCap80k || hasTargetSalary;
+  const monthlyIncomeLimit = hasTargetSalary ? params.targetSalary : limits.monthlyIncome;
+
   let incomeCapWarning: string | undefined;
   let incomeCapUnits: ReturnType<typeof resolveIncomeCapUnits> = null;
-  if (limits.incomeCap80k && limits.monthlyIncome != null) {
+  if (hasIncomeCap && monthlyIncomeLimit != null) {
     incomeCapUnits = resolveIncomeCapUnits(
       salaryType,
       salary,
       hourlyRate,
       dailyRate,
       contractWorkDaysInMonth,
-      limits.monthlyIncome
+      monthlyIncomeLimit
     );
     if (!incomeCapUnits) {
       incomeCapWarning = missingRateWarning(salaryType);
-      if (!limits.visa28h) {
+      if (!limits.visa28h && !hasTargetDays) {
         return makeEmptyResult(incomeCapWarning);
       }
     }
@@ -553,9 +560,10 @@ export function buildAutoScheduleForMonth(params: {
   };
 
   // Random spread: pick a random week, then a random day in that week (within limits).
+  const targetDaysLimit = hasTargetDays ? params.targetDays! : Infinity;
   let safety = availableDates.length * 4;
   while (safety-- > 0) {
-    if (monthHoursUsed >= maxMonthHours || monthDaysUsed >= maxMonthDays) break;
+    if (monthHoursUsed >= maxMonthHours || monthDaysUsed >= maxMonthDays || monthDaysUsed >= targetDaysLimit) break;
 
     const viableWeeks = weekStates.filter(w => w.pool.length > 0 && w.hoursUsed < weekLimit);
     if (viableWeeks.length === 0) break;
@@ -595,7 +603,7 @@ export function buildAutoScheduleForMonth(params: {
       totalHours: Math.round(monthHoursUsed * 10) / 10,
       estimatedGross,
       weeklyLimit: limits.weeklyHours,
-      monthlyCap: limits.monthlyIncome,
+      monthlyCap: (hasTargetSalary ? params.targetSalary : limits.monthlyIncome) ?? null,
       timeFrom: windowFrom,
       timeTo: windowTo,
       ...(incomeCapWarning ? { warning: incomeCapWarning } : {}),
