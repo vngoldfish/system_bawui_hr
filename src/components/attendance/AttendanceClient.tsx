@@ -139,7 +139,16 @@ function getHolidayForDate(holidays: Holiday[], dateStr: string): Holiday | null
 function isContractWorkDay(contract: EmployeeContract | null, dateStr: string): boolean {
   if (!contract) return true;
   const day = new Date(`${dateStr}T00:00:00`).getDay();
-  return (contract.workDays || [1, 2, 3, 4, 5]).includes(day);
+  let workDays: any = [1, 2, 3, 4, 5];
+  if (contract.workDays != null) {
+    try {
+      workDays = typeof contract.workDays === 'string' ? JSON.parse(contract.workDays) : contract.workDays;
+    } catch (e) {}
+  }
+  if (Array.isArray(workDays)) {
+    return workDays.includes(day) || workDays.includes(String(day));
+  }
+  return false;
 }
 
 function calculateContractAwareOvertime(
