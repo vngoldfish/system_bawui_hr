@@ -189,8 +189,9 @@ export async function POST(request: NextRequest) {
 
     const rateConfig = await getActiveRateConfig(prisma);
     const rateSettings = toPayrollRateSettings(rateConfig);
-    const company = await prisma.company.findFirst({ select: { healthInsuranceRate: true } });
+    const company = await prisma.company.findFirst({ select: { healthInsuranceRate: true, incomeTaxThreshold: true } });
     const companyRate = company?.healthInsuranceRate;
+    const incomeTaxThreshold = company?.incomeTaxThreshold ?? 88000;
 
     // Calculate detailed payroll breakdown for each record
     for (const data of recordsData) {
@@ -234,6 +235,7 @@ export async function POST(request: NextRequest) {
               : undefined,
             positionAllowance: employee.position?.allowance || 0,
             overtimeMultiplier: payrollRules.overtimeMultiplier,
+            incomeTaxThreshold,
           });
 
           // Map all 11 detailed fields
@@ -523,8 +525,9 @@ export async function PUT(request: NextRequest) {
 
     const rateConfig = await getActiveRateConfig(prisma);
     const rateSettings = toPayrollRateSettings(rateConfig);
-    const company = await prisma.company.findFirst({ select: { healthInsuranceRate: true } });
+    const company = await prisma.company.findFirst({ select: { healthInsuranceRate: true, incomeTaxThreshold: true } });
     const companyRate = company?.healthInsuranceRate;
+    const incomeTaxThreshold = company?.incomeTaxThreshold ?? 88000;
 
     if (employee) {
       const payrollRules = resolveContractPayrollRules(employee, existing.month);
@@ -556,6 +559,7 @@ export async function PUT(request: NextRequest) {
         customBonus: undefined,
         positionAllowance: employee.position?.allowance || 0,
         overtimeMultiplier: payrollRules.overtimeMultiplier,
+        incomeTaxThreshold,
       });
 
       healthInsuranceCompany = body.healthInsuranceCompany !== undefined ? parseFloat(body.healthInsuranceCompany) : details.healthInsuranceCompany;

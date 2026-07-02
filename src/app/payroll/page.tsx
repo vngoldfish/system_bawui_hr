@@ -51,7 +51,7 @@ async function PayrollLoader() {
           payday: company?.payday || '25' 
         }} 
         isEmployeeMode={true}
-        companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate, roundingPolicy: company.roundingPolicy } : undefined}
+        companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate, roundingPolicy: company.roundingPolicy, incomeTaxThreshold: company.incomeTaxThreshold } : undefined}
       />
     );
   }
@@ -81,7 +81,7 @@ async function PayrollLoader() {
         payday: company?.payday || '25' 
       }} 
       isEmployeeMode={false}
-      companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate, roundingPolicy: company.roundingPolicy } : undefined}
+      companyInfo={company ? { name: company.name, address: company.address, healthInsuranceRate: company.healthInsuranceRate, roundingPolicy: company.roundingPolicy, incomeTaxThreshold: company.incomeTaxThreshold } : undefined}
     />
   );
 }

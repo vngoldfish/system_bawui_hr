@@ -14,6 +14,7 @@ export interface AttendanceSystemSettings {
   shiftRegistrationDeadlineDay: number;
   shiftRegistrationPolicy: ShiftRegistrationPolicy;
   enabledShiftTypes: ShiftType[];
+  incomeTaxThreshold: number;
 }
 
 const defaultSettings: AttendanceSystemSettings = {
@@ -23,6 +24,7 @@ const defaultSettings: AttendanceSystemSettings = {
   shiftRegistrationDeadlineDay: 25,
   shiftRegistrationPolicy: parseShiftRegistrationPolicy(null, 25),
   enabledShiftTypes: parseEnabledShiftTypes(null),
+  incomeTaxThreshold: 88000,
 };
 
 function mapCompanyToSettings(company: Record<string, unknown> | null): AttendanceSystemSettings {
@@ -38,6 +40,7 @@ function mapCompanyToSettings(company: Record<string, unknown> | null): Attendan
       deadlineDay
     ),
     enabledShiftTypes: parseEnabledShiftTypes(company.enabledShiftTypes as string | null),
+    incomeTaxThreshold: Number(company.incomeTaxThreshold ?? 88000) || 88000,
   };
 }
 
@@ -51,11 +54,12 @@ export async function getAttendanceSystemSettings(): Promise<AttendanceSystemSet
         shiftRegistrationDeadlineDay: number | null;
         shiftRegistrationPolicyRules: unknown;
         enabledShiftTypes: string | null;
+        incomeTaxThreshold: number | null;
       }>
     >`
       SELECT "attendanceAutoScheduleEnabled", "attendanceGrossEstimateEnabled",
              "shiftRegistrationRequired", "shiftRegistrationDeadlineDay",
-             "shiftRegistrationPolicyRules", "enabledShiftTypes"
+             "shiftRegistrationPolicyRules", "enabledShiftTypes", "incomeTaxThreshold"
       FROM "companies"
       LIMIT 1
     `;

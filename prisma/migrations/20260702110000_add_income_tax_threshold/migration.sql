@@ -1,0 +1,1 @@
+ALTER TABLE "companies" ADD COLUMN "incomeTaxThreshold" INTEGER NOT NULL DEFAULT 88000;

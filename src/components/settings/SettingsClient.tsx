@@ -18,6 +18,7 @@ interface SystemSettings {
   shiftRegistrationRequired: boolean;
   shiftRegistrationDeadlineDay: number;
   shiftRegistrationPolicy: ShiftRegistrationPolicy;
+  incomeTaxThreshold: number;
 }
 
 const defaultSettings: SystemSettings = {
@@ -26,6 +27,7 @@ const defaultSettings: SystemSettings = {
   shiftRegistrationRequired: true,
   shiftRegistrationDeadlineDay: 25,
   shiftRegistrationPolicy: DEFAULT_SHIFT_REGISTRATION_POLICY,
+  incomeTaxThreshold: 88000,
 };
 
 export default function SettingsClient() {
@@ -55,6 +57,7 @@ export default function SettingsClient() {
               payload.shiftRegistrationPolicy,
               deadlineDay
             ),
+            incomeTaxThreshold: Number(payload.incomeTaxThreshold ?? 88000) || 88000,
           };
           setSettings(loaded);
           setDraft(loaded);
@@ -126,6 +129,7 @@ export default function SettingsClient() {
           shiftRegistrationRequired: draft.shiftRegistrationRequired,
           shiftRegistrationDeadlineDay: draft.shiftRegistrationDeadlineDay,
           shiftRegistrationPolicy: draft.shiftRegistrationPolicy,
+          incomeTaxThreshold: draft.incomeTaxThreshold,
         }),
       });
       if (!res.ok) {
@@ -145,6 +149,7 @@ export default function SettingsClient() {
           payload.shiftRegistrationPolicy,
           deadlineDay
         ),
+        incomeTaxThreshold: Number(payload.incomeTaxThreshold ?? draft.incomeTaxThreshold) || 88000,
       };
       setSettings(updated);
       setDraft(updated);
@@ -362,6 +367,32 @@ export default function SettingsClient() {
             </div>
           </div>
         )}
+      </Card>
+
+      <Card title={t('settings.cardPayroll') || '給与・所得税設定'} className="bg-white dark:bg-slate-900 border border-slate-200/50 rounded-2xl">
+        <p className="text-sm text-slate-500 mb-5">{t('settings.cardPayrollDesc') || '給与計算のパラメータおよび所得税の適用しきい値を設定します。'}</p>
+        <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 max-w-md">
+          <label className="text-xs font-bold text-slate-600 block mb-2">
+            {t('settings.incomeTaxThresholdLabel') || '所得税適用しきい値（円）'}
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              step={1000}
+              value={draft.incomeTaxThreshold}
+              onChange={e => {
+                setDraft(prev => ({ ...prev, incomeTaxThreshold: Number(e.target.value) || 0 }));
+                markDirty();
+              }}
+              className="w-40 px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold bg-white"
+            />
+            <span className="text-xs text-slate-500">{t('options.currencyUnit') || '円'}</span>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+            {t('settings.incomeTaxThresholdDesc') || '総支給額がこの金額未満の場合、所得税は自動的に0円として計算されます。日本の税法上のデフォルトは88,000円です。'}
+          </p>
+        </div>
       </Card>
 
       <div className="flex justify-end gap-3">

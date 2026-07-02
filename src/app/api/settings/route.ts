@@ -26,6 +26,7 @@ const updateSettingsSchema = z.object({
   shiftRegistrationRequired: z.boolean().optional(),
   shiftRegistrationDeadlineDay: z.number().int().min(1).max(31).optional(),
   shiftRegistrationPolicy: shiftPolicySchema.optional(),
+  incomeTaxThreshold: z.number().int().min(0).optional(),
 });
 
 export async function GET(_request: NextRequest) {
@@ -53,7 +54,8 @@ export async function PUT(request: NextRequest) {
       data.attendanceGrossEstimateEnabled === undefined &&
       data.shiftRegistrationRequired === undefined &&
       data.shiftRegistrationDeadlineDay === undefined &&
-      data.shiftRegistrationPolicy === undefined
+      data.shiftRegistrationPolicy === undefined &&
+      data.incomeTaxThreshold === undefined
     ) {
       return errorResponse('No settings to update', 400);
     }
@@ -88,12 +90,14 @@ export async function PUT(request: NextRequest) {
           healthInsuranceRate: 9.98,
           attendanceAutoScheduleEnabled: data.attendanceAutoScheduleEnabled ?? true,
           attendanceGrossEstimateEnabled: data.attendanceGrossEstimateEnabled ?? true,
+          incomeTaxThreshold: data.incomeTaxThreshold ?? 88000,
         },
       });
     } else if (
       data.attendanceAutoScheduleEnabled !== undefined ||
       data.attendanceGrossEstimateEnabled !== undefined ||
-      data.shiftRegistrationRequired !== undefined
+      data.shiftRegistrationRequired !== undefined ||
+      data.incomeTaxThreshold !== undefined
     ) {
       company = await prisma.company.update({
         where: { id: company.id },
@@ -106,6 +110,9 @@ export async function PUT(request: NextRequest) {
             : {}),
           ...(data.shiftRegistrationRequired !== undefined
             ? { shiftRegistrationRequired: data.shiftRegistrationRequired }
+            : {}),
+          ...(data.incomeTaxThreshold !== undefined
+            ? { incomeTaxThreshold: data.incomeTaxThreshold }
             : {}),
         },
       });

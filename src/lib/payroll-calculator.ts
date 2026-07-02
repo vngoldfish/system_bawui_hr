@@ -228,6 +228,7 @@ export function getSmrIncome({
   positionAllowance,
   rateSettings,
   overtimeMultiplier = 1.25,
+  incomeTaxThreshold,
 }: {
   baseSalary: number;
   salaryType: string;
@@ -251,6 +252,7 @@ export function getSmrIncome({
   positionAllowance?: number;
   rateSettings?: PayrollRateSettings;
   overtimeMultiplier?: number;
+  incomeTaxThreshold?: number;
 }) {
 	  // Override salary from SalaryAdjustment if prisma + employeeId provided
 	  if (prisma && employeeId) {
@@ -371,7 +373,13 @@ export function getSmrIncome({
 	  }
 
 	  const taxTable = rates.incomeTaxTable ?? getR8IncomeTaxTable();
-	  const incomeTax = lookupMonthlyIncomeTax(taxableIncome, finalDependentsCount, taxTable);
+	  let incomeTax = lookupMonthlyIncomeTax(taxableIncome, finalDependentsCount, taxTable);
+
+	  // Áp dụng ngưỡng thu nhập tính thuế thu nhập (mặc định 88,000 JPY theo biểu thuế Nhật Bản)
+	  const threshold = incomeTaxThreshold !== undefined ? incomeTaxThreshold : 88000;
+	  if (totalGross < threshold) {
+	    incomeTax = 0;
+	  }
 
 	  // 7. Resident Tax (住民税): Thu hộ (特別徴収) nếu được bật, ngược lại bằng 0
 	  const residentTax = b.residentTax ? b.residentTaxAmount : 0;

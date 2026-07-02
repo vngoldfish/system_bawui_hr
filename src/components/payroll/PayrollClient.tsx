@@ -284,7 +284,7 @@ interface EditFieldsType {
 interface PayslipPrintContentProps {
   record: PayrollRecord;
   employee: Employee;
-  companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null; roundingPolicy?: string | null };
+  companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null; roundingPolicy?: string | null; incomeTaxThreshold?: number | null };
   isEditing?: boolean;
   editFields?: EditFieldsType;
   setEditFields?: Dispatch<SetStateAction<EditFieldsType>>;
@@ -966,7 +966,7 @@ function BulkPrintContainer({
 }: {
   filtered: PayrollRecord[];
   employees: Employee[];
-  companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null; roundingPolicy?: string | null };
+  companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null; roundingPolicy?: string | null; incomeTaxThreshold?: number | null };
   locale: string;
   t: (key: string) => string;
   onClose: () => void;
@@ -1494,7 +1494,7 @@ ${pairsHTML}
 function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = false, onSave, onClose }: { 
   record: PayrollRecord; 
   employee: Employee; 
-  companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null; roundingPolicy?: string | null };
+  companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null; roundingPolicy?: string | null; incomeTaxThreshold?: number | null };
   rateSettings?: PayrollRateSettings;
   isAdmin?: boolean;
   onSave?: (updated: PayrollRecord) => void;
@@ -1651,6 +1651,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
       companyRate: companyInfo?.healthInsuranceRate,
       rateSettings,
       positionAllowance: employee.positionAllowance || 0,
+      incomeTaxThreshold: companyInfo?.incomeTaxThreshold ?? undefined,
     });
 
     setEditFields(prev => ({
@@ -2022,7 +2023,7 @@ export default function PayrollClient({
   initialRecords: PayrollRecord[]; 
   payrollSettings?: PayrollSettings; 
   isEmployeeMode?: boolean;
-  companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null; roundingPolicy?: string | null };
+  companyInfo?: { name: string; address: string; healthInsuranceRate?: number | null; roundingPolicy?: string | null; incomeTaxThreshold?: number | null };
 }) {
   const { t, locale } = useI18n();
   const getStatusLabel = (s: string) =>
@@ -2378,6 +2379,7 @@ export default function PayrollClient({
             companyRate: companyInfo?.healthInsuranceRate,
             rateSettings,
             positionAllowance: emp.positionAllowance || 0,
+            incomeTaxThreshold: companyInfo?.incomeTaxThreshold ?? undefined,
           });
 
           return {
