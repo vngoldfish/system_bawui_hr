@@ -354,6 +354,7 @@ export function transformPayrollRecord(
   let pensionCompany = r.pensionCompany;
   let employmentInsuranceCompany = r.employmentInsuranceCompany;
   let workersCompCompany = r.workersCompCompany;
+  let childRearingContributionCompany = (r as any).childRearingContributionCompany || 0;
   let healthInsuranceEmployee = r.healthInsuranceEmployee;
   let pensionEmployee = r.pensionEmployee;
   let employmentInsuranceEmployee = r.employmentInsuranceEmployee;
@@ -400,6 +401,7 @@ export function transformPayrollRecord(
     pensionCompany = details.pensionCompany;
     employmentInsuranceCompany = details.employmentInsuranceCompany;
     workersCompCompany = details.workersCompCompany;
+    childRearingContributionCompany = details.childRearingContributionCompany || 0;
     healthInsuranceEmployee = details.healthInsuranceEmployee;
     pensionEmployee = details.pensionEmployee;
     employmentInsuranceEmployee = details.employmentInsuranceEmployee;
@@ -441,6 +443,7 @@ export function transformPayrollRecord(
     pensionCompany,
     employmentInsuranceCompany,
     workersCompCompany,
+    childRearingContributionCompany,
     healthInsuranceEmployee,
     pensionEmployee,
     employmentInsuranceEmployee,

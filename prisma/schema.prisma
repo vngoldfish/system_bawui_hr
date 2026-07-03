@@ -342,6 +342,7 @@ model PayrollRecord {
   pensionCompany             Float @default(0)
   employmentInsuranceCompany Float @default(0)
   workersCompCompany         Float @default(0)
+  childRearingContributionCompany Float @default(0)
 
   // Employee contributions (従業員負担分) - detailed
   healthInsuranceEmployee    Float @default(0)

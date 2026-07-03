@@ -262,6 +262,7 @@ export async function POST(request: NextRequest) {
           data.pensionCompany = details.pensionCompany;
           data.employmentInsuranceCompany = details.employmentInsuranceCompany;
           data.workersCompCompany = details.workersCompCompany;
+          data.childRearingContributionCompany = details.childRearingContributionCompany || 0;
           data.healthInsuranceEmployee = details.healthInsuranceEmployee;
           data.pensionEmployee = details.pensionEmployee;
           data.employmentInsuranceEmployee = details.employmentInsuranceEmployee;
@@ -335,6 +336,7 @@ export async function POST(request: NextRequest) {
             pensionCompany: data.pensionCompany || 0,
             employmentInsuranceCompany: data.employmentInsuranceCompany || 0,
             workersCompCompany: data.workersCompCompany || 0,
+            childRearingContributionCompany: data.childRearingContributionCompany || 0,
             healthInsuranceEmployee: data.healthInsuranceEmployee || 0,
             pensionEmployee: data.pensionEmployee || 0,
             employmentInsuranceEmployee: data.employmentInsuranceEmployee || 0,
@@ -363,6 +365,7 @@ export async function POST(request: NextRequest) {
             pensionCompany: data.pensionCompany || 0,
             employmentInsuranceCompany: data.employmentInsuranceCompany || 0,
             workersCompCompany: data.workersCompCompany || 0,
+            childRearingContributionCompany: data.childRearingContributionCompany || 0,
             healthInsuranceEmployee: data.healthInsuranceEmployee || 0,
             pensionEmployee: data.pensionEmployee || 0,
             employmentInsuranceEmployee: data.employmentInsuranceEmployee || 0,
@@ -589,6 +592,7 @@ export async function PUT(request: NextRequest) {
       pensionCompany = body.pensionCompany !== undefined ? parseFloat(body.pensionCompany) : details.pensionCompany;
       employmentInsuranceCompany = body.employmentInsuranceCompany !== undefined ? parseFloat(body.employmentInsuranceCompany) : details.employmentInsuranceCompany;
       workersCompCompany = body.workersCompCompany !== undefined ? parseFloat(body.workersCompCompany) : details.workersCompCompany;
+      let childRearingContributionCompany = body.childRearingContributionCompany !== undefined ? parseFloat(body.childRearingContributionCompany) : (details.childRearingContributionCompany || 0);
       healthInsuranceEmployee = body.healthInsuranceEmployee !== undefined ? parseFloat(body.healthInsuranceEmployee) : details.healthInsuranceEmployee;
       pensionEmployee = body.pensionEmployee !== undefined ? parseFloat(body.pensionEmployee) : details.pensionEmployee;
       employmentInsuranceEmployee = body.employmentInsuranceEmployee !== undefined ? parseFloat(body.employmentInsuranceEmployee) : details.employmentInsuranceEmployee;
@@ -596,8 +600,13 @@ export async function PUT(request: NextRequest) {
       incomeTax = body.incomeTax !== undefined ? parseFloat(body.incomeTax) : details.incomeTax;
       nursingCareInsurance = body.nursingCareInsurance !== undefined ? parseFloat(body.nursingCareInsurance) : details.nursingCareInsurance;
       
-      const companySocialInsurance = healthInsuranceCompany + pensionCompany + employmentInsuranceCompany + workersCompCompany;
+      const companySocialInsurance = healthInsuranceCompany + pensionCompany + employmentInsuranceCompany + workersCompCompany + childRearingContributionCompany;
       totalCompanyCost = baseSalary + overtimePay + allowances + companySocialInsurance;
+
+      // We need to keep childRearingContributionCompany in the closure for prisma.update
+      (existing as any).childRearingContributionCompany = childRearingContributionCompany;
+    } else {
+      (existing as any).childRearingContributionCompany = body.childRearingContributionCompany !== undefined ? parseFloat(body.childRearingContributionCompany) : ((existing as any).childRearingContributionCompany || 0);
     }
 
     const tax = employee ? (incomeTax + residentTax) : (body.tax !== undefined ? parseFloat(body.tax) : existing.tax);
@@ -630,6 +639,7 @@ export async function PUT(request: NextRequest) {
         pensionCompany,
         employmentInsuranceCompany,
         workersCompCompany,
+        childRearingContributionCompany: (existing as any).childRearingContributionCompany,
         healthInsuranceEmployee,
         pensionEmployee,
         employmentInsuranceEmployee,

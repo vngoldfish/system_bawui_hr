@@ -397,6 +397,7 @@ export function getSmrIncome({
 	    workersCompEnabled: !!b.workersComp,
 	    employmentInsuranceCompanyRate: rates.employmentInsuranceCompanyRate,
 	    workersCompRate: rates.workersCompRate,
+	    pensionSMR: b.pension ? pensionSMR : 0,
 	  });
 
 	  const nursingCareInsurance = nursingCarePremium;
@@ -421,6 +422,7 @@ export function getSmrIncome({
 	    pensionCompany: companyContribs.pensionCompany,
 	    employmentInsuranceCompany: companyContribs.employmentInsuranceCompany,
 	    workersCompCompany: companyContribs.workersCompCompany,
+	    childRearingContributionCompany: companyContribs.childRearingContributionCompany,
 	    healthInsuranceEmployee: healthInsurance,
 	    pensionEmployee: pension,
 	    employmentInsuranceEmployee: employmentInsurance,
@@ -530,6 +532,7 @@ export function getSmrIncome({
   workersCompEnabled,
   employmentInsuranceCompanyRate = 0.9,
   workersCompRate = 0.3,
+  pensionSMR = 0,
 }: {
   healthInsurance: number;
   nursingCarePremium: number;
@@ -539,11 +542,13 @@ export function getSmrIncome({
   workersCompEnabled: boolean;
   employmentInsuranceCompanyRate?: number;
   workersCompRate?: number;
+  pensionSMR?: number;
 }): {
   healthInsuranceCompany: number;
   pensionCompany: number;
   employmentInsuranceCompany: number;
   workersCompCompany: number;
+  childRearingContributionCompany: number;
   totalCompanyCost: number;
 } {
   const healthInsuranceCompany = healthInsurance + nursingCarePremium;
@@ -554,15 +559,23 @@ export function getSmrIncome({
   const workersCompCompany = workersCompEnabled
     ? Math.round(totalGross * (workersCompRate / 100))
     : 0;
+  const childRearingContributionCompany = pensionSMR > 0
+    ? Math.round(pensionSMR * 0.0036)
+    : 0;
 
   const totalCompanyCost =
-    healthInsuranceCompany + pensionCompany + employmentInsuranceCompany + workersCompCompany;
+    healthInsuranceCompany +
+    pensionCompany +
+    employmentInsuranceCompany +
+    workersCompCompany +
+    childRearingContributionCompany;
 
   return {
     healthInsuranceCompany,
     pensionCompany,
     employmentInsuranceCompany,
     workersCompCompany,
+    childRearingContributionCompany,
     totalCompanyCost,
   };
 }
