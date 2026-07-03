@@ -2446,7 +2446,6 @@ export default function AttendanceClient({
                 <th className="border border-slate-300 p-1.5 text-center">{locale === 'vi' ? 'Nghỉ' : locale === 'ja' ? '休憩' : 'Break'}</th>
                 <th className="border border-slate-300 p-1.5 text-center">{locale === 'vi' ? 'Giờ làm' : locale === 'ja' ? '実労働' : 'Work'}</th>
                 <th className="border border-slate-300 p-1.5 text-center">{locale === 'vi' ? 'Tăng ca' : locale === 'ja' ? '残業' : 'OT'}</th>
-                <th className="border border-slate-300 p-1.5 text-left">{locale === 'vi' ? 'Ghi chú' : locale === 'ja' ? '備考' : 'Notes'}</th>
               </tr>
             </thead>
             <tbody>
@@ -2485,7 +2484,6 @@ export default function AttendanceClient({
                     <td className="border border-slate-300 p-1 text-center font-mono">{breakString}</td>
                     <td className="border border-slate-300 p-1 text-center font-mono font-bold">{workHours > 0 ? `${Math.round(workHours * 10) / 10}h` : '-'}</td>
                     <td className="border border-slate-300 p-1 text-center font-mono font-bold text-orange-600">{otHours > 0 ? `${Math.round(otHours * 10) / 10}h` : '-'}</td>
-                    <td className="border border-slate-300 p-1 text-left truncate max-w-[150px]">{record?.notes || ''}</td>
                   </tr>
                 );
               })}
