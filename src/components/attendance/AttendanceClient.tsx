@@ -2489,22 +2489,6 @@ export default function AttendanceClient({
               })}
             </tbody>
           </table>
-
-          {/* Approvals section */}
-          <div className="grid grid-cols-3 gap-8 mt-12 text-center text-[10px]">
-            <div>
-              <p className="font-bold border-b border-slate-300 pb-16 mb-2">{locale === 'vi' ? 'Chữ ký nhân viên (本人署名)' : '本人署名'}</p>
-              <p className="text-[9px] text-slate-400">Date: ____ / ____ / ________</p>
-            </div>
-            <div>
-              <p className="font-bold border-b border-slate-300 pb-16 mb-2">{locale === 'vi' ? 'Người kiểm tra (管理者印)' : '管理者印'}</p>
-              <p className="text-[9px] text-slate-400">Date: ____ / ____ / ________</p>
-            </div>
-            <div>
-              <p className="font-bold border-b border-slate-300 pb-16 mb-2">{locale === 'vi' ? 'Giám đốc phê duyệt (社長印)' : '社長印'}</p>
-              <p className="text-[9px] text-slate-400">Date: ____ / ____ / ________</p>
-            </div>
-          </div>
         </div>
       )}
     </>
