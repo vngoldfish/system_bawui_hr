@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       employmentInsurance: records.reduce((sum, r) => sum + (r.employmentInsuranceCompany || 0), 0),
       workersComp: records.reduce((sum, r) => sum + (r.workersCompCompany || 0), 0),
       childRearingContribution: records.reduce((sum, r) => sum + ((r as any).childRearingContributionCompany || 0), 0),
+      childRearingSupport: records.reduce((sum, r) => sum + ((r as any).childRearingSupportCompany || 0), 0),
     };
 
     return successResponse({
@@ -48,7 +49,8 @@ export async function GET(request: NextRequest) {
           pension: r.pensionCompany,
           employmentInsurance: r.employmentInsuranceCompany,
           workersComp: r.workersCompCompany,
-          childRearingContribution: (r as any).childRearingContributionCompany || 0
+          childRearingContribution: (r as any).childRearingContributionCompany || 0,
+          childRearingSupport: (r as any).childRearingSupportCompany || 0
         }
       }))
     });

@@ -263,9 +263,11 @@ export async function POST(request: NextRequest) {
           data.employmentInsuranceCompany = details.employmentInsuranceCompany;
           data.workersCompCompany = details.workersCompCompany;
           data.childRearingContributionCompany = details.childRearingContributionCompany || 0;
+          data.childRearingSupportCompany = details.childRearingSupportCompany || 0;
           data.healthInsuranceEmployee = details.healthInsuranceEmployee;
           data.pensionEmployee = details.pensionEmployee;
           data.employmentInsuranceEmployee = details.employmentInsuranceEmployee;
+          data.childRearingSupportEmployee = details.childRearingSupportEmployee || 0;
           data.residentTax = details.residentTax;
           data.incomeTax = details.incomeTax;
           data.nursingCareInsurance = details.nursingCareInsurance;
@@ -276,7 +278,7 @@ export async function POST(request: NextRequest) {
           data.overtimePay = details.overtimePay;
           data.allowances = details.allowances;
           data.tax = details.incomeTax + details.residentTax;
-          data.insurance = details.healthInsurance + details.pension + details.employmentInsurance;
+          data.insurance = details.healthInsurance + details.pension + details.employmentInsurance + details.childRearingSupportEmployee;
           data.netSalary = details.netSalary;
           data.workHours = details.workHours;
         }
@@ -337,9 +339,11 @@ export async function POST(request: NextRequest) {
             employmentInsuranceCompany: data.employmentInsuranceCompany || 0,
             workersCompCompany: data.workersCompCompany || 0,
             childRearingContributionCompany: data.childRearingContributionCompany || 0,
+            childRearingSupportCompany: data.childRearingSupportCompany || 0,
             healthInsuranceEmployee: data.healthInsuranceEmployee || 0,
             pensionEmployee: data.pensionEmployee || 0,
             employmentInsuranceEmployee: data.employmentInsuranceEmployee || 0,
+            childRearingSupportEmployee: data.childRearingSupportEmployee || 0,
             residentTax: data.residentTax || 0,
             incomeTax: data.incomeTax || 0,
             nursingCareInsurance: data.nursingCareInsurance || 0,
@@ -366,9 +370,11 @@ export async function POST(request: NextRequest) {
             employmentInsuranceCompany: data.employmentInsuranceCompany || 0,
             workersCompCompany: data.workersCompCompany || 0,
             childRearingContributionCompany: data.childRearingContributionCompany || 0,
+            childRearingSupportCompany: data.childRearingSupportCompany || 0,
             healthInsuranceEmployee: data.healthInsuranceEmployee || 0,
             pensionEmployee: data.pensionEmployee || 0,
             employmentInsuranceEmployee: data.employmentInsuranceEmployee || 0,
+            childRearingSupportEmployee: data.childRearingSupportEmployee || 0,
             residentTax: data.residentTax || 0,
             incomeTax: data.incomeTax || 0,
             nursingCareInsurance: data.nursingCareInsurance || 0,
@@ -593,24 +599,30 @@ export async function PUT(request: NextRequest) {
       employmentInsuranceCompany = body.employmentInsuranceCompany !== undefined ? parseFloat(body.employmentInsuranceCompany) : details.employmentInsuranceCompany;
       workersCompCompany = body.workersCompCompany !== undefined ? parseFloat(body.workersCompCompany) : details.workersCompCompany;
       let childRearingContributionCompany = body.childRearingContributionCompany !== undefined ? parseFloat(body.childRearingContributionCompany) : (details.childRearingContributionCompany || 0);
+      let childRearingSupportCompany = body.childRearingSupportCompany !== undefined ? parseFloat(body.childRearingSupportCompany) : (details.childRearingSupportCompany || 0);
       healthInsuranceEmployee = body.healthInsuranceEmployee !== undefined ? parseFloat(body.healthInsuranceEmployee) : details.healthInsuranceEmployee;
       pensionEmployee = body.pensionEmployee !== undefined ? parseFloat(body.pensionEmployee) : details.pensionEmployee;
       employmentInsuranceEmployee = body.employmentInsuranceEmployee !== undefined ? parseFloat(body.employmentInsuranceEmployee) : details.employmentInsuranceEmployee;
+      let childRearingSupportEmployee = body.childRearingSupportEmployee !== undefined ? parseFloat(body.childRearingSupportEmployee) : (details.childRearingSupportEmployee || 0);
       residentTax = body.residentTax !== undefined ? parseFloat(body.residentTax) : details.residentTax;
       incomeTax = body.incomeTax !== undefined ? parseFloat(body.incomeTax) : details.incomeTax;
       nursingCareInsurance = body.nursingCareInsurance !== undefined ? parseFloat(body.nursingCareInsurance) : details.nursingCareInsurance;
       
-      const companySocialInsurance = healthInsuranceCompany + pensionCompany + employmentInsuranceCompany + workersCompCompany + childRearingContributionCompany;
+      const companySocialInsurance = healthInsuranceCompany + pensionCompany + employmentInsuranceCompany + workersCompCompany + childRearingContributionCompany + childRearingSupportCompany;
       totalCompanyCost = baseSalary + overtimePay + allowances + companySocialInsurance;
 
-      // We need to keep childRearingContributionCompany in the closure for prisma.update
+      // Keep them in closure for prisma.update
       (existing as any).childRearingContributionCompany = childRearingContributionCompany;
+      (existing as any).childRearingSupportCompany = childRearingSupportCompany;
+      (existing as any).childRearingSupportEmployee = childRearingSupportEmployee;
     } else {
       (existing as any).childRearingContributionCompany = body.childRearingContributionCompany !== undefined ? parseFloat(body.childRearingContributionCompany) : ((existing as any).childRearingContributionCompany || 0);
+      (existing as any).childRearingSupportCompany = body.childRearingSupportCompany !== undefined ? parseFloat(body.childRearingSupportCompany) : ((existing as any).childRearingSupportCompany || 0);
+      (existing as any).childRearingSupportEmployee = body.childRearingSupportEmployee !== undefined ? parseFloat(body.childRearingSupportEmployee) : ((existing as any).childRearingSupportEmployee || 0);
     }
 
     const tax = employee ? (incomeTax + residentTax) : (body.tax !== undefined ? parseFloat(body.tax) : existing.tax);
-    const insurance = employee ? (healthInsuranceEmployee + pensionEmployee + employmentInsuranceEmployee + nursingCareInsurance) : (body.insurance !== undefined ? parseFloat(body.insurance) : existing.insurance);
+    const insurance = employee ? (healthInsuranceEmployee + pensionEmployee + employmentInsuranceEmployee + nursingCareInsurance + (existing as any).childRearingSupportEmployee) : (body.insurance !== undefined ? parseFloat(body.insurance) : existing.insurance);
 
     // Mathematical net salary validation overrides client inputs
     const calculatedNet = baseSalary + overtimePay + allowances - (deductions + tax + insurance);
@@ -640,9 +652,11 @@ export async function PUT(request: NextRequest) {
         employmentInsuranceCompany,
         workersCompCompany,
         childRearingContributionCompany: (existing as any).childRearingContributionCompany,
+        childRearingSupportCompany: (existing as any).childRearingSupportCompany,
         healthInsuranceEmployee,
         pensionEmployee,
         employmentInsuranceEmployee,
+        childRearingSupportEmployee: (existing as any).childRearingSupportEmployee,
         residentTax,
         incomeTax,
         nursingCareInsurance,

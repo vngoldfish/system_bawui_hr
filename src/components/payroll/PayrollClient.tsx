@@ -66,9 +66,11 @@ interface PayrollRecord {
   employmentInsuranceCompany?: number;
   workersCompCompany?: number;
   childRearingContributionCompany?: number;
+  childRearingSupportCompany?: number;
   healthInsuranceEmployee?: number;
   pensionEmployee?: number;
   employmentInsuranceEmployee?: number;
+  childRearingSupportEmployee?: number;
   nursingCareInsurance?: number;
   totalCompanyCost?: number;
 }
@@ -275,6 +277,7 @@ interface EditFieldsType {
   nursingCareInsurance: number;
   pensionEmployee: number;
   employmentInsuranceEmployee: number;
+  childRearingSupportEmployee: number;
   residentTax: number;
   incomeTax: number;
   healthInsuranceCompany: number;
@@ -282,6 +285,7 @@ interface EditFieldsType {
   employmentInsuranceCompany: number;
   workersCompCompany: number;
   childRearingContributionCompany: number;
+  childRearingSupportCompany: number;
 }
 
 interface PayslipPrintContentProps {
@@ -324,11 +328,13 @@ function PayslipPrintContent({
   const companyEmpIns = record.employmentInsuranceCompany || 0;
   const companyWorkersComp = record.workersCompCompany || 0;
   const companyChildRearing = record.childRearingContributionCompany || 0;
+  const companyChildRearingSupport = record.childRearingSupportCompany || 0;
 
   // Employee contributions detailed
   const empHealthIns = record.healthInsuranceEmployee || 0;
   const empPension = record.pensionEmployee || 0;
   const empEmpIns = record.employmentInsuranceEmployee || 0;
+  const empChildRearingSupport = record.childRearingSupportEmployee || 0;
   const nursingCare = record.nursingCareInsurance || 0;
   const resTax = record.residentTax || 0;
   const incTax = record.incomeTax || record.tax || 0;
@@ -351,8 +357,9 @@ function PayslipPrintContent({
   const currentTax = isEditing && editFields
     ? (editFields.incomeTax + editFields.residentTax)
     : (record.tax || 0);
+  const currentEmpChildRearingSupport = isEditing && editFields ? editFields.childRearingSupportEmployee : empChildRearingSupport;
   const currentInsurance = isEditing && editFields
-    ? (editFields.healthInsuranceEmployee + editFields.nursingCareInsurance + editFields.pensionEmployee + editFields.employmentInsuranceEmployee)
+    ? (editFields.healthInsuranceEmployee + editFields.nursingCareInsurance + editFields.pensionEmployee + editFields.employmentInsuranceEmployee + editFields.childRearingSupportEmployee)
     : (record.insurance || 0);
 
   const currentOtherAllow = isEditing && editFields ? editFields.allowances : 0;
@@ -366,7 +373,8 @@ function PayslipPrintContent({
   const currentCompanyEmpIns = isEditing && editFields ? editFields.employmentInsuranceCompany : companyEmpIns;
   const currentCompanyWorkersComp = isEditing && editFields ? editFields.workersCompCompany : companyWorkersComp;
   const currentCompanyChildRearing = isEditing && editFields ? editFields.childRearingContributionCompany : companyChildRearing;
-  const currentCompanyTotalCost = currentCompanyHealthIns + currentCompanyPension + currentCompanyEmpIns + currentCompanyWorkersComp + currentCompanyChildRearing;
+  const currentCompanyChildRearingSupport = isEditing && editFields ? editFields.childRearingSupportCompany : companyChildRearingSupport;
+  const currentCompanyTotalCost = currentCompanyHealthIns + currentCompanyPension + currentCompanyEmpIns + currentCompanyWorkersComp + currentCompanyChildRearing + currentCompanyChildRearingSupport;
 
   return (
     <div id={id} className="p-8 bg-white print:p-0 print:w-full print:text-black print:overflow-visible">
@@ -726,6 +734,23 @@ function PayslipPrintContent({
                   </td>
                 </tr>
               )}
+              {((record.childRearingSupportEmployee ?? 0) > 0 || isEditing) && (
+                <tr>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.childRearingSupportEmployeeShare')}</td>
+                  <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-right font-semibold text-red-505 print:text-black print:border-black">
+                    {isEditing && editFields && setEditFields ? (
+                      <input
+                        type="number"
+                        value={editFields.childRearingSupportEmployee}
+                        onChange={e => setEditFields(prev => ({ ...prev, childRearingSupportEmployee: parseFloat(e.target.value) || 0 }))}
+                        className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                      />
+                    ) : (
+                      `-${formatCurrency(record.childRearingSupportEmployee || 0)}`
+                    )}
+                  </td>
+                </tr>
+              )}
               {displayConfig?.showPension !== false && (
                 <tr>
                   <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-slate-600 print:text-black print:border-black">{t('payroll.pensionSubject')}</td>
@@ -896,6 +921,19 @@ function PayslipPrintContent({
                     <span>{formatCurrency(companyChildRearing)}</span>
                   )}
                 </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>{t('payroll.childRearingSupportCompanyShare')}</span>
+                  {isEditing && editFields && setEditFields ? (
+                    <input
+                      type="number"
+                      value={editFields.childRearingSupportCompany}
+                      onChange={e => setEditFields(prev => ({ ...prev, childRearingSupportCompany: parseFloat(e.target.value) || 0 }))}
+                      className="w-32 px-2 py-1 text-right border border-slate-300 rounded text-sm bg-white text-slate-850"
+                    />
+                  ) : (
+                    <span>{formatCurrency(companyChildRearingSupport)}</span>
+                  )}
+                </div>
                 <div className="flex justify-between pt-2 border-t font-semibold text-blue-700 print:text-black">
                   <span>{t('payroll.totalCompanyShare')}</span>
                   <span>{formatCurrency(currentCompanyTotalCost)}</span>
@@ -911,6 +949,7 @@ function PayslipPrintContent({
               <div className="flex justify-between"><span className="text-slate-600">{t('payroll.healthInsEmployeeShare')}</span><span>{formatCurrency(empHealthIns)}</span></div>
               <div className="flex justify-between"><span className="text-slate-600">{t('payroll.pensionEmployeeShare')}</span><span>{formatCurrency(empPension)}</span></div>
               <div className="flex justify-between"><span className="text-slate-600">{t('payroll.employmentInsEmployeeShare')}</span><span>{formatCurrency(empEmpIns)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">{t('payroll.childRearingSupportEmployeeShare')}</span><span>{formatCurrency(empChildRearingSupport)}</span></div>
               <div className="flex justify-between"><span className="text-slate-600">{t('payroll.nursingCareInsuranceEmployee')}</span><span>{formatCurrency(nursingCare)}</span></div>
               <div className="flex justify-between"><span className="text-slate-600">{t('payroll.residentTaxSubject')}</span><span>{formatCurrency(resTax)}</span></div>
               <div className="flex justify-between"><span className="text-slate-600">{t('payroll.incomeTaxSubject')}</span><span>{formatCurrency(incTax)}</span></div>
@@ -961,6 +1000,10 @@ function PayslipPrintContent({
               <div className="flex justify-between text-slate-600">
                 <span>{t('payroll.childRearingContributionCompanyShare')}</span>
                 <span className="font-semibold">{formatCurrency(currentCompanyChildRearing)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>{t('payroll.childRearingSupportCompanyShare')}</span>
+                <span className="font-semibold">{formatCurrency(currentCompanyChildRearingSupport)}</span>
               </div>
             </div>
           </div>
@@ -1585,12 +1628,14 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
   const companyEmpIns = record.employmentInsuranceCompany || 0;
   const companyWorkersComp = record.workersCompCompany || 0;
   const companyChildRearing = record.childRearingContributionCompany || 0;
+  const companyChildRearingSupport = record.childRearingSupportCompany || 0;
   const totalCompanyCost = record.totalCompanyCost || 0;
 
   // Employee contributions detailed
   const empHealthIns = record.healthInsuranceEmployee || 0;
   const empPension = record.pensionEmployee || 0;
   const empEmpIns = record.employmentInsuranceEmployee || 0;
+  const empChildRearingSupport = record.childRearingSupportEmployee || 0;
   const nursingCare = record.nursingCareInsurance || 0;
   const resTax = record.residentTax || 0;
   const incTax = record.incomeTax || record.tax || 0;
@@ -1616,6 +1661,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
     nursingCareInsurance: record.nursingCareInsurance ?? 0,
     pensionEmployee: record.pensionEmployee ?? 0,
     employmentInsuranceEmployee: record.employmentInsuranceEmployee ?? 0,
+    childRearingSupportEmployee: record.childRearingSupportEmployee ?? 0,
     residentTax: record.residentTax ?? 0,
     incomeTax: record.incomeTax ?? 0,
     healthInsuranceCompany: record.healthInsuranceCompany ?? 0,
@@ -1623,6 +1669,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
     employmentInsuranceCompany: record.employmentInsuranceCompany ?? 0,
     workersCompCompany: record.workersCompCompany ?? 0,
     childRearingContributionCompany: record.childRearingContributionCompany ?? 0,
+    childRearingSupportCompany: record.childRearingSupportCompany ?? 0,
   });
 
 
@@ -1656,6 +1703,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
       nursingCareInsurance: record.nursingCareInsurance ?? 0,
       pensionEmployee: record.pensionEmployee ?? 0,
       employmentInsuranceEmployee: record.employmentInsuranceEmployee ?? 0,
+      childRearingSupportEmployee: record.childRearingSupportEmployee ?? 0,
       residentTax: record.residentTax ?? 0,
       incomeTax: record.incomeTax ?? 0,
       healthInsuranceCompany: record.healthInsuranceCompany ?? 0,
@@ -1663,6 +1711,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
       employmentInsuranceCompany: record.employmentInsuranceCompany ?? 0,
       workersCompCompany: record.workersCompCompany ?? 0,
       childRearingContributionCompany: record.childRearingContributionCompany ?? 0,
+      childRearingSupportCompany: record.childRearingSupportCompany ?? 0,
     });
   }, [record, employee]);
 
@@ -1698,11 +1747,12 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
       workHours: calc.workHours,
       overtimePay: calc.overtimePay,
       tax: calc.incomeTax + calc.residentTax,
-      insurance: calc.healthInsuranceEmployee + calc.nursingCareInsurance + calc.pensionEmployee + calc.employmentInsuranceEmployee,
+      insurance: calc.healthInsuranceEmployee + calc.nursingCareInsurance + calc.pensionEmployee + calc.employmentInsuranceEmployee + ((calc as any).childRearingSupportEmployee || 0),
       healthInsuranceEmployee: calc.healthInsuranceEmployee,
       nursingCareInsurance: calc.nursingCareInsurance,
       pensionEmployee: calc.pensionEmployee,
       employmentInsuranceEmployee: calc.employmentInsuranceEmployee,
+      childRearingSupportEmployee: (calc as any).childRearingSupportEmployee || 0,
       residentTax: calc.residentTax,
       incomeTax: calc.incomeTax,
       healthInsuranceCompany: calc.healthInsuranceCompany,
@@ -1710,6 +1760,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
       employmentInsuranceCompany: calc.employmentInsuranceCompany,
       workersCompCompany: calc.workersCompCompany,
       childRearingContributionCompany: calc.childRearingContributionCompany,
+      childRearingSupportCompany: (calc as any).childRearingSupportCompany || 0,
     }));
   };
 
@@ -1773,7 +1824,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
         allowances: editFields.transportation + editFields.housing + editFields.meal + editFields.allowances + editFields.bonus,
         deductions: editFields.deductions,
         tax: editFields.incomeTax + editFields.residentTax,
-        insurance: editFields.healthInsuranceEmployee + editFields.nursingCareInsurance + editFields.pensionEmployee + editFields.employmentInsuranceEmployee,
+        insurance: editFields.healthInsuranceEmployee + editFields.nursingCareInsurance + editFields.pensionEmployee + editFields.employmentInsuranceEmployee + editFields.childRearingSupportEmployee,
         paymentDate: editFields.paymentDate,
         status: editFields.status,
         workDays: editFields.workDays,
@@ -1785,6 +1836,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
         nursingCareInsurance: editFields.nursingCareInsurance,
         pensionEmployee: editFields.pensionEmployee,
         employmentInsuranceEmployee: editFields.employmentInsuranceEmployee,
+        childRearingSupportEmployee: editFields.childRearingSupportEmployee,
         residentTax: editFields.residentTax,
         incomeTax: editFields.incomeTax,
         healthInsuranceCompany: editFields.healthInsuranceCompany,
@@ -1792,6 +1844,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
         employmentInsuranceCompany: editFields.employmentInsuranceCompany,
         workersCompCompany: editFields.workersCompCompany,
         childRearingContributionCompany: editFields.childRearingContributionCompany,
+        childRearingSupportCompany: editFields.childRearingSupportCompany,
       };
 
       const res = await fetch('/api/payroll', {
@@ -1839,9 +1892,11 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
           employmentInsuranceCompany: updated.employmentInsuranceCompany,
           workersCompCompany: updated.workersCompCompany,
           childRearingContributionCompany: updated.childRearingContributionCompany,
+          childRearingSupportCompany: updated.childRearingSupportCompany,
           healthInsuranceEmployee: updated.healthInsuranceEmployee,
           pensionEmployee: updated.pensionEmployee,
           employmentInsuranceEmployee: updated.employmentInsuranceEmployee,
+          childRearingSupportEmployee: updated.childRearingSupportEmployee,
           residentTax: updated.residentTax,
           incomeTax: updated.incomeTax,
           nursingCareInsurance: updated.nursingCareInsurance,
@@ -1876,7 +1931,7 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
     ? (editFields.incomeTax + editFields.residentTax)
     : (record.tax || 0);
   const currentInsurance = isEditing
-    ? (editFields.healthInsuranceEmployee + editFields.nursingCareInsurance + editFields.pensionEmployee + editFields.employmentInsuranceEmployee)
+    ? (editFields.healthInsuranceEmployee + editFields.nursingCareInsurance + editFields.pensionEmployee + editFields.employmentInsuranceEmployee + editFields.childRearingSupportEmployee)
     : (record.insurance || 0);
 
   const currentOtherAllow = isEditing ? editFields.allowances : 0;
@@ -1890,7 +1945,8 @@ function PayslipModal({ record, employee, companyInfo, rateSettings, isAdmin = f
   const currentCompanyEmpIns = isEditing ? editFields.employmentInsuranceCompany : companyEmpIns;
   const currentCompanyWorkersComp = isEditing ? editFields.workersCompCompany : companyWorkersComp;
   const currentCompanyChildRearing = isEditing ? editFields.childRearingContributionCompany : companyChildRearing;
-  const currentCompanyTotalCost = currentCompanyHealthIns + currentCompanyPension + currentCompanyEmpIns + currentCompanyWorkersComp + currentCompanyChildRearing;
+  const currentCompanyChildRearingSupport = isEditing ? editFields.childRearingSupportCompany : companyChildRearingSupport;
+  const currentCompanyTotalCost = currentCompanyHealthIns + currentCompanyPension + currentCompanyEmpIns + currentCompanyWorkersComp + currentCompanyChildRearing + currentCompanyChildRearingSupport;
 
   return (
     <Portal>

@@ -348,10 +348,14 @@ export function getSmrIncome({
 	  const employmentInsuranceRate = rates.employmentInsuranceEmployeeRate / 100;
 	  const employmentInsurance = b.employmentInsurance ? Math.round(totalGross * employmentInsuranceRate) : 0;
 
+	  // 5.5. Child-rearing Support Gold (子ども・子育て支援金): 0.115% of healthSMR for employee
+	  const childRearingSupportEmployee = b.healthInsurance ? apply50SenRounding(healthSMR * 0.0023) : 0;
+	  const childRearingSupportCompany = childRearingSupportEmployee;
+
 	  const workersComp = 0; // Công ty đóng 100%, nhân viên đóng 0%
 
 	  // Tổng bảo hiểm xã hội khấu trừ từ lương nhân viên
-	  const totalSocialInsurance = healthInsurance + nursingCarePremium + pension + employmentInsurance;
+	  const totalSocialInsurance = healthInsurance + nursingCarePremium + pension + employmentInsurance + childRearingSupportEmployee;
 
 	  // 6. Income Tax (所得税): Tính trên Gross trừ trợ cấp đi lại miễn thuế và trừ tổng bảo hiểm xã hội
 	  const taxableIncome = Math.max(0, totalGross - b.transportation - totalSocialInsurance);
@@ -398,6 +402,7 @@ export function getSmrIncome({
 	    employmentInsuranceCompanyRate: rates.employmentInsuranceCompanyRate,
 	    workersCompRate: rates.workersCompRate,
 	    pensionSMR: b.pension ? pensionSMR : 0,
+	    childRearingSupportCompany,
 	  });
 
 	  const nursingCareInsurance = nursingCarePremium;
@@ -423,9 +428,11 @@ export function getSmrIncome({
 	    employmentInsuranceCompany: companyContribs.employmentInsuranceCompany,
 	    workersCompCompany: companyContribs.workersCompCompany,
 	    childRearingContributionCompany: companyContribs.childRearingContributionCompany,
+	    childRearingSupportCompany: companyContribs.childRearingSupportCompany,
 	    healthInsuranceEmployee: healthInsurance,
 	    pensionEmployee: pension,
 	    employmentInsuranceEmployee: employmentInsurance,
+	    childRearingSupportEmployee,
 	    nursingCareInsurance,
 	    totalCompanyCost,
 	  };
@@ -533,6 +540,7 @@ export function getSmrIncome({
   employmentInsuranceCompanyRate = 0.9,
   workersCompRate = 0.3,
   pensionSMR = 0,
+  childRearingSupportCompany = 0,
 }: {
   healthInsurance: number;
   nursingCarePremium: number;
@@ -543,12 +551,14 @@ export function getSmrIncome({
   employmentInsuranceCompanyRate?: number;
   workersCompRate?: number;
   pensionSMR?: number;
+  childRearingSupportCompany?: number;
 }): {
   healthInsuranceCompany: number;
   pensionCompany: number;
   employmentInsuranceCompany: number;
   workersCompCompany: number;
   childRearingContributionCompany: number;
+  childRearingSupportCompany: number;
   totalCompanyCost: number;
 } {
   const healthInsuranceCompany = healthInsurance + nursingCarePremium;
@@ -568,7 +578,8 @@ export function getSmrIncome({
     pensionCompany +
     employmentInsuranceCompany +
     workersCompCompany +
-    childRearingContributionCompany;
+    childRearingContributionCompany +
+    childRearingSupportCompany;
 
   return {
     healthInsuranceCompany,
@@ -576,6 +587,7 @@ export function getSmrIncome({
     employmentInsuranceCompany,
     workersCompCompany,
     childRearingContributionCompany,
+    childRearingSupportCompany,
     totalCompanyCost,
   };
 }

@@ -355,9 +355,11 @@ export function transformPayrollRecord(
   let employmentInsuranceCompany = r.employmentInsuranceCompany;
   let workersCompCompany = r.workersCompCompany;
   let childRearingContributionCompany = (r as any).childRearingContributionCompany || 0;
+  let childRearingSupportCompany = (r as any).childRearingSupportCompany || 0;
   let healthInsuranceEmployee = r.healthInsuranceEmployee;
   let pensionEmployee = r.pensionEmployee;
   let employmentInsuranceEmployee = r.employmentInsuranceEmployee;
+  let childRearingSupportEmployee = (r as any).childRearingSupportEmployee || 0;
   let residentTax = r.residentTax;
   let incomeTax = r.incomeTax;
   let nursingCareInsurance = r.nursingCareInsurance;
@@ -402,9 +404,11 @@ export function transformPayrollRecord(
     employmentInsuranceCompany = details.employmentInsuranceCompany;
     workersCompCompany = details.workersCompCompany;
     childRearingContributionCompany = details.childRearingContributionCompany || 0;
+    childRearingSupportCompany = details.childRearingSupportCompany || 0;
     healthInsuranceEmployee = details.healthInsuranceEmployee;
     pensionEmployee = details.pensionEmployee;
     employmentInsuranceEmployee = details.employmentInsuranceEmployee;
+    childRearingSupportEmployee = details.childRearingSupportEmployee || 0;
     residentTax = details.residentTax;
     incomeTax = details.incomeTax;
     nursingCareInsurance = details.nursingCareInsurance;
@@ -414,7 +418,7 @@ export function transformPayrollRecord(
 
   const totalGross = baseSalary + overtimePay + allowances;
   const healthInsurance = healthInsuranceEmployee + (nursingCareInsurance || 0);
-  const totalDeductions = r.deductions + healthInsurance + pensionEmployee + employmentInsuranceEmployee + incomeTax + residentTax;
+  const totalDeductions = r.deductions + healthInsurance + pensionEmployee + employmentInsuranceEmployee + childRearingSupportEmployee + incomeTax + residentTax;
 
   return {
     id: r.id,
@@ -444,9 +448,11 @@ export function transformPayrollRecord(
     employmentInsuranceCompany,
     workersCompCompany,
     childRearingContributionCompany,
+    childRearingSupportCompany,
     healthInsuranceEmployee,
     pensionEmployee,
     employmentInsuranceEmployee,
+    childRearingSupportEmployee,
     nursingCareInsurance,
     totalCompanyCost,
   };
