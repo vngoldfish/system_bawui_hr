@@ -137,29 +137,30 @@ export default function DashboardLayout({ children, title, subtitle }: Dashboard
   const translatedSubtitle = translateSubtitle(subtitle, t);
 
   return (
-    <div className="flex h-screen w-full max-w-full bg-slate-50 overflow-hidden relative">
+    <div className="flex h-screen w-full max-w-full bg-slate-50 overflow-hidden relative print:bg-white print:h-auto print:overflow-visible">
       {/* Sidebar overlay on mobile */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm md:hidden print:hidden"
           onClick={handleCloseMobile}
         />
       )}
       
       <Sidebar 
-        className={`fixed inset-y-0 left-0 z-50 transform md:relative md:translate-x-0 transition-transform duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-50 transform md:relative md:translate-x-0 transition-transform duration-300 ease-in-out print:hidden ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         onCloseMobile={handleCloseMobile}
       />
       
-      <div className="flex-1 flex flex-col min-w-0 max-w-full overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 max-w-full overflow-hidden print:overflow-visible print:h-auto">
         <Header 
           title={translatedTitle} 
           subtitle={translatedSubtitle} 
           onMenuClick={() => setIsMobileOpen(true)}
+          className="print:hidden"
         />
-        <main className="flex-1 p-4 md:p-6 overflow-auto">
+        <main className="flex-1 p-4 md:p-6 overflow-auto print:overflow-visible print:p-0 print:m-0">
           {children}
         </main>
       </div>

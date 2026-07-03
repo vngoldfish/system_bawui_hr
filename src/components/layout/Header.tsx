@@ -36,9 +36,10 @@ interface HeaderProps {
   title: string;
   subtitle?: string;
   onMenuClick?: () => void;
+  className?: string;
 }
 
-export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
+export default function Header({ title, subtitle, onMenuClick, className }: HeaderProps) {
   const { t, locale } = useI18n();
   const [today, setToday] = useState('');
   const [user, setUser] = useState<LoggedUser | null>(null);
@@ -90,7 +91,7 @@ export default function Header({ title, subtitle, onMenuClick }: HeaderProps) {
 
 
   return (
-    <header className="bg-white/85 backdrop-blur-md border-b border-slate-200/50 px-4 md:px-6 py-3.5 flex-shrink-0 sticky top-0 z-30 shadow-[0_1px_3px_rgba(15,23,42,0.02)]">
+    <header className={cn("bg-white/85 backdrop-blur-md border-b border-slate-200/50 px-4 md:px-6 py-3.5 flex-shrink-0 sticky top-0 z-30 shadow-[0_1px_3px_rgba(15,23,42,0.02)]", className)}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {onMenuClick && (

@@ -197,6 +197,7 @@ export default function AttendanceClient({
   const [records, setRecords] = useState<AttendanceRecord[]>(initialRecords);
   
   const [roundingPolicy, setRoundingPolicy] = useState<string>('exact');
+  const [companyName, setCompanyName] = useState<string>('BAWUI HR');
 
   const getStatusLabel = (s: string) => {
     switch (s) {
@@ -216,6 +217,9 @@ export default function AttendanceClient({
       if (savedInfo) {
         try {
           const parsed = JSON.parse(savedInfo);
+          if (parsed.name) {
+            setCompanyName(parsed.name);
+          }
           if (parsed.roundingPolicy) {
             setRoundingPolicy(parsed.roundingPolicy);
           }
@@ -236,6 +240,9 @@ export default function AttendanceClient({
         const res = await fetch('/api/company');
         if (res.ok) {
           const data = await res.json();
+          if (data.name) {
+            setCompanyName(data.name);
+          }
           if (data.roundingPolicy) {
             setRoundingPolicy(data.roundingPolicy);
           }
@@ -1292,7 +1299,7 @@ export default function AttendanceClient({
   // Selected Employee Detail View
   return (
     <>
-      <div className="space-y-6 animate-fadeIn">
+      <div className="space-y-6 animate-fadeIn print:hidden">
       <CurrentPayrollParamsPanel
         targetMonth={paramsTargetMonth}
         mode="attendance"
@@ -1505,6 +1512,16 @@ export default function AttendanceClient({
                 ]}
                 fileName={`attendance_${selectedYear}-${String(selectedMonth).padStart(2, '0')}`}
               />
+
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 text-white rounded-xl hover:bg-slate-700 text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                <span>{locale === 'vi' ? 'In / Lưu PDF' : locale === 'ja' ? '印刷 / PDF保存' : 'Print / PDF'}</span>
+              </button>
 
               {/* View Toggle */}
               <div className="flex bg-slate-100 dark:bg-slate-850 rounded-xl p-0.5 border border-slate-200 dark:border-slate-800 shadow-inner">
@@ -2361,6 +2378,136 @@ export default function AttendanceClient({
             </div>
           </div>
         </Portal>
+      )}
+      
+      {/* Print-only timesheet container */}
+      {selectedEmployee && (
+        <div className="hidden print:block bg-white text-black p-8 font-sans w-[210mm] mx-auto min-h-[297mm]">
+          {/* Title Header */}
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold uppercase tracking-wider">
+              {locale === 'vi' ? 'BẢNG CHẤM CÔNG CHI TIẾT' : locale === 'ja' ? '勤務状況報告書 (タイムカード)' : 'TIME SHEET'}
+            </h2>
+            <p className="text-sm mt-1 text-slate-500">
+              {locale === 'vi' ? `Tháng ${selectedMonth}/${selectedYear}` : locale === 'ja' ? `${selectedYear}年 ${selectedMonth}月` : `${selectedMonth}/${selectedYear}`}
+            </p>
+          </div>
+
+          {/* Employee & Company Info Grid */}
+          <div className="grid grid-cols-2 gap-4 mb-6 pb-4 border-b border-slate-300">
+            <div className="space-y-1 text-xs">
+              <div><strong>{locale === 'vi' ? 'Nhân viên' : locale === 'ja' ? '従業員' : 'Employee'}:</strong> {selectedEmployee.lastName} {selectedEmployee.firstName} ({selectedEmployee.employeeCode})</div>
+              <div><strong>{locale === 'vi' ? 'Bộ phận' : locale === 'ja' ? '部署' : 'Department'}:</strong> {selectedEmployee.department?.name || '-'}</div>
+              <div><strong>{locale === 'vi' ? 'Chức vụ' : locale === 'ja' ? '役職' : 'Position'}:</strong> {selectedEmployee.position?.name || '-'}</div>
+            </div>
+            <div className="space-y-1 text-xs text-right">
+              <div><strong>{locale === 'vi' ? 'Công ty' : locale === 'ja' ? '会社名' : 'Company'}:</strong> {companyName}</div>
+              <div><strong>{locale === 'vi' ? 'Ngày in' : locale === 'ja' ? '出力日' : 'Print Date'}:</strong> {new Date().toLocaleDateString(locale, {year: 'numeric', month: '2-digit', day: '2-digit'})}</div>
+            </div>
+          </div>
+
+          {/* Monthly Attendance Summary statistics */}
+          <div className="grid grid-cols-6 gap-2 mb-6 text-center text-xs">
+            <div className="border border-slate-200 p-2 rounded-lg bg-slate-50">
+              <div className="text-[9px] text-slate-400 font-bold uppercase">{locale === 'vi' ? 'Ngày làm' : locale === 'ja' ? '出勤日数' : 'Work Days'}</div>
+              <div className="text-xs font-black mt-0.5">{monthlySummary.presentDays} {t('common.dayUnit')}</div>
+            </div>
+            <div className="border border-slate-200 p-2 rounded-lg bg-slate-50">
+              <div className="text-[9px] text-slate-400 font-bold uppercase">{locale === 'vi' ? 'Giờ làm' : locale === 'ja' ? '総労働時間' : 'Work Hours'}</div>
+              <div className="text-xs font-black mt-0.5">{monthlySummary.totalWorkHours}h</div>
+            </div>
+            <div className="border border-slate-200 p-2 rounded-lg bg-slate-50">
+              <div className="text-[9px] text-slate-400 font-bold uppercase">{locale === 'vi' ? 'Tăng ca' : locale === 'ja' ? '時間外労働' : 'OT Hours'}</div>
+              <div className="text-xs font-black mt-0.5">{monthlySummary.totalOT}h</div>
+            </div>
+            <div className="border border-slate-200 p-2 rounded-lg bg-slate-50">
+              <div className="text-[9px] text-slate-400 font-bold uppercase">{locale === 'vi' ? 'Đi muộn' : locale === 'ja' ? '遅刻回数' : 'Late'}</div>
+              <div className="text-xs font-black mt-0.5">{monthlySummary.lateDays} {t('common.timesUnit')}</div>
+            </div>
+            <div className="border border-slate-200 p-2 rounded-lg bg-slate-50">
+              <div className="text-[9px] text-slate-400 font-bold uppercase">{locale === 'vi' ? 'Nghỉ phép' : locale === 'ja' ? '有給消化' : 'Paid Leave'}</div>
+              <div className="text-xs font-black mt-0.5">{monthlySummary.holidays} {t('common.dayUnit')}</div>
+            </div>
+            <div className="border border-slate-200 p-2 rounded-lg bg-slate-50">
+              <div className="text-[9px] text-slate-400 font-bold uppercase">{locale === 'vi' ? 'Vắng mặt' : locale === 'ja' ? '欠勤日数' : 'Absent'}</div>
+              <div className="text-xs font-black mt-0.5">{monthlySummary.absentDays} {t('common.dayUnit')}</div>
+            </div>
+          </div>
+
+          {/* Daily Table Details */}
+          <table className="w-full border-collapse border border-slate-300 text-[9px] mb-8">
+            <thead>
+              <tr className="bg-slate-100/80">
+                <th className="border border-slate-300 p-1.5 text-center w-10">{locale === 'vi' ? 'Ngày' : locale === 'ja' ? '日付' : 'Date'}</th>
+                <th className="border border-slate-300 p-1.5 text-center w-8">{locale === 'vi' ? 'Thứ' : locale === 'ja' ? '曜日' : 'Day'}</th>
+                <th className="border border-slate-300 p-1.5 text-center w-24">{locale === 'vi' ? 'Trạng thái' : locale === 'ja' ? '区分' : 'Status'}</th>
+                <th className="border border-slate-300 p-1.5 text-center">{locale === 'vi' ? 'Giờ vào' : locale === 'ja' ? '出勤' : 'In'}</th>
+                <th className="border border-slate-300 p-1.5 text-center">{locale === 'vi' ? 'Giờ ra' : locale === 'ja' ? '退勤' : 'Out'}</th>
+                <th className="border border-slate-300 p-1.5 text-center">{locale === 'vi' ? 'Nghỉ' : locale === 'ja' ? '休憩' : 'Break'}</th>
+                <th className="border border-slate-300 p-1.5 text-center">{locale === 'vi' ? 'Giờ làm' : locale === 'ja' ? '実労働' : 'Work'}</th>
+                <th className="border border-slate-300 p-1.5 text-center">{locale === 'vi' ? 'Tăng ca' : locale === 'ja' ? '残業' : 'OT'}</th>
+                <th className="border border-slate-300 p-1.5 text-left">{locale === 'vi' ? 'Ghi chú' : locale === 'ja' ? '備考' : 'Notes'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {daysInMonth.map(({ day, date, record }) => {
+                const contract = getActiveContractForDate(selectedEmployee, date);
+                const holiday = getHolidayForDate(holidays, date);
+                const contractWorkDay = isContractWorkDay(contract, date);
+                const weekdayName = dayNamesMap[locale]?.[new Date(date).getDay()] || '';
+                const workHours = record ? calculateRecordWorkHours(record.checkIn, record.checkOut, record.breakStart, record.breakEnd, roundingPolicy) : 0;
+                const otHours = calculateContractAwareOvertime(record, contract, holiday, roundingPolicy);
+
+                const formatTimeVal = (val: string | null) => {
+                  if (!val) return '-';
+                  const d = new Date(val);
+                  return isNaN(d.getTime()) ? '-' : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
+                };
+
+                const breakString = record && record.breakStart && record.breakEnd
+                  ? `${formatTimeVal(record.breakStart)} - ${formatTimeVal(record.breakEnd)}`
+                  : '-';
+
+                return (
+                  <tr key={day} className={holiday ? 'bg-rose-50/20' : !contractWorkDay ? 'bg-slate-50/50' : ''}>
+                    <td className="border border-slate-300 p-1 text-center font-bold">{day}</td>
+                    <td className={`border border-slate-300 p-1 text-center font-bold ${
+                      holiday || new Date(date).getDay() === 0 ? 'text-rose-600' :
+                      new Date(date).getDay() === 6 ? 'text-sky-600' : 'text-slate-700'
+                    }`}>{weekdayName}</td>
+                    <td className="border border-slate-300 p-1 text-center font-semibold">
+                      {holiday ? (locale === 'vi' ? 'Ngày lễ' : '祝日') :
+                       !contractWorkDay ? (locale === 'vi' ? 'Nghỉ hợp đồng' : '公休') :
+                       record ? getStatusLabel(record.status) : (locale === 'vi' ? 'Chưa ghi nhận' : '未打刻')}
+                    </td>
+                    <td className="border border-slate-300 p-1 text-center font-mono">{record ? formatTimeVal(record.checkIn) : '-'}</td>
+                    <td className="border border-slate-300 p-1 text-center font-mono">{record ? formatTimeVal(record.checkOut) : '-'}</td>
+                    <td className="border border-slate-300 p-1 text-center font-mono">{breakString}</td>
+                    <td className="border border-slate-300 p-1 text-center font-mono font-bold">{workHours > 0 ? `${Math.round(workHours * 10) / 10}h` : '-'}</td>
+                    <td className="border border-slate-300 p-1 text-center font-mono font-bold text-orange-600">{otHours > 0 ? `${Math.round(otHours * 10) / 10}h` : '-'}</td>
+                    <td className="border border-slate-300 p-1 text-left truncate max-w-[150px]">{record?.notes || ''}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Approvals section */}
+          <div className="grid grid-cols-3 gap-8 mt-12 text-center text-[10px]">
+            <div>
+              <p className="font-bold border-b border-slate-300 pb-16 mb-2">{locale === 'vi' ? 'Chữ ký nhân viên (本人署名)' : '本人署名'}</p>
+              <p className="text-[9px] text-slate-400">Date: ____ / ____ / ________</p>
+            </div>
+            <div>
+              <p className="font-bold border-b border-slate-300 pb-16 mb-2">{locale === 'vi' ? 'Người kiểm tra (管理者印)' : '管理者印'}</p>
+              <p className="text-[9px] text-slate-400">Date: ____ / ____ / ________</p>
+            </div>
+            <div>
+              <p className="font-bold border-b border-slate-300 pb-16 mb-2">{locale === 'vi' ? 'Giám đốc phê duyệt (社長印)' : '社長印'}</p>
+              <p className="text-[9px] text-slate-400">Date: ____ / ____ / ________</p>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
