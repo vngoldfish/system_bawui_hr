@@ -1395,7 +1395,7 @@ export default function AttendanceClient({
         <div className={`space-y-6 transition-all duration-300 ${rightSidebarCollapsed ? "lg:col-span-3" : "lg:col-span-2"}`}>
           
           {/* Calendar Controller Card */}
-          <Card className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-4">
+          <Card className="bg-white dark:bg-slate-900 border border-slate-200/50 shadow-sm rounded-2xl p-4 overflow-visible">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <select 
