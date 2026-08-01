@@ -43,6 +43,7 @@ interface Employee {
   department?: { name: string } | null;
   position?: { name: string; allowance?: number | null } | null;
   hireDate: string;
+  status?: string;
   contractTypeId?: string;
   contractType?: { name: string } | null;
   contractStartDate?: string | null;
@@ -459,7 +460,7 @@ export default function AttendanceClient({
     return { present, late, earlyLeave, absent, leave, unregistered };
   }, [records, employees, todayStr]);
 
-  // Filtered employees for selector
+  // Filtered employees for selector (hide resigned employees whose contractEndDate is before the selected month)
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
       const matchSearch = empSearch === '' ||
@@ -467,9 +468,19 @@ export default function AttendanceClient({
         `${emp.lastNameKana || ''} ${emp.firstNameKana || ''}`.includes(empSearch) ||
         emp.employeeCode.includes(empSearch);
       const matchDept = empDeptFilter === 'ALL' || (emp.department?.name === empDeptFilter);
+
+      // Hide INACTIVE employees whose contractEndDate is before the start of the selected month
+      if (emp.status === 'INACTIVE' && emp.contractEndDate) {
+        const endDate = new Date(emp.contractEndDate);
+        const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
+        if (endDate < monthStart) {
+          return false;
+        }
+      }
+
       return matchSearch && matchDept;
     });
-  }, [employees, empSearch, empDeptFilter]);
+  }, [employees, empSearch, empDeptFilter, selectedYear, selectedMonth]);
 
   // Records filtered for selected month & employee
   const monthRecords = useMemo(() => {
@@ -1241,6 +1252,44 @@ export default function AttendanceClient({
           </div>
         </Card>
 
+        {/* Month/Year Selector — visible at list level */}
+        <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/50 shadow-sm rounded-2xl p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{locale === 'vi' ? 'Tháng chấm công' : locale === 'en' ? 'Attendance Month' : '勤怠月'}</span>
+            <select 
+              value={selectedYear} 
+              onChange={e => setSelectedYear(parseInt(e.target.value))} 
+              className="px-3.5 py-2 border border-slate-200 bg-white dark:bg-slate-850 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+            >
+              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{locale === 'ja' || locale === 'zh' ? `${y}${getAttendanceText('yearUnit', locale)}` : `${getAttendanceText('yearUnit', locale)}${y}`}</option>)}
+            </select>
+            <div className="flex items-center bg-slate-100 dark:bg-slate-850 p-0.5 rounded-xl border border-slate-200 dark:border-slate-800 max-w-full overflow-x-auto">
+              <button 
+                onClick={() => setSelectedMonth(selectedMonth === 1 ? 12 : selectedMonth - 1)} 
+                className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
+              >
+                &lt;
+              </button>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                <button 
+                  key={m} 
+                  onClick={() => setSelectedMonth(m)} 
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${selectedMonth === m ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm font-black' : 'text-slate-650 hover:text-slate-950 dark:hover:text-white'}`}
+                >
+                  {locale === 'ja' || locale === 'zh' ? `${m}${getAttendanceText('monthUnit', locale)}` : `${getAttendanceText('monthUnit', locale)}${m}`}
+                </button>
+              ))}
+              <button 
+                onClick={() => setSelectedMonth(selectedMonth === 12 ? 1 : selectedMonth + 1)} 
+                className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
+              >
+                &gt;
+              </button>
+            </div>
+            <span className="text-xs text-slate-400 font-medium">({filteredEmployees.length}/{employees.length} {locale === 'vi' ? 'nhân viên' : locale === 'en' ? 'employees' : '名'})</span>
+          </div>
+        </Card>
+
         {/* Employee grid profile cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {filteredEmployees.map(emp => {
@@ -1410,7 +1459,7 @@ export default function AttendanceClient({
                 <div className="flex items-center bg-slate-100 dark:bg-slate-850 p-0.5 rounded-xl border border-slate-200 dark:border-slate-800 max-w-full overflow-x-auto">
                   <button 
                     onClick={() => setSelectedMonth(selectedMonth === 1 ? 12 : selectedMonth - 1)} 
-                    className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold"
+                    className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
                   >
                     &lt;
                   </button>
@@ -1425,12 +1474,13 @@ export default function AttendanceClient({
                   ))}
                   <button 
                     onClick={() => setSelectedMonth(selectedMonth === 12 ? 1 : selectedMonth + 1)} 
-                    className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold"
+                    className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
                   >
                     &gt;
                   </button>
                 </div>
               </div>
+
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {!isEmployeeMode && autoScheduleFeatureEnabled && (

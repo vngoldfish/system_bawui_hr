@@ -40,7 +40,7 @@ function mapCompanyToSettings(company: Record<string, unknown> | null): Attendan
       deadlineDay
     ),
     enabledShiftTypes: parseEnabledShiftTypes(company.enabledShiftTypes as string | null),
-    incomeTaxThreshold: Number(company.incomeTaxThreshold ?? 88000) || 88000,
+    incomeTaxThreshold: Number(company.incomeTaxThreshold ?? 88000),
   };
 }
 

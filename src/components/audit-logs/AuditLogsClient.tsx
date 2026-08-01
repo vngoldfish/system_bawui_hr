@@ -211,6 +211,26 @@ const knownModels = [
   'ReminderTemplate'
 ];
 
+// Local Time Formatter (Asia/Tokyo)
+const formatLocalTimestamp = (ts: string) => {
+  try {
+    const date = new Date(ts);
+    // Format to Tokyo timezone
+    return date.toLocaleString('ja-JP', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  } catch (e) {
+    return ts;
+  }
+};
+
 export default function AuditLogsClient({
   initialLogs,
   initialPagination,
@@ -339,26 +359,6 @@ export default function AuditLogsClient({
       return <span className="inline-block px-2.5 py-1 text-[10px] font-black rounded-lg border bg-rose-50 text-rose-700 border-rose-200">DELETE</span>;
     }
     return <span className="inline-block px-2.5 py-1 text-[10px] font-black rounded-lg border bg-slate-50 text-slate-600 border-slate-200">{act}</span>;
-  };
-
-  // Local Time Formatter (Asia/Tokyo)
-  const formatLocalTimestamp = (ts: string) => {
-    try {
-      const date = new Date(ts);
-      // Format to Tokyo timezone
-      return date.toLocaleString('ja-JP', {
-        timeZone: 'Asia/Tokyo',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      });
-    } catch (e) {
-      return ts;
-    }
   };
 
   const showingStart = pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0;

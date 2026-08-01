@@ -29,7 +29,7 @@ export function lookupMonthlyIncomeTax(
   table: IncomeTaxTableData
 ): number {
   const income = Math.floor(taxableIncome);
-  if (income < 88000) return 0;
+  if (income <= 0) return 0;
 
   const depIndex = Math.min(Math.max(0, dependentsCount), 7);
 

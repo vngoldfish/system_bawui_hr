@@ -20,6 +20,8 @@ interface Employee {
   id: string; employeeCode: string; firstName: string; lastName: string; firstNameKana: string; lastNameKana: string;
   department: string; position: string; positionAllowance?: number; salary: number; salaryType: string; hourlyRate: number; dailyRate: number;
   contractType: string;
+  status?: string;
+  contractEndDate?: string | null;
   employeeContracts?: Array<{
     workDays: number[] | unknown;
     isActive: boolean;
@@ -230,6 +232,8 @@ function normalizePayrollRecord(record: PayrollRecord): PayrollRecord {
     + (record.employmentInsuranceEmployee ?? record.employmentInsurance ?? 0)
   );
   const totalGross = record.totalGross ?? (baseSalary + overtimePay + allowances);
+  const companySocialInsurance = (record.healthInsuranceCompany ?? 0) + (record.pensionCompany ?? 0) + (record.employmentInsuranceCompany ?? 0) + (record.workersCompCompany ?? 0) + (record.childRearingContributionCompany ?? 0) + (record.childRearingSupportCompany ?? 0);
+  const totalCompanyCost = record.totalCompanyCost ?? (totalGross + companySocialInsurance);
   const totalDeductions = record.totalDeductions ?? (deductions + tax + insurance);
   const workDays = record.workDays ?? 0;
 
@@ -337,9 +341,15 @@ function PayslipPrintContent({
   const empChildRearingSupport = record.childRearingSupportEmployee || 0;
   const nursingCare = record.nursingCareInsurance || 0;
   const resTax = record.residentTax || 0;
-  const incTax = record.incomeTax || record.tax || 0;
+  const incTax = record.incomeTax || 0;
 
   const displayMonth = getDisplayMonth(record.month, locale);
+
+  // Compute working/attendance month (1 month before payment month)
+  const attendanceMonthStr = getAttendanceMonthForPayroll(record.month);
+  const [attYear, attMonth] = attendanceMonthStr.split('-').map(Number);
+  const attendanceLastDay = new Date(attYear, attMonth, 0).getDate();
+  const attendancePeriod = `${attYear}/${String(attMonth).padStart(2, '0')}/01〜${attYear}/${String(attMonth).padStart(2, '0')}/${String(attendanceLastDay).padStart(2, '0')}`;
 
   const formatPayday = (dateStrOrObj: any) => {
     if (!dateStrOrObj) return '-';
@@ -381,7 +391,9 @@ function PayslipPrintContent({
       {/* Header Block */}
       <div className="text-center mb-8 print:mb-1">
         <h2 className="text-2xl print:text-sm font-bold border-b-2 border-slate-800 pb-2 print:pb-0.5 inline-block px-12 print:px-4 tracking-widest text-slate-800 print:text-black print:border-black">{t('payroll.payslipTitle')}</h2>
-        <p className="text-lg print:text-[10px] font-semibold mt-2 print:mt-0 text-slate-700 print:text-black">{displayMonth}</p>
+        <p className="text-lg print:text-[10px] font-semibold mt-2 print:mt-0 text-slate-700 print:text-black">
+          <span className="font-bold">支払い分: </span>{displayMonth}
+        </p>
       </div>
 
       {/* Employee & Company Info Grid */}
@@ -413,7 +425,7 @@ function PayslipPrintContent({
                   className="px-2 py-1 border border-slate-300 rounded text-sm bg-white text-slate-800"
                 />
               ) : (
-                <span className="font-semibold">{record.paymentDate ? formatPayday(record.paymentDate) : '2026/05/25'}</span>
+                <span className="font-semibold">{record.paymentDate ? formatPayday(record.paymentDate) : `${record.month.replace('-', '/')}/25`}</span>
               )}
             </div>
           )}
@@ -438,7 +450,10 @@ function PayslipPrintContent({
       {/* Attendance Section (勤怠) */}
       {displayConfig?.showAttendance !== false && (
         <div className="mb-6 print:mb-1">
-          <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 print:mb-0.5 print:py-0.5 print:px-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">【{t('payroll.attendanceHeader')}】</h3>
+          <h3 className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 mb-2 print:mb-0.5 print:py-0.5 print:px-2 rounded border-l-4 border-slate-700 print:bg-slate-200 print:text-black print:border-black">
+            <span>【勤怠】</span>
+            <span className="ml-2 text-xs font-semibold text-slate-600 print:text-black">{attendancePeriod}</span>
+          </h3>
           <div className="overflow-x-auto print:overflow-x-visible">
             <table className="w-full text-xs print:text-[9px] border-collapse border border-slate-300 print:border-black">
               <thead>
@@ -485,14 +500,22 @@ function PayslipPrintContent({
                   )}
                   {displayConfig?.showPaidLeaveDays !== false && (
                     <td className="border border-slate-300 p-2 print:py-0.5 print:px-1 text-center print:border-black font-semibold">
-                      {22 - (isEditing && editFields ? editFields.workDays : record.workDays) - (isEditing && editFields ? editFields.absentDays : (record.absentDays || 0)) > 0 
-                        ? 22 - (isEditing && editFields ? editFields.workDays : record.workDays) - (isEditing && editFields ? editFields.absentDays : (record.absentDays || 0)) 
-                        : 0} {t('payroll.daysUnit')}
+                      {(() => {
+                        const contractDays = employee.employeeContracts?.[0] ? countContractWorkDaysInMonth(employee.employeeContracts[0].workDays as number[] | undefined, ...record.month.split('-').map(Number) as [number, number]) : 22;
+                        const wd = isEditing && editFields ? editFields.workDays : record.workDays;
+                        const ad = isEditing && editFields ? editFields.absentDays : (record.absentDays || 0);
+                        const paidLeave = Math.max(0, contractDays - wd - ad);
+                        return `${paidLeave} ${t('payroll.daysUnit')}`;
+                      })()}
                     </td>
                   )}
                   {displayConfig?.showPrescribedHours !== false && (
                     <td className="border border-slate-300 p-2.5 print:py-0.5 print:px-1 text-center font-bold text-sm print:text-[9px] print:border-black print:hidden">
-                      {isEditing && editFields ? editFields.workDays * 8 : (record.workDays * 8)} {t('payroll.hoursUnit')}
+                      {(() => {
+                        const hpd = employee.employeeContracts?.[0]?.standardHoursPerDay ?? 8;
+                        const wd = isEditing && editFields ? editFields.workDays : record.workDays;
+                        return `${wd * hpd} ${t('payroll.hoursUnit')}`;
+                      })()}
                     </td>
                   )}
                   {displayConfig?.showActualHours !== false && (
@@ -962,8 +985,10 @@ function PayslipPrintContent({
       {/* Net pay summary box */}
       <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6 print:py-1.5 print:px-2 flex flex-col md:flex-row md:items-center justify-between gap-4 print:bg-white print:border-black print:rounded-none">
         <div>
-          <p className="text-xs print:text-[9px] text-slate-500 print:text-black font-bold uppercase tracking-wider">{t('payroll.grossPayMinusDeductions')}</p>
-          <p className="text-xs print:text-[8px] text-slate-400 print:text-black">Gross Pay minus Deductions</p>
+          <p className="flex items-center">
+            <span className="text-blue-900 font-extrabold text-base print:text-[10px]">【支払い分】</span>
+            <span className="text-xs print:text-[8px] font-semibold text-slate-600 print:text-black ml-2">(差引支給額 {locale === 'vi' ? '/ Số tiền thực lĩnh' : ''})</span>
+          </p>
         </div>
         <div className="text-right">
           <span className="text-3xl print:text-base font-black text-blue-600 print:text-black tracking-wide">{formatCurrency(currentNetSalary)}</span>
@@ -1112,7 +1137,8 @@ function BulkPrintContainer({
       #__bpr_hidden__ .bpr-slot,
       .bpr-slot {
         display: block !important;
-        height: 135mm !important;
+        height: 134mm !important;
+        max-height: 134mm !important;
         width: 100% !important;
         overflow: hidden !important;
         position: relative !important;
@@ -1144,13 +1170,24 @@ function BulkPrintContainer({
       }
 
       /* Native layout shrinking to avoid html2canvas scale transform text-overlapping bugs */
+      .bpr-zoom [class*="mb-"] { margin-bottom: 2px !important; }
+      .bpr-zoom [class*="mt-"] { margin-top: 2px !important; }
+      .bpr-zoom [class*="gap-"] { gap: 3px !important; }
+      .bpr-zoom div.p-8,
+      .bpr-zoom div.p-6,
+      .bpr-zoom div.p-4,
+      .bpr-zoom [class*="p-"] { padding: 2px 4px !important; }
+      .bpr-zoom [class*="pb-"] { padding-bottom: 2px !important; }
+      .bpr-zoom [class*="pt-"] { padding-top: 2px !important; }
+      .bpr-zoom .border-b-2 { border-bottom-width: 1px !important; }
+      .bpr-zoom .border-2 { border-width: 1px !important; }
       .bpr-zoom div.p-8 {
         padding: 0 !important;
       }
       .bpr-zoom h2 {
-        font-size: 13px !important;
-        margin-bottom: 2px !important;
-        padding-bottom: 1px !important;
+        font-size: 11px !important;
+        margin-bottom: 1px !important;
+        padding-bottom: 0px !important;
       }
       .bpr-zoom h2 + p {
         font-size: 9px !important;
@@ -1159,8 +1196,8 @@ function BulkPrintContainer({
       .bpr-zoom .grid {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 4px !important;
-        padding: 4px !important;
-        margin-bottom: 3px !important;
+        padding: 2px 4px !important;
+        margin-bottom: 2px !important;
         border-radius: 4px !important;
         border-color: #000 !important;
       }
@@ -1174,19 +1211,19 @@ function BulkPrintContainer({
         font-size: 8px !important;
       }
       .bpr-zoom h3 {
-        font-size: 8.5px !important;
-        padding: 2px 4px !important;
-        margin-bottom: 3px !important;
+        font-size: 8px !important;
+        padding: 1px 3px !important;
+        margin-bottom: 2px !important;
       }
       .bpr-zoom table {
-        font-size: 8px !important;
+        font-size: 7.5px !important;
         margin-bottom: 2px !important;
         border-color: #000 !important;
       }
       .bpr-zoom th,
       .bpr-zoom td {
-        padding: 1.5px 3px !important;
-        font-size: 7.5px !important;
+        padding: 1px 2.5px !important;
+        font-size: 7px !important;
         border-color: #000 !important;
       }
       .bpr-zoom input,
@@ -1194,19 +1231,21 @@ function BulkPrintContainer({
         display: none !important;
       }
       .bpr-zoom .bg-blue-50 {
-        padding: 3px 6px !important;
+        padding: 2px 5px !important;
         border-radius: 4px !important;
         border-color: #000 !important;
         background-color: #f8fafc !important; /* light gray for print compatibility */
+        margin-top: 2px !important;
       }
       .bpr-zoom .bg-blue-50 p {
         font-size: 7px !important;
+        line-height: 1.1 !important;
       }
       .bpr-zoom .bg-blue-50 span {
-        font-size: 11px !important;
+        font-size: 10.5px !important;
       }
       .bpr-zoom .divide-y > tr > td {
-        padding: 1.5px 3px !important;
+        padding: 1px 2.5px !important;
       }
       .bpr-zoom .mt-4 {
         margin-top: 3px !important;
@@ -1270,7 +1309,8 @@ function BulkPrintContainer({
     }
     .bpr-slot {
       display: block !important;
-      height: 135mm !important;
+      height: 134mm !important;
+      max-height: 134mm !important;
       width: 100% !important;
       overflow: hidden !important;
       position: relative !important;
@@ -1300,13 +1340,24 @@ function BulkPrintContainer({
     }
 
     /* Native layout shrinking for browser print to match PDF exactly */
+    .bpr-zoom [class*="mb-"] { margin-bottom: 2px !important; }
+    .bpr-zoom [class*="mt-"] { margin-top: 2px !important; }
+    .bpr-zoom [class*="gap-"] { gap: 3px !important; }
+    .bpr-zoom div.p-8,
+    .bpr-zoom div.p-6,
+    .bpr-zoom div.p-4,
+    .bpr-zoom [class*="p-"] { padding: 2px 4px !important; }
+    .bpr-zoom [class*="pb-"] { padding-bottom: 2px !important; }
+    .bpr-zoom [class*="pt-"] { padding-top: 2px !important; }
+    .bpr-zoom .border-b-2 { border-bottom-width: 1px !important; }
+    .bpr-zoom .border-2 { border-width: 1px !important; }
     .bpr-zoom div.p-8 {
       padding: 0 !important;
     }
     .bpr-zoom h2 {
-      font-size: 13px !important;
-      margin-bottom: 2px !important;
-      padding-bottom: 1px !important;
+      font-size: 11px !important;
+      margin-bottom: 1px !important;
+      padding-bottom: 0px !important;
     }
     .bpr-zoom h2 + p {
       font-size: 9px !important;
@@ -1315,8 +1366,8 @@ function BulkPrintContainer({
     .bpr-zoom .grid {
       grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
       gap: 4px !important;
-      padding: 4px !important;
-      margin-bottom: 3px !important;
+      padding: 2px 4px !important;
+      margin-bottom: 2px !important;
       border-radius: 4px !important;
       border-color: #000 !important;
     }
@@ -1330,19 +1381,19 @@ function BulkPrintContainer({
       font-size: 8px !important;
     }
     .bpr-zoom h3 {
-      font-size: 8.5px !important;
-      padding: 2px 4px !important;
-      margin-bottom: 3px !important;
+      font-size: 8px !important;
+      padding: 1px 3px !important;
+      margin-bottom: 2px !important;
     }
     .bpr-zoom table {
-      font-size: 8px !important;
+      font-size: 7.5px !important;
       margin-bottom: 2px !important;
       border-color: #000 !important;
     }
     .bpr-zoom th,
     .bpr-zoom td {
-      padding: 1.5px 3px !important;
-      font-size: 7.5px !important;
+      padding: 1px 2.5px !important;
+      font-size: 7px !important;
       border-color: #000 !important;
     }
     .bpr-zoom input,
@@ -1350,19 +1401,21 @@ function BulkPrintContainer({
       display: none !important;
     }
     .bpr-zoom .bg-blue-50 {
-      padding: 3px 6px !important;
+      padding: 2px 5px !important;
       border-radius: 4px !important;
       border-color: #000 !important;
       background-color: #f8fafc !important;
+      margin-top: 2px !important;
     }
     .bpr-zoom .bg-blue-50 p {
       font-size: 7px !important;
+      line-height: 1.1 !important;
     }
     .bpr-zoom .bg-blue-50 span {
-      font-size: 11px !important;
+      font-size: 10.5px !important;
     }
     .bpr-zoom .divide-y > tr > td {
-      padding: 1.5px 3px !important;
+      padding: 1px 2.5px !important;
     }
     .bpr-zoom .mt-4 {
       margin-top: 3px !important;
@@ -2260,6 +2313,10 @@ export default function PayrollClient({
   };
 
   const activeColumns = allPayrollColumns.filter(c => visibleColumns[c.key]);
+  const basicInfoCount = ['name', 'salaryType'].filter(k => visibleColumns[k]).length;
+  const attendanceCount = ['workDays', 'workHours', 'overtimeHours'].filter(k => visibleColumns[k]).length;
+  const earningsCount = ['baseSalary', 'overtimePay', 'allowances', 'bonus'].filter(k => visibleColumns[k]).length;
+  const deductionsCount = ['deductions'].filter(k => visibleColumns[k]).length;
 
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(DEFAULT_PAYROLL_COLUMN_WIDTHS);
 
@@ -2439,6 +2496,12 @@ export default function PayrollClient({
       const [workingYear, workingMonth] = workingMonthStr.split('-').map(Number);
 
       const recalculableEmployees = employees.filter(emp => {
+        if (emp.status === 'INACTIVE' && emp.contractEndDate) {
+          const endMonthStr = emp.contractEndDate.slice(0, 7);
+          if (endMonthStr < workingMonthStr) {
+            return false;
+          }
+        }
         const existing = records.find(r => r.employeeId === emp.id && r.month === endMonth);
         return !existing || (existing.status !== 'APPROVED' && existing.status !== 'PAID');
       });
@@ -2496,6 +2559,7 @@ export default function PayrollClient({
             rateSettings,
             positionAllowance: emp.positionAllowance || 0,
             incomeTaxThreshold: companyInfo?.incomeTaxThreshold ?? undefined,
+            contractWorkDaysInMonth: fallbackWorkDays,
           });
 
           return {
@@ -2506,7 +2570,7 @@ export default function PayrollClient({
             allowances: payrollDetails.allowances, // maps to bonus on save
             deductions: 0,
             tax: payrollDetails.incomeTax + payrollDetails.residentTax,
-            insurance: payrollDetails.healthInsurance + payrollDetails.pension + payrollDetails.employmentInsurance,
+            insurance: payrollDetails.healthInsurance + payrollDetails.pension + payrollDetails.employmentInsurance + (payrollDetails.childRearingSupportEmployee || 0),
             netSalary: payrollDetails.netSalary,
             paymentDate: `${endMonth}-25`,
             status: 'CALCULATED' as const,
@@ -2902,7 +2966,7 @@ export default function PayrollClient({
           <div className="flex items-center bg-slate-100 dark:bg-slate-850 p-0.5 rounded-xl border border-slate-200 dark:border-slate-800 max-w-full overflow-x-auto">
             <button 
               onClick={() => { setSelectedMonth(prev => prev === 1 ? 12 : prev - 1); setCurrentPage(1); }} 
-              className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold"
+              className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
             >
               &lt;
             </button>
@@ -2917,7 +2981,7 @@ export default function PayrollClient({
             ))}
             <button 
               onClick={() => { setSelectedMonth(prev => prev === 12 ? 1 : prev + 1); setCurrentPage(1); }} 
-              className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold"
+              className="px-2 py-1.5 text-slate-450 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
             >
               &gt;
             </button>
@@ -3094,6 +3158,33 @@ export default function PayrollClient({
                 <col style={{ width: actionColPercent }} />
               </colgroup>
               <thead>
+                <tr className="bg-slate-100/90 border-b border-slate-200 text-slate-700 text-xs">
+                  {!isEmployeeMode && viewType === 'month' && (
+                    <th className="px-2 py-1 text-center bg-slate-200/80 font-bold border-r border-slate-300"></th>
+                  )}
+                  {basicInfoCount > 0 && (
+                    <th colSpan={basicInfoCount} className="px-2 py-1 text-center bg-slate-200/80 font-bold border-r border-slate-300">【基本情報】</th>
+                  )}
+                  {attendanceCount > 0 && (
+                    <th colSpan={attendanceCount} className="px-2 py-1 text-center bg-indigo-100 font-extrabold text-indigo-900 border-r border-indigo-200">📅 【勤怠】</th>
+                  )}
+                  {earningsCount > 0 && (
+                    <th colSpan={earningsCount} className="px-2 py-1 text-center bg-emerald-100 font-extrabold text-emerald-900 border-r border-emerald-200">💰 【支給】</th>
+                  )}
+                  {deductionsCount > 0 && (
+                    <th colSpan={deductionsCount} className="px-2 py-1 text-center bg-rose-100 font-extrabold text-rose-900 border-r border-rose-200">📉 【控除】</th>
+                  )}
+                  {visibleColumns.netSalary && (
+                    <th colSpan={1} className="px-2 py-1 text-center bg-blue-600 text-white font-extrabold border-r border-blue-700 shadow-sm">💵 【支払い分】</th>
+                  )}
+                  {visibleColumns.companyCost && (
+                    <th colSpan={1} className="px-2 py-1 text-center bg-slate-200/80 font-bold border-r border-slate-300">【会社負担】</th>
+                  )}
+                  {visibleColumns.status && (
+                    <th colSpan={1} className="px-2 py-1 text-center bg-slate-200/80 font-bold border-r border-slate-300">【ステータス】</th>
+                  )}
+                  <th className="px-2 py-1 text-center bg-slate-200/80 font-bold">【操作】</th>
+                </tr>
                 <tr className="bg-slate-50/90 border-b border-slate-100 text-slate-500 text-xs">
                   {!isEmployeeMode && viewType === 'month' && (
                     <th

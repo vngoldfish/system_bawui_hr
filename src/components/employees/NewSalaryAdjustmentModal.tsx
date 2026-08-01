@@ -1,15 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Portal from '@/components/common/Portal';
 import { useI18n } from '@/lib/i18n';
-import type { Employee } from '@/types';
+import type { Employee, SalaryAdjustment } from '@/types';
 
 interface NewSalaryAdjustmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   employee: Employee;
+  adjustmentToEdit?: SalaryAdjustment | any | null;
 }
 
 export default function NewSalaryAdjustmentModal({
@@ -17,19 +18,45 @@ export default function NewSalaryAdjustmentModal({
   onClose,
   onSuccess,
   employee,
+  adjustmentToEdit,
 }: NewSalaryAdjustmentModalProps) {
   const { t } = useI18n();
 
   const [effectiveFrom, setEffectiveFrom] = useState(
-    new Date().toISOString().slice(0, 7) // Default to current month YYYY-MM
+    adjustmentToEdit?.effectiveFrom || new Date().toISOString().slice(0, 7)
   );
-  const [newBaseSalary, setNewBaseSalary] = useState(String(employee.salary || 0));
-  const [newHourlyRate, setNewHourlyRate] = useState(String(employee.hourlyRate || 0));
-  const [newDailyRate, setNewDailyRate] = useState(String(employee.dailyRate || 0));
-  const [reason, setReason] = useState('');
+  const [newBaseSalary, setNewBaseSalary] = useState(
+    String(adjustmentToEdit?.newBaseSalary ?? employee.salary ?? 0)
+  );
+  const [newHourlyRate, setNewHourlyRate] = useState(
+    String(adjustmentToEdit?.newHourlyRate ?? employee.hourlyRate ?? 0)
+  );
+  const [newDailyRate, setNewDailyRate] = useState(
+    String(adjustmentToEdit?.newDailyRate ?? employee.dailyRate ?? 0)
+  );
+  const [reason, setReason] = useState(adjustmentToEdit?.reason || '');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (adjustmentToEdit) {
+        setEffectiveFrom(adjustmentToEdit.effectiveFrom || new Date().toISOString().slice(0, 7));
+        setNewBaseSalary(String(adjustmentToEdit.newBaseSalary ?? employee.salary ?? 0));
+        setNewHourlyRate(String(adjustmentToEdit.newHourlyRate ?? employee.hourlyRate ?? 0));
+        setNewDailyRate(String(adjustmentToEdit.newDailyRate ?? employee.dailyRate ?? 0));
+        setReason(adjustmentToEdit.reason || '');
+      } else {
+        setEffectiveFrom(new Date().toISOString().slice(0, 7));
+        setNewBaseSalary(String(employee.salary ?? 0));
+        setNewHourlyRate(String(employee.hourlyRate ?? 0));
+        setNewDailyRate(String(employee.dailyRate ?? 0));
+        setReason('');
+      }
+      setError(null);
+    }
+  }, [isOpen, adjustmentToEdit, employee]);
 
   if (!isOpen) return null;
 
@@ -39,19 +66,23 @@ export default function NewSalaryAdjustmentModal({
     setError(null);
 
     try {
+      const isEdit = Boolean(adjustmentToEdit?.id);
+      const method = isEdit ? 'PUT' : 'POST';
+      const body: any = {
+        ...(isEdit ? { id: adjustmentToEdit.id } : { employeeId: employee.id }),
+        effectiveFrom,
+        newBaseSalary: employee.salaryType === '月給' ? (parseFloat(newBaseSalary) || 0) : (employee.salary || 0),
+        newHourlyRate: employee.salaryType === '時給' ? (parseFloat(newHourlyRate) || 0) : (employee.hourlyRate || 0),
+        newDailyRate: employee.salaryType === '日給' ? (parseFloat(newDailyRate) || 0) : (employee.dailyRate || 0),
+        reason,
+      };
+
       const res = await fetch('/api/salary-adjustments', {
-        method: 'POST',
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          employeeId: employee.id,
-          effectiveFrom,
-          newBaseSalary: employee.salaryType === '月給' ? (parseFloat(newBaseSalary) || 0) : (employee.salary || 0),
-          newHourlyRate: employee.salaryType === '時給' ? (parseFloat(newHourlyRate) || 0) : (employee.hourlyRate || 0),
-          newDailyRate: employee.salaryType === '日給' ? (parseFloat(newDailyRate) || 0) : (employee.dailyRate || 0),
-          reason,
-        }),
+        body: JSON.stringify(body),
       });
 
       const json = await res.json();
@@ -83,7 +114,9 @@ export default function NewSalaryAdjustmentModal({
           <div className="p-6 border-b border-slate-100 flex-shrink-0 flex items-center justify-between bg-slate-50/50 rounded-t-3xl">
             <div>
               <h3 className="text-lg font-extrabold text-slate-800 tracking-tight">
-                {t('client.adjustSalaryBtn') || 'Adjust Salary'}
+                {adjustmentToEdit?.id
+                  ? (t('client.editSalaryAdjustment') || '給与改定の編集')
+                  : (t('client.adjustSalaryBtn') || 'Adjust Salary')}
               </h3>
               <p className="text-xs text-slate-500 mt-1 font-semibold">
                 {employee.lastName} {employee.firstName} ({employee.employeeCode})
@@ -249,3 +282,4 @@ export default function NewSalaryAdjustmentModal({
     </Portal>
   );
 }
+

@@ -149,11 +149,14 @@ export async function POST(request: NextRequest) {
 
     // Remove role and password from employeeData to pass cleanly
     const { role: _, password: __, ...cleanedEmployeeData } = employeeData;
+    const hireDateMonth = employeeData.hireDate ? employeeData.hireDate.substring(0, 7) : new Date().toISOString().slice(0, 7);
+    const initialSalary = parseFloat(String(employeeData.salary)) || 0;
 
     const employee = await prisma.employee.create({
       data: {
         employeeCode,
         ...cleanedEmployeeData,
+        baseSalaryAtHire: initialSalary,
         role,
         password: hashedPassword,
         department: { connect: { id: departmentId } },
@@ -179,6 +182,18 @@ export async function POST(request: NextRequest) {
         },
         certifications: {
           create: certifications.map(mapCertificationForCreate),
+        },
+        salaryAdjustments: {
+          create: {
+            effectiveFrom: hireDateMonth,
+            oldBaseSalary: 0,
+            newBaseSalary: initialSalary,
+            oldHourlyRate: 0,
+            newHourlyRate: parseFloat(String(employeeData.hourlyRate ?? 0)) || 0,
+            oldDailyRate: 0,
+            newDailyRate: parseFloat(String(employeeData.dailyRate ?? 0)) || 0,
+            reason: '初任給',
+          },
         },
         employeeContracts: {
           create: {

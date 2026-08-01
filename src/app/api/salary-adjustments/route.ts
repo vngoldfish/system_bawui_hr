@@ -4,6 +4,7 @@ import { createdResponse, successResponse, errorResponse, handleApiError } from 
 import { hasPermission } from '@/lib/auth-mock';
 import { getSessionUser } from '@/lib/session';
 import { logDatabaseChange } from '@/lib/audit-logger';
+import { syncEmployeeSalaries } from '@/lib/payroll-calculator';
 
 export async function GET(request: NextRequest) {
   try {
@@ -108,6 +109,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    await syncEmployeeSalaries(prisma);
+
     logDatabaseChange({
       request,
       action: 'CREATE',
@@ -121,3 +124,137 @@ export async function POST(request: NextRequest) {
     return handleApiError(error);
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const user = getSessionUser(request);
+    if (!user) return errorResponse('Unauthorized', 401);
+
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    if (viewMode === 'employee' || !hasPermission('payroll:edit', user as any)) {
+      return errorResponse('Forbidden', 403);
+    }
+
+    const dbOperator = await prisma.employee.findUnique({
+      where: { id: user.id }
+    });
+    if (!dbOperator || (dbOperator.role !== 'SUPER_ADMIN' && dbOperator.role !== 'HR_MANAGER')) {
+      return errorResponse('Forbidden: Insufficient privileges', 403);
+    }
+
+    const body = await request.json();
+    const { id, effectiveFrom, newBaseSalary, newHourlyRate, newDailyRate, reason } = body;
+
+    if (!id) {
+      return errorResponse('id is required', 400);
+    }
+
+    const existingAdjustment = await prisma.salaryAdjustment.findUnique({
+      where: { id },
+    });
+
+    if (!existingAdjustment) {
+      return errorResponse('Salary adjustment not found', 404);
+    }
+
+    if (effectiveFrom) {
+      const employee = await prisma.employee.findUnique({
+        where: { id: existingAdjustment.employeeId }
+      });
+      if (employee) {
+        const hireDateMonth = employee.hireDate.toISOString().slice(0, 7);
+        if (effectiveFrom < hireDateMonth) {
+          return errorResponse('effectiveFrom cannot be before employee hire date month', 400);
+        }
+      }
+    }
+
+    const adjustment = await prisma.salaryAdjustment.update({
+      where: { id },
+      data: {
+        ...(effectiveFrom && { effectiveFrom }),
+        ...(newBaseSalary !== undefined && { newBaseSalary: parseFloat(newBaseSalary) }),
+        ...(newHourlyRate !== undefined && { newHourlyRate: parseFloat(newHourlyRate) }),
+        ...(newDailyRate !== undefined && { newDailyRate: parseFloat(newDailyRate) }),
+        ...(reason !== undefined && { reason: reason || '' }),
+        adjustedBy: user.id,
+        adjustedAt: new Date(),
+      },
+    });
+
+    await syncEmployeeSalaries(prisma);
+
+    logDatabaseChange({
+      request,
+      action: 'UPDATE',
+      model: 'SalaryAdjustment',
+      recordId: adjustment.id,
+      details: { employeeId: adjustment.employeeId, effectiveFrom: adjustment.effectiveFrom },
+    });
+
+    return successResponse(adjustment);
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = getSessionUser(request);
+    if (!user) return errorResponse('Unauthorized', 401);
+
+    const viewMode = request.cookies.get('view_mode')?.value || 'admin';
+    if (viewMode === 'employee' || !hasPermission('payroll:edit', user as any)) {
+      return errorResponse('Forbidden', 403);
+    }
+
+    const dbOperator = await prisma.employee.findUnique({
+      where: { id: user.id }
+    });
+    if (!dbOperator || (dbOperator.role !== 'SUPER_ADMIN' && dbOperator.role !== 'HR_MANAGER')) {
+      return errorResponse('Forbidden: Insufficient privileges', 403);
+    }
+
+    const { searchParams } = new URL(request.url);
+    let id = searchParams.get('id');
+    if (!id) {
+      try {
+        const body = await request.json();
+        id = body?.id;
+      } catch (e) {
+        // ignore JSON parse error if body is empty
+      }
+    }
+
+    if (!id) {
+      return errorResponse('id query parameter or body property is required', 400);
+    }
+
+    const existingAdjustment = await prisma.salaryAdjustment.findUnique({
+      where: { id },
+    });
+
+    if (!existingAdjustment) {
+      return errorResponse('Salary adjustment not found', 404);
+    }
+
+    await prisma.salaryAdjustment.delete({
+      where: { id },
+    });
+
+    await syncEmployeeSalaries(prisma);
+
+    logDatabaseChange({
+      request,
+      action: 'DELETE',
+      model: 'SalaryAdjustment',
+      recordId: id,
+      details: { employeeId: existingAdjustment.employeeId },
+    });
+
+    return successResponse({ success: true, message: 'Salary adjustment deleted' });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+

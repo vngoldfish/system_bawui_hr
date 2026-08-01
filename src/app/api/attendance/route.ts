@@ -124,6 +124,27 @@ async function assertAttendanceWithinWorkLimits(
   }
 }
 
+// Check if employee has resigned and the attendance date is after their resignation date
+async function assertEmployeeNotResigned(employeeId: string, recordDate: Date) {
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { status: true, contractEndDate: true, firstName: true, lastName: true },
+  });
+  if (!employee) return;
+
+  if (employee.status === 'INACTIVE' && employee.contractEndDate) {
+    const endDate = new Date(employee.contractEndDate);
+    if (recordDate > endDate) {
+      const name = `${employee.lastName} ${employee.firstName}`;
+      const endStr = endDate.toISOString().split('T')[0];
+      throw new Error(
+        `${name} は ${endStr} に退職済みのため、それ以降の勤怠登録はできません。`
+        + ` (${name} đã nghỉ việc ngày ${endStr}, không thể chấm công sau ngày này.)`
+      );
+    }
+  }
+}
+
 // Helper to parse date and time safely
 function parseDateTime(dateStr: string, timeVal: string | null) {
   if (!timeVal) return null;
@@ -155,9 +176,17 @@ export async function POST(request: NextRequest) {
 
     const data = await request.json();
 
-    // Check if payroll is locked for this month
+    // Check if employee has resigned
     const recordDate = new Date(data.date);
     if (!isNaN(recordDate.getTime())) {
+      try {
+        await assertEmployeeNotResigned(data.employeeId, recordDate);
+      } catch (resignErr: unknown) {
+        const msg = resignErr instanceof Error ? resignErr.message : '退職済みの従業員です。';
+        return errorResponse(msg, 400);
+      }
+
+      // Check if payroll is locked for this month
       const payrollMonth = getPayrollMonthForAttendanceDate(recordDate);
       const payrollRecord = await prisma.payrollRecord.findFirst({
         where: {
@@ -270,7 +299,16 @@ export async function PUT(request: NextRequest) {
       return errorResponse('Attendance record not found', 404);
     }
 
-    const recordDate = new Date(currentRecord.date);
+    const targetEmployeeId = data.employeeId || currentRecord.employeeId;
+    const recordDate = data.date ? new Date(data.date) : new Date(currentRecord.date);
+
+    // Check if employee has resigned
+    try {
+      await assertEmployeeNotResigned(targetEmployeeId, recordDate);
+    } catch (resignErr: unknown) {
+      const msg = resignErr instanceof Error ? resignErr.message : '退職済みの従業員です。';
+      return errorResponse(msg, 400);
+    }
     const payrollMonth = getPayrollMonthForAttendanceDate(recordDate);
     const payrollRecord = await prisma.payrollRecord.findFirst({
       where: {

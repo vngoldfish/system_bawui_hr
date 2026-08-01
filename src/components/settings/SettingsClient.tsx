@@ -75,7 +75,7 @@ export default function SettingsClient() {
               payload.shiftRegistrationPolicy,
               deadlineDay
             ),
-            incomeTaxThreshold: Number(payload.incomeTaxThreshold ?? 88000) || 88000,
+            incomeTaxThreshold: Number(payload.incomeTaxThreshold ?? 88000),
           };
           setSettings(loaded);
           setDraft(loaded);
@@ -167,7 +167,7 @@ export default function SettingsClient() {
           payload.shiftRegistrationPolicy,
           deadlineDay
         ),
-        incomeTaxThreshold: Number(payload.incomeTaxThreshold ?? draft.incomeTaxThreshold) || 88000,
+        incomeTaxThreshold: Number(payload.incomeTaxThreshold ?? draft.incomeTaxThreshold ?? 88000),
       };
       setSettings(updated);
       setDraft(updated);

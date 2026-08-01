@@ -6,6 +6,7 @@ import { logDatabaseChange } from '@/lib/audit-logger';
 import { getSessionUser } from '@/lib/session';
 import { batchGetEffectiveSalaries, calculatePayrollDetails, getEffectiveSalary, syncEmployeeSalaries } from '@/lib/payroll-calculator';
 import { resolveContractPayrollRules } from '@/lib/contract-payroll-rules';
+import { getAttendanceMonthForPayroll } from '@/lib/payroll-helpers';
 import { getActiveRateConfig, toPayrollRateSettings } from '@/services/payrollRateService';
 
 // GET payroll records
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
         const nowMonthStr = `${nowYear}-${String(nowMonth).padStart(2, '0')}`;
 
         where.month = {
-          ...(where.month && typeof where.month === 'object' ? where.month : {}),
+          ...(typeof where.month === 'string' ? { equals: where.month } : (typeof where.month === 'object' ? where.month : {})),
           gte: hireMonthStr,
           lte: nowMonthStr,
         };
@@ -162,6 +163,8 @@ export async function POST(request: NextRequest) {
           where: { id: { in: uniqueEmployeeIds } },
           select: {
             id: true,
+            status: true,
+            contractEndDate: true,
             salary: true,
             salaryType: true,
             hourlyRate: true,
@@ -292,6 +295,15 @@ export async function POST(request: NextRequest) {
       }
       const employee = employeeMap.get(data.employeeId);
       if (!employee) return true;
+      if (employee.status === 'INACTIVE' && employee.contractEndDate) {
+        const endMonthStr = employee.contractEndDate instanceof Date
+          ? employee.contractEndDate.toISOString().slice(0, 7)
+          : String(employee.contractEndDate).slice(0, 7);
+        const workingMonthStr = getAttendanceMonthForPayroll(data.month);
+        if (endMonthStr < workingMonthStr) {
+          return false;
+        }
+      }
       return resolveContractPayrollRules(employee, data.month).payrollMode !== 'HOURS_ONLY';
     });
 

@@ -14,7 +14,12 @@ async function PayrollLoader() {
     redirect('/login');
   }
   
-  const user = JSON.parse(decodeURIComponent(sessionUserCookie.value));
+  let user;
+  try {
+    user = JSON.parse(decodeURIComponent(sessionUserCookie.value));
+  } catch (e) {
+    redirect('/login');
+  }
   
   const dbUser = await prisma.employee.findUnique({
     where: { id: user.id },

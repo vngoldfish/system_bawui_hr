@@ -117,6 +117,30 @@ export async function POST(request: NextRequest) {
     });
     if (!employee) return errorResponse('従業員が見つかりません', 404);
 
+    // Check if employee has resigned
+    if (employee.status === 'INACTIVE') {
+      if (employee.contractEndDate) {
+        const endDate = new Date(employee.contractEndDate);
+        const name = `${employee.lastName} ${employee.firstName}`;
+        const endStr = endDate.toISOString().split('T')[0];
+        // Check if the entire target month is after resignation
+        const calendarMonthCheck = `${year}-${String(month).padStart(2, '0')}`;
+        const { startUtc: monthStartCheck } = getAttendanceMonthDateRangeJst(calendarMonthCheck);
+        if (monthStartCheck > endDate) {
+          return errorResponse(
+            `${name} は ${endStr} に退職済みのため、自動配置できません。 (${name} đã nghỉ việc ngày ${endStr}, không thể tự động xếp ca.)`,
+            400
+          );
+        }
+      } else {
+        const name = `${employee.lastName} ${employee.firstName}`;
+        return errorResponse(
+          `${name} は退職済みのため、自動配置できません。 (${name} đã nghỉ việc, không thể tự động xếp ca.)`,
+          400
+        );
+      }
+    }
+
     const calendarMonth = `${year}-${String(month).padStart(2, '0')}`;
     const { startUtc: monthStart, endUtc: monthEnd } = getAttendanceMonthDateRangeJst(calendarMonth);
     const payrollMonth = getPayrollMonthForAttendanceDate(monthStart);
@@ -212,12 +236,20 @@ export async function POST(request: NextRequest) {
 
       const results = [];
       for (const day of schedule.days) {
+        const recordDate = new Date(`${day.date}T00:00:00+09:00`);
+
+        if (
+          employee.status === 'INACTIVE' &&
+          employee.contractEndDate &&
+          recordDate > new Date(employee.contractEndDate)
+        ) {
+          continue;
+        }
+
         const existing = await tx.attendanceRecord.findFirst({
-          where: { employeeId, date: new Date(`${day.date}T00:00:00+09:00`) },
+          where: { employeeId, date: recordDate },
         });
         if (existing && !replaceExisting) continue;
-
-        const recordDate = new Date(`${day.date}T00:00:00+09:00`);
         const checkIn = new Date(day.checkIn + '+09:00');
         const checkOut = new Date(day.checkOut + '+09:00');
         const breakStart = day.breakStart ? new Date(day.breakStart + '+09:00') : null;

@@ -13,7 +13,12 @@ async function BenefitsLoader() {
     redirect('/login');
   }
   
-  const user = JSON.parse(decodeURIComponent(sessionUserCookie.value));
+  let user;
+  try {
+    user = JSON.parse(decodeURIComponent(sessionUserCookie.value));
+  } catch (e) {
+    redirect('/login');
+  }
   
   // Fetch logged-in employee details from DB to check role/valid session
   const dbUser = await prisma.employee.findUnique({

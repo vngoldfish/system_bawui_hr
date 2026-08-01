@@ -105,21 +105,35 @@ function ResidenceAlertBanner({
   );
 }
 
-function EmployeeDetailModal({ employee: initialEmployee, onClose, onEdit, onSave }: { employee: Employee; onClose: () => void; onEdit: () => void; onSave?: () => void }) {
+function EmployeeDetailModal({
+  employee: initialEmployee,
+  onClose,
+  onEdit,
+  onSave,
+  updateSingleEmployeeInState,
+}: {
+  employee: Employee;
+  onClose: () => void;
+  onEdit: () => void;
+  onSave?: () => void;
+  updateSingleEmployeeInState?: (updatedEmployee: Employee) => void;
+}) {
   const { t, locale } = useI18n();
   const [employee, setEmployee] = useState<Employee>(initialEmployee);
   const [activeTab, setActiveTab] = useState<'basic' | 'contract' | 'visa' | 'background' | 'dependents' | 'salary'>('basic');
   const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustmentToEdit, setAdjustmentToEdit] = useState<any | null>(null);
   const expiry = employee.residenceExpiry ? getExpiryStatus(employee.residenceExpiry) : null;
   const isForeigner = employee.nationality && employee.nationality !== '\u65e5\u672c';
 
   const refreshEmployeeData = async () => {
     try {
-      const res = await fetch(`/api/employees/${employee.id}`);
+      const res = await fetch(`/api/employees/${employee.id}?_t=${Date.now()}`, { cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
         if (json && json.data) {
           setEmployee(json.data);
+          updateSingleEmployeeInState?.(json.data);
         }
       }
     } catch (e) {
@@ -282,7 +296,13 @@ function EmployeeDetailModal({ employee: initialEmployee, onClose, onEdit, onSav
               <p className="text-xs text-slate-450 font-semibold">{employee.lastNameKana} {employee.firstNameKana}</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <button onClick={() => { setAdjustmentToEdit(null); setShowAdjustModal(true); }} className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:scale-[1.02] active:scale-95 transition-all">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              給与改定
+            </button>
             <button onClick={handleExportPDF} className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:scale-[1.02] active:scale-95 transition-all">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               {t('client.pdfBtn')}
@@ -651,7 +671,7 @@ function EmployeeDetailModal({ employee: initialEmployee, onClose, onEdit, onSav
                     {t('client.salaryHistoryTitle')}
                   </h3>
                   <button
-                    onClick={() => setShowAdjustModal(true)}
+                    onClick={() => { setAdjustmentToEdit(null); setShowAdjustModal(true); }}
                     className="px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-1.5"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -676,65 +696,140 @@ function EmployeeDetailModal({ employee: initialEmployee, onClose, onEdit, onSav
                   </div>
                 </div>
 
-                {employee.salaryAdjustments && employee.salaryAdjustments.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-[10px] text-slate-450 font-bold uppercase tracking-wider">
-                          <th className="py-2.5 px-3">{t('client.effectiveMonth')}</th>
-                          <th className="py-2.5 px-3 text-right">{t('client.newSalary')}</th>
-                          <th className="py-2.5 px-3 text-right">{t('client.newHourlyRate')}</th>
-                          <th className="py-2.5 px-3 text-right">{t('client.newDailyRate')}</th>
-                          <th className="py-2.5 px-3">{t('client.changeReason')}</th>
-                          <th className="py-2.5 px-3 text-right">{t('client.adjustedDate')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {employee.salaryAdjustments.map((adj) => (
-                          <tr key={adj.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors text-xs text-slate-700">
-                            <td className="py-3 px-3 font-semibold text-slate-850">{adj.effectiveFrom}</td>
-                            <td className="py-3 px-3 text-right font-mono font-medium">
-                              {adj.oldBaseSalary !== adj.newBaseSalary ? (
-                                <div className="flex flex-col items-end">
-                                  <span className="text-[10px] text-slate-400 line-through">{formatCurrency(adj.oldBaseSalary)}</span>
-                                  <span className="text-emerald-600 font-bold">{formatCurrency(adj.newBaseSalary)}</span>
-                                </div>
-                              ) : (
-                                <span>{formatCurrency(adj.newBaseSalary)}</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3 text-right font-mono font-medium">
-                              {adj.oldHourlyRate !== adj.newHourlyRate ? (
-                                <div className="flex flex-col items-end">
-                                  <span className="text-[10px] text-slate-400 line-through">{formatCurrency(adj.oldHourlyRate)}</span>
-                                  <span className="text-emerald-600 font-bold">{formatCurrency(adj.newHourlyRate)}</span>
-                                </div>
-                              ) : (
-                                <span>{formatCurrency(adj.newHourlyRate)}</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3 text-right font-mono font-medium">
-                              {adj.oldDailyRate !== adj.newDailyRate ? (
-                                <div className="flex flex-col items-end">
-                                  <span className="text-[10px] text-slate-400 line-through">{formatCurrency(adj.oldDailyRate)}</span>
-                                  <span className="text-emerald-600 font-bold">{formatCurrency(adj.newDailyRate)}</span>
-                                </div>
-                              ) : (
-                                <span>{formatCurrency(adj.newDailyRate)}</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3 max-w-[150px] truncate" title={adj.reason}>{adj.reason || '-'}</td>
-                            <td className="py-3 px-3 text-right text-[10px] text-slate-450 font-mono">{formatDate(adj.adjustedAt)}</td>
+                {(() => {
+                  const adjustments = [...(employee.salaryAdjustments || [])];
+                  const hireMonth = employee.hireDate ? String(employee.hireDate).substring(0, 7) : '';
+                  if (hireMonth && !adjustments.some((adj) => adj.effectiveFrom === hireMonth)) {
+                    const initialBaseSalary = (employee.baseSalaryAtHire && employee.baseSalaryAtHire > 0)
+                      ? employee.baseSalaryAtHire
+                      : (employee.salary || 0);
+
+                    adjustments.push({
+                      id: 'initial-hire-adjustment',
+                      employeeId: employee.id,
+                      effectiveFrom: hireMonth,
+                      oldBaseSalary: 0,
+                      newBaseSalary: initialBaseSalary,
+                      oldHourlyRate: 0,
+                      newHourlyRate: employee.hourlyRate || 0,
+                      oldDailyRate: 0,
+                      newDailyRate: employee.dailyRate || 0,
+                      reason: '初任給',
+                      adjustedBy: null,
+                      adjustedAt: employee.hireDate,
+                    });
+                  }
+
+                  adjustments.sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+
+                  if (adjustments.length === 0) {
+                    return (
+                      <div className="text-center py-8 border border-dashed border-slate-200 rounded-2xl bg-slate-50/30">
+                        <p className="text-xs text-slate-400">{t('client.salaryHistoryNone')}</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-[10px] text-slate-450 font-bold uppercase tracking-wider">
+                            <th className="py-2.5 px-3">{t('client.effectiveMonth')}</th>
+                            <th className="py-2.5 px-3 text-right">{t('client.newSalary')}</th>
+                            <th className="py-2.5 px-3 text-right">{t('client.newHourlyRate')}</th>
+                            <th className="py-2.5 px-3 text-right">{t('client.newDailyRate')}</th>
+                            <th className="py-2.5 px-3">{t('client.changeReason')}</th>
+                            <th className="py-2.5 px-3 text-right">{t('client.adjustedDate')}</th>
+                            <th className="py-2.5 px-3 text-center">{t('common.actions') || 'Thao tác'}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 border border-dashed border-slate-200 rounded-2xl bg-slate-50/30">
-                    <p className="text-xs text-slate-400">{t('client.salaryHistoryNone')}</p>
-                  </div>
-                )}
+                        </thead>
+                        <tbody>
+                          {adjustments.map((adj) => (
+                            <tr key={adj.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors text-xs text-slate-700">
+                              <td className="py-3 px-3 font-semibold text-slate-850">{adj.effectiveFrom}</td>
+                              <td className="py-3 px-3 text-right font-mono font-medium">
+                                {adj.oldBaseSalary !== adj.newBaseSalary ? (
+                                  <div className="flex flex-col items-end">
+                                    <span className="text-[10px] text-slate-400 line-through">{formatCurrency(adj.oldBaseSalary)}</span>
+                                    <span className="text-emerald-600 font-bold">{formatCurrency(adj.newBaseSalary)}</span>
+                                  </div>
+                                ) : (
+                                  <span>{formatCurrency(adj.newBaseSalary)}</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono font-medium">
+                                {adj.oldHourlyRate !== adj.newHourlyRate ? (
+                                  <div className="flex flex-col items-end">
+                                    <span className="text-[10px] text-slate-400 line-through">{formatCurrency(adj.oldHourlyRate)}</span>
+                                    <span className="text-emerald-600 font-bold">{formatCurrency(adj.newHourlyRate)}</span>
+                                  </div>
+                                ) : (
+                                  <span>{formatCurrency(adj.newHourlyRate)}</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono font-medium">
+                                {adj.oldDailyRate !== adj.newDailyRate ? (
+                                  <div className="flex flex-col items-end">
+                                    <span className="text-[10px] text-slate-400 line-through">{formatCurrency(adj.oldDailyRate)}</span>
+                                    <span className="text-emerald-600 font-bold">{formatCurrency(adj.newDailyRate)}</span>
+                                  </div>
+                                ) : (
+                                  <span>{formatCurrency(adj.newDailyRate)}</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 max-w-[150px] truncate" title={adj.reason}>{adj.reason || '-'}</td>
+                              <td className="py-3 px-3 text-right text-[10px] text-slate-450 font-mono">{formatDate(adj.adjustedAt)}</td>
+                              <td className="py-3 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      if (adj.id === 'initial-hire-adjustment') {
+                                        setAdjustmentToEdit({ ...adj, id: '' });
+                                      } else {
+                                        setAdjustmentToEdit(adj);
+                                      }
+                                      setShowAdjustModal(true);
+                                    }}
+                                    className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded transition-colors"
+                                    title={t('common.edit') || 'Sửa'}
+                                  >
+                                    ✏️
+                                  </button>
+                                  {adj.id !== 'initial-hire-adjustment' && (
+                                    <button
+                                      onClick={async () => {
+                                        const confirmMsg = t('client.confirmDeleteSalaryAdjustment') || 'この給与改定履歴を削除してもよろしいですか？';
+                                        if (!window.confirm(confirmMsg)) return;
+
+                                        try {
+                                          const res = await fetch(`/api/salary-adjustments?id=${adj.id}`, {
+                                            method: 'DELETE',
+                                          });
+                                          if (!res.ok) {
+                                            const json = await res.json();
+                                            throw new Error(json.error || 'Failed to delete salary adjustment');
+                                          }
+                                          await refreshEmployeeData();
+                                        } catch (err: any) {
+                                          alert(err.message || 'Error deleting salary adjustment');
+                                        }
+                                      }}
+                                      className="p-1 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded transition-colors"
+                                      title={t('common.delete') || 'Xóa'}
+                                    >
+                                      🗑️
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -805,12 +900,15 @@ function EmployeeDetailModal({ employee: initialEmployee, onClose, onEdit, onSav
       {showAdjustModal && (
         <NewSalaryAdjustmentModal
           isOpen={showAdjustModal}
-          onClose={() => setShowAdjustModal(false)}
-          onSuccess={() => {
-            refreshEmployeeData();
-            onSave?.();
+          onClose={() => {
+            setShowAdjustModal(false);
+            setAdjustmentToEdit(null);
+          }}
+          onSuccess={async () => {
+            await refreshEmployeeData();
           }}
           employee={employee}
+          adjustmentToEdit={adjustmentToEdit}
         />
       )}
     </Portal>
@@ -839,7 +937,15 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+  const [salaryAdjustTarget, setSalaryAdjustTarget] = useState<Employee | null>(null);
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
+
+  const updateSingleEmployeeInState = (updatedEmployee: Employee) => {
+    setEmployees(prev => prev.map(e => e.id === updatedEmployee.id ? updatedEmployee : e));
+    if (viewingEmployee?.id === updatedEmployee.id) {
+      setViewingEmployee(updatedEmployee);
+    }
+  };
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
   const [sortField, setSortField] = useState<string>('createdAt');
@@ -1121,10 +1227,16 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
 
   const refetchEmployees = async () => {
     try {
-      const res = await fetch('/api/employees?limit=100');
+      const res = await fetch(`/api/employees?limit=100&_t=${Date.now()}`, { cache: 'no-store' });
       const result = await res.json();
       if (result.data) {
         setEmployees(result.data);
+        if (viewingEmployee) {
+          const updatedViewing = result.data.find((e: Employee) => e.id === viewingEmployee.id);
+          if (updatedViewing) {
+            setViewingEmployee(updatedViewing);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to refetch employees:', err);
@@ -1145,6 +1257,12 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
           const err = await res.json();
           throw new Error(err.details || err.error || t('client.updateFailed'));
         }
+        const json = await res.json();
+        if (json && json.data) {
+          updateSingleEmployeeInState(json.data);
+        } else {
+          await refetchEmployees();
+        }
       } else {
         // Create
         const res = await fetch('/api/employees', {
@@ -1156,8 +1274,8 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
           const err = await res.json();
           throw new Error(err.details || err.error || t('client.createFailed'));
         }
+        await refetchEmployees();
       }
-      await refetchEmployees();
     } catch (err: any) {
       console.error('Save failed:', err);
       alert(err.message || t('client.saveFailed'));
@@ -1540,7 +1658,7 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                     </th>
                   );
                 })}
-                <th className="px-4 py-3.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[100px]" style={{ width: '100px' }}>{t('common.actions')}</th>
+                <th className="px-4 py-3.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[140px]" style={{ width: '140px' }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-150">
@@ -1670,7 +1788,14 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
                       </td>
                     )}
                     <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
-                      <div className="flex gap-1.5 justify-center">
+                      <div className="flex gap-1.5 justify-center items-center">
+                        <button
+                          onClick={() => setSalaryAdjustTarget(employee)}
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-all hover:scale-105 active:scale-95"
+                          title="給与改定 / 昇給予約 (Điều chỉnh lương)"
+                        >
+                          <span className="text-sm leading-none select-none">💲</span>
+                        </button>
                         <button onClick={() => openEdit(employee)} className="p-2 text-blue-600 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all hover:scale-105 active:scale-95" title={t('common.edit')}>
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1765,7 +1890,36 @@ export default function EmployeesClient({ initialEmployees }: { initialEmployees
           employee={viewingEmployee}
           onClose={() => setViewingEmployee(null)}
           onEdit={() => openEdit(viewingEmployee)}
-          onSave={refetchEmployees}
+          updateSingleEmployeeInState={updateSingleEmployeeInState}
+        />
+      )}
+      {salaryAdjustTarget && (
+        <NewSalaryAdjustmentModal
+          isOpen={!!salaryAdjustTarget}
+          onClose={() => setSalaryAdjustTarget(null)}
+          onSuccess={async () => {
+            if (salaryAdjustTarget) {
+              try {
+                const res = await fetch(`/api/employees/${salaryAdjustTarget.id}?_t=${Date.now()}`, { cache: 'no-store' });
+                if (res.ok) {
+                  const json = await res.json();
+                  if (json && json.data) {
+                    updateSingleEmployeeInState(json.data);
+                  } else {
+                    await refetchEmployees();
+                  }
+                } else {
+                  await refetchEmployees();
+                }
+              } catch (e) {
+                await refetchEmployees();
+              }
+            } else {
+              await refetchEmployees();
+            }
+            setSalaryAdjustTarget(null);
+          }}
+          employee={salaryAdjustTarget}
         />
       )}
     </>

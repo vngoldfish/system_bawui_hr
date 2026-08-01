@@ -67,6 +67,26 @@ export async function POST(request: NextRequest) {
       return errorResponse('この月の給与計算がすでに確定されているため、打刻できません。 (Bảng lương tháng này đã được chốt, không thể thực hiện chấm công.)', 400);
     }
 
+    // Check if employee has resigned
+    const empRecord = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { status: true, contractEndDate: true, firstName: true, lastName: true },
+    });
+    if (empRecord && empRecord.status === 'INACTIVE') {
+      const name = `${empRecord.lastName} ${empRecord.firstName}`;
+      if (empRecord.contractEndDate) {
+        const endStr = new Date(empRecord.contractEndDate).toISOString().split('T')[0];
+        return errorResponse(
+          `${name} は ${endStr} に退職済みのため、打刻できません。 (${name} đã nghỉ việc ngày ${endStr}, không thể chấm công.)`,
+          400
+        );
+      }
+      return errorResponse(
+        `${name} は退職済みのため、打刻できません。 (${name} đã nghỉ việc, không thể chấm công.)`,
+        400
+      );
+    }
+
     const body = await request.json();
     const { action } = body; // 'checkIn' | 'breakStart' | 'breakEnd' | 'checkOut'
 

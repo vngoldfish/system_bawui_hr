@@ -628,16 +628,32 @@ export async function syncEmployeeSalaries(prisma: any) {
     }
   });
 
-  for (const emp of employees) {
-    const latestAdjustment = await prisma.salaryAdjustment.findFirst({
-      where: {
-        employeeId: emp.id,
-        effectiveFrom: {
-          lte: currentMonth
-        }
+  // Fetch all relevant adjustments in a single query (batch)
+  const adjustments = await prisma.salaryAdjustment.findMany({
+    where: {
+      employeeId: {
+        in: employees.map((emp: { id: string }) => emp.id)
       },
-      orderBy: [{ effectiveFrom: 'desc' }, { adjustedAt: 'desc' }],
-    });
+      effectiveFrom: {
+        lte: currentMonth
+      }
+    },
+    orderBy: [
+      { effectiveFrom: 'desc' },
+      { adjustedAt: 'desc' }
+    ]
+  });
+
+  // Group by employeeId to map the latest adjustment for each employee
+  const latestAdjustmentMap = new Map();
+  for (const adj of adjustments) {
+    if (!latestAdjustmentMap.has(adj.employeeId)) {
+      latestAdjustmentMap.set(adj.employeeId, adj);
+    }
+  }
+
+  for (const emp of employees) {
+    const latestAdjustment = latestAdjustmentMap.get(emp.id);
 
     if (latestAdjustment) {
       const effective = effectiveSalaryFromAdjustment(emp, latestAdjustment);

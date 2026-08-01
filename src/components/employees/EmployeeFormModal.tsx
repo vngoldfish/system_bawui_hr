@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Employee, Dependent, Education, Certification, ResidenceCardHistory, Department, Position, ContractType, Shiten } from '@/types';
 import ManagementModal from '@/components/common/ManagementModal';
 import ContractTypeManagementModal from '@/components/common/ContractTypeManagementModal';
+import NewSalaryAdjustmentModal from './NewSalaryAdjustmentModal';
 import Portal from '@/components/common/Portal';
 import { useI18n } from '@/lib/i18n';
 import { countryOptions, visaOptions, getCountryLabel, getVisaStatusLabel } from '@/lib/translations/options';
@@ -144,6 +145,7 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
   const [manageDeptOpen, setManageDeptOpen] = useState(false);
   const [managePosOpen, setManagePosOpen] = useState(false);
   const [manageContractOpen, setManageContractOpen] = useState(false);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
 
   const isForeign = formData.nationality !== '日本';
   const selectedContractType = contractTypes.find(c => c.id === formData.contractTypeId);
@@ -686,7 +688,19 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
 
             {/* 給与形態・諸手当 */}
             <section>
-              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">{t('form.salaryTitle')}</h3>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{t('form.salaryTitle')}</h3>
+                {employee && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAdjustModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
+                    title="昇給・給与改定を予約 (Điều chỉnh lương theo tháng hiệu lực)"
+                  >
+                    <span>📅 昇給・給与改定を予約</span>
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><label className="block text-sm font-medium text-slate-700 mb-1">{t('form.salaryType')}</label>
                   <select name="salaryType" value={formData.salaryType} onChange={handleChange} className={inputCls} required>
@@ -989,6 +1003,16 @@ export default function EmployeeFormModal({ isOpen, onClose, onSave, employee }:
         isOpen={manageContractOpen}
         onClose={() => { setManageContractOpen(false); fetchContractTypes(); }}
       />
+      {showAdjustModal && employee && (
+        <NewSalaryAdjustmentModal
+          isOpen={showAdjustModal}
+          onClose={() => setShowAdjustModal(false)}
+          onSuccess={() => {
+            setShowAdjustModal(false);
+          }}
+          employee={employee}
+        />
+      )}
     </div>
     </Portal>
   );

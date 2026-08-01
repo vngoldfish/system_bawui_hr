@@ -62,6 +62,19 @@ export async function POST(request: NextRequest) {
       return errorResponse('従業員IDが指定されていません。', 400);
     }
 
+    const employee = await prisma.employee.findUnique({
+      where: { id: targetEmployeeId },
+      select: { status: true, contractEndDate: true },
+    });
+
+    if (employee && employee.status === 'INACTIVE' && employee.contractEndDate) {
+      const overtimeDate = new Date(data.date);
+      const endDate = new Date(employee.contractEndDate);
+      if (overtimeDate > endDate) {
+        return errorResponse('Nhân viên đã nghỉ việc, không thể tạo đơn tăng ca.', 400);
+      }
+    }
+
     const requestRecord = await prisma.overtimeRequest.create({
       data: {
         employeeId: targetEmployeeId,
